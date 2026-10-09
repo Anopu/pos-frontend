@@ -1,0 +1,210 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  background-color: #f0f7ff;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  /* ব্যাকগ্রাউন্ড অ্যাপ ও ডায়ালগ বাটন সম্পূর্ণ লুকানো */
+  header, nav, aside, .print\:hidden {
+    display: none !important;
+  }
+
+  html, body {
+    width: 100% !important;
+    min-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* ফিক্সড পজিশন ও ম্যাক্স-উইথ বাতিল করে পুরো পৃষ্ঠায় স্কেল করা */
+  .fixed {
+    position: static !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+  }
+
+  .print-card-wrapper {
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .printable-area, #printable-content {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+  }
+
+  /* ইনভয়েস প্রিন্ট লেআউট ও একদম নিচে স্বাক্ষর */
+  #printable-content.invoice-printable,
+  .invoice-printable {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    min-height: calc(297mm - 26mm) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .invoice-signatures {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-end !important;
+    margin-top: auto !important;
+    padding-top: 2rem !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* মানি রিসিপ্ট প্রিন্ট লেআউট ও একদম নিচে স্বাক্ষর */
+  #printable-content.money-receipt-printable,
+  .money-receipt-printable {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    min-height: calc(297mm - 26mm) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .money-receipt-signatures {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-end !important;
+    margin-top: auto !important;
+    padding-top: 2rem !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    width: 100% !important;
+  }
+
+  /* লেজার ও অন্যান্য প্রিন্ট লেআউট */
+  #printable-content.statement-printable,
+  .statement-printable {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    min-height: calc(297mm - 26mm) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .statement-signatures {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-end !important;
+    margin-top: auto !important;
+    padding-top: 2rem !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* কোটেশন প্রিন্ট লেআউট ও একদম নিচে স্বাক্ষর */
+  #printable-content.quotation-printable,
+  .quotation-printable {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    min-height: calc(297mm - 26mm) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .quotation-signatures {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-end !important;
+    margin-top: auto !important;
+    padding-top: 2rem !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    width: 100% !important;
+  }
+
+  /* কোটেশন বক্সগুলোর ব্যাকগ্রাউন্ড ট্রান্সপারেন্ট রাখা যাতে জলছাপ ঢেকে না যায় */
+  .quotation-printable .quotation-transparent-box,
+  .quotation-printable table,
+  .quotation-printable tfoot,
+  .quotation-printable tbody tr {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  /* ওয়ারেন্টি ও সার্ভিসিং স্লিপ প্রিন্ট লেআউট ও একদম নিচে স্বাক্ষর */
+  #printable-content.warranty-slip-printable,
+  .warranty-slip-printable {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    min-height: calc(297mm - 26mm) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .warranty-signatures {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-end !important;
+    margin-top: auto !important;
+    padding-top: 2rem !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    width: 100% !important;
+  }
+
+  /* ওয়ারেন্টি স্লিপ বক্সগুলোর ব্যাকগ্রাউন্ড ট্রান্সপারেন্ট রাখা যাতে জলছাপ ঢেকে না যায় */
+  .warranty-slip-printable .warranty-transparent-box,
+  .warranty-slip-printable .warranty-transparent-box div {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+}
