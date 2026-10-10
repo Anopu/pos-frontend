@@ -31,7 +31,8 @@ export default function LoginPage({ onLogin, lang: propLang, onToggleLang }) {
     setError('');
 
     try {
-      const response = await fetch('http://127.0.0.1:5010/api/login', {
+      const apiHost = window.location.hostname || '127.0.0.1';
+      const response = await fetch(`http://${apiHost}:5010/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password })
@@ -63,7 +64,7 @@ export default function LoginPage({ onLogin, lang: propLang, onToggleLang }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4 relative">
+    <div className="min-h-screen bg-gradient-to-br from-[#060b19] via-[#091533] to-[#0d1d47] flex items-center justify-center p-4 relative">
       {/* ল্যাঙ্গুয়েজ সুইচ বাটন (টপ-রাইট) */}
       <div className="absolute top-4 right-4 z-10">
         <button

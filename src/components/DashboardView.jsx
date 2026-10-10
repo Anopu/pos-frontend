@@ -183,7 +183,7 @@ export default function DashboardView({
         <img 
           src="/fc_brand_watermark.png" 
           alt="FC Technology Watermark" 
-          className="w-[520px] md:w-[700px] opacity-[0.055] object-contain transition-all duration-700"
+          className="w-[520px] md:w-[700px] opacity-[0.10] md:opacity-[0.12] object-contain transition-all duration-700 pointer-events-none select-none"
           onError={(e) => {
             // fallback if fc_brand_watermark fails
             e.target.src = '/fc_logo_watermark.png';

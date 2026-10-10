@@ -4,7 +4,7 @@ import {
   Edit, Edit3, History, ArrowDownRight, ArrowUpRight, LogOut, Shield, Truck, FileText, CheckCircle, 
   UserPlus, Calendar, RotateCcw, Wrench, Bell, AlertTriangle, CheckSquare, Clock, Filter, Eye, 
   AlertCircle, Receipt, Globe, Camera, Image as ImageIcon, Share2, Languages,
-  RefreshCw, PackageMinus, CheckCircle2 
+  RefreshCw, PackageMinus, CheckCircle2, Wifi, Database 
 } from 'lucide-react';
 import LoginPage from './components/LoginPage';
 import { translations } from './translations';
@@ -13,6 +13,8 @@ import ImageViewModal from './components/ImageViewModal';
 import WarrantySlipPrintModal from './components/WarrantySlipPrintModal';
 import DashboardView from './components/DashboardView';
 import WarrantyServiceModule from './components/WarrantyServiceModule';
+import IspManagementModule from './components/IspManagementModule';
+import DatabaseBackupModal from './components/DatabaseBackupModal';
 
 const MASTER_CATEGORIES = [
   "General", "CC Camera", "Router", "Motherboard", "Keyboard", "Mouse", "Laptop", "Cable",
@@ -28,6 +30,10 @@ const EXPENSE_CATEGORIES = [
   "দোকান ভাড়া", "বিদ্যুৎ বিল", "চা/নাস্তা ও আপ্যায়ন", "যাতায়াত/পরিবহন", 
   "স্টাফ বেতন", "ইন্টারনেট বিল", "মেরামত ও রক্ষণাবেক্ষণ", "অন্যান্য খরচ"
 ];
+
+// স্বয়ংক্রিয় নেটওয়ার্ক/হোস্ট ডিটেকশন (দোকান, বাসা বা ভিপিএন থেকে একই সাথে চালানোর জন্য)
+const API_HOST = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : '127.0.0.1';
+const API_BASE = `http://${API_HOST}:5010/api`;
 
 function App() {
   // ভাষা স্টেট ও ট্রান্সলেশন হেল্পার (বাংলা এবং ইংরেজি সুইচিং)
@@ -74,6 +80,7 @@ function App() {
   const [shareData, setShareData] = useState(null);
   const [activeImageView, setActiveImageView] = useState(null);
   const [activeWarrantySlip, setActiveWarrantySlip] = useState(null);
+  const [editWarrantySlipDirect, setEditWarrantySlipDirect] = useState(null);
 
   // সাপ্লায়ার ক্রয় বিল সংযোজন স্টেট
   const [showSupplierPurchaseModal, setShowSupplierPurchaseModal] = useState(false);
@@ -117,7 +124,8 @@ function App() {
     warranty: '1 month'
   });
 
-  const [activeTab, setActiveTab] = useState('pos'); // pos, dashboard, warranty_service, inventory, returns, barcode_search, quotation, customers, suppliers, expenses, reports
+  const [activeTab, setActiveTab] = useState('pos'); // pos, dashboard, warranty_service, isp_management, inventory, returns, barcode_search, quotation, customers, suppliers, expenses, reports
+  const [ispAlertCount, setIspAlertCount] = useState(0);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -169,6 +177,9 @@ function App() {
   const [supplierForm, setSupplierForm] = useState({ name: '', company: '', mobile: '', address: '' });
   const [supplierPayModal, setSupplierPayModal] = useState(null);
   const [supplierPayAmount, setSupplierPayAmount] = useState('');
+
+  // ডাটাবেজ ব্যাকআপ ও রিস্টোর মডাল স্টেট
+  const [showBackupModal, setShowBackupModal] = useState(false);
 
   // কাস্টমার পেমেন্ট ও মানি রিসিপ্ট স্টেট
   const [payModal, setPayModal] = useState(null);
@@ -389,30 +400,40 @@ function App() {
   };
 
   // ডেটা ফেচিং ফাংশনসমূহ
-  const fetchProducts = () => fetch('http://127.0.0.1:5010/api/products').then(r => r.json()).then(d => setProducts(Array.isArray(d) ? d : [])).catch(() => {});
-  const fetchCustomers = () => fetch('http://127.0.0.1:5010/api/customers').then(r => r.json()).then(d => setCustomers(Array.isArray(d) ? d : [])).catch(() => {});
-  const fetchSuppliers = () => fetch('http://127.0.0.1:5010/api/suppliers').then(r => r.json()).then(d => setSuppliers(Array.isArray(d) ? d : [])).catch(() => {});
-  const fetchReports = () => fetch('http://127.0.0.1:5010/api/reports/sales').then(r => r.json()).then(d => setSalesReports(Array.isArray(d) ? d : [])).catch(() => {});
-  const fetchUsers = () => fetch('http://127.0.0.1:5010/api/users').then(r => r.json()).then(d => setUsersList(Array.isArray(d) ? d : [])).catch(() => {});
-  const fetchQuotations = () => fetch('http://127.0.0.1:5010/api/quotations').then(r => r.json()).then(d => setQuotationList(Array.isArray(d) ? d : [])).catch(() => {});
-  const fetchReturnsHistory = () => fetch('http://127.0.0.1:5010/api/returns').then(r => r.json()).then(d => setReturnsHistoryList(Array.isArray(d) ? d : [])).catch(() => {});
+  const fetchProducts = () => fetch(`${API_BASE}/products`).then(r => r.json()).then(d => setProducts(Array.isArray(d) ? d : [])).catch(() => {});
+  const fetchCustomers = () => fetch(`${API_BASE}/customers`).then(r => r.json()).then(d => setCustomers(Array.isArray(d) ? d : [])).catch(() => {});
+  const fetchSuppliers = () => fetch(`${API_BASE}/suppliers`).then(r => r.json()).then(d => setSuppliers(Array.isArray(d) ? d : [])).catch(() => {});
+  const fetchReports = () => fetch(`${API_BASE}/reports/sales`).then(r => r.json()).then(d => setSalesReports(Array.isArray(d) ? d : [])).catch(() => {});
+  const fetchUsers = () => fetch(`${API_BASE}/users`).then(r => r.json()).then(d => setUsersList(Array.isArray(d) ? d : [])).catch(() => {});
+  const fetchQuotations = () => fetch(`${API_BASE}/quotations`).then(r => r.json()).then(d => setQuotationList(Array.isArray(d) ? d : [])).catch(() => {});
+  const fetchReturnsHistory = () => fetch(`${API_BASE}/returns`).then(r => r.json()).then(d => setReturnsHistoryList(Array.isArray(d) ? d : [])).catch(() => {});
   
-  const fetchChequeAlerts = () => fetch('http://127.0.0.1:5010/api/cheques/alerts').then(r => r.json()).then(d => setChequeAlerts(Array.isArray(d) ? d : [])).catch(() => {});
-  const fetchAllCheques = () => fetch('http://127.0.0.1:5010/api/cheques').then(r => r.json()).then(d => setAllCheques(Array.isArray(d) ? d : [])).catch(() => {});
-  const fetchCashReconciliations = () => fetch('http://127.0.0.1:5010/api/cash-reconciliation').then(r => r.json()).then(d => setCashReconciliationsList(Array.isArray(d) ? d : [])).catch(() => {});
+  const fetchChequeAlerts = () => fetch(`${API_BASE}/cheques/alerts`).then(r => r.json()).then(d => setChequeAlerts(Array.isArray(d) ? d : [])).catch(() => {});
+  const fetchAllCheques = () => fetch(`${API_BASE}/cheques`).then(r => r.json()).then(d => setAllCheques(Array.isArray(d) ? d : [])).catch(() => {});
+  const fetchCashReconciliations = () => fetch(`${API_BASE}/cash-reconciliation`).then(r => r.json()).then(d => setCashReconciliationsList(Array.isArray(d) ? d : [])).catch(() => {});
 
   const fetchDailySummary = (date) => {
-    fetch(`http://127.0.0.1:5010/api/reports/daily-summary?date=${date}`)
+    fetch(`${API_BASE}/reports/daily-summary?date=${date}`)
       .then(r => r.json())
       .then(d => setDailySummary(d))
       .catch(() => {});
   };
 
   const fetchExpenses = (date) => {
-    fetch(`http://127.0.0.1:5010/api/expenses?date=${date}`)
+    fetch(`${API_BASE}/expenses?date=${date}`)
       .then(r => r.json())
       .then(d => setExpensesList(Array.isArray(d) ? d : []))
       .catch(() => {});
+  };
+
+  const fetchIspAlertCount = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/isp/customers?filter=alert3days`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setIspAlertCount(data.length);
+      }
+    } catch {}
   };
 
   useEffect(() => {
@@ -429,6 +450,7 @@ function App() {
       fetchCashReconciliations();
       fetchDailySummary(selectedDate);
       fetchExpenses(selectedDate);
+      fetchIspAlertCount();
     }
   }, [currentUser, selectedDate]);
 
@@ -1740,12 +1762,12 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50/90 via-sky-50/70 to-indigo-50/50 flex flex-col font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-[#060b19] via-[#091533] to-[#0d1d47] flex flex-col font-sans text-slate-100">
       {/* টপ কালারফুল অ্যাকসেন্ট বার */}
       <div className="h-1 bg-gradient-to-r from-blue-600 via-indigo-500 via-purple-500 via-pink-500 via-amber-500 to-emerald-500 print:hidden shrink-0"></div>
 
-      {/* হেডার নেভবার */}
-      <nav className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-6 py-3 flex justify-between items-center shadow-sm print:hidden sticky top-0 z-40">
+      {/* হেডার নেভবার - ডার্ক নেভি ব্লু */}
+      <nav className="bg-[#0b1739]/95 backdrop-blur-md border-b border-blue-900/50 px-6 py-3 flex justify-between items-center shadow-lg shadow-black/30 print:hidden sticky top-0 z-40">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 p-0.5 shadow-md shadow-indigo-500/20 flex items-center justify-center shrink-0">
             <img 
@@ -1757,10 +1779,10 @@ function App() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 bg-clip-text text-transparent">FC TECHNOLOGY</h1>
+              <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-sky-300 bg-clip-text text-transparent">FC TECHNOLOGY</h1>
               <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs">POS & Inventory</span>
             </div>
-            <p className="text-xs text-slate-500 font-medium">{t('brandTagline')}</p>
+            <p className="text-xs text-blue-200/70 font-medium">{t('brandTagline')}</p>
           </div>
         </div>
 
@@ -1771,7 +1793,7 @@ function App() {
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
               activeTab === 'dashboard' 
                 ? 'bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 text-white shadow-md shadow-indigo-500/30 scale-[1.02]' 
-                : 'bg-indigo-50/80 text-indigo-800 hover:bg-indigo-100 border border-indigo-200/70'
+                : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 border border-slate-700/60'
             }`}
           >
             📊 {t('tabDashboard')}
@@ -1783,7 +1805,7 @@ function App() {
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
               activeTab === 'pos' 
                 ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/30 scale-[1.02]' 
-                : 'bg-blue-50/80 text-blue-700 hover:bg-blue-100 border border-blue-200/70'
+                : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 border border-slate-700/60'
             }`}
           >
             🛒 {t('tabPos')}
@@ -1795,10 +1817,27 @@ function App() {
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
               activeTab === 'warranty_service' 
                 ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/30 scale-[1.02]' 
-                : 'bg-amber-50/80 text-amber-800 hover:bg-amber-100 border border-amber-200/70'
+                : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 border border-slate-700/60'
             }`}
           >
             <Wrench size={13} /> {t('tabWarrantyService')}
+          </button>
+
+          {/* আইএসপি ইন্টারনেট ম্যানেজমেন্ট ট্যাব */}
+          <button 
+            onClick={() => setActiveTab('isp_management')} 
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 relative ${
+              activeTab === 'isp_management' 
+                ? 'bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/30 scale-[1.02]' 
+                : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 border border-slate-700/60'
+            }`}
+          >
+            <Wifi size={13} /> {t('tabIsp')}
+            {ispAlertCount > 0 && (
+              <span className="bg-red-600 text-white px-1.5 py-0.2 rounded-full text-[10px] font-black animate-pulse shadow-sm">
+                {ispAlertCount}
+              </span>
+            )}
           </button>
 
           {/* ইনভেন্টরি স্টক */}
@@ -1807,7 +1846,7 @@ function App() {
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
               activeTab === 'inventory' || activeTab === 'dashboard_inventory'
                 ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-500/30 scale-[1.02]' 
-                : 'bg-emerald-50/80 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/70'
+                : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 border border-slate-700/60'
             }`}
           >
             📦 {t('tabInventory')}
@@ -1819,7 +1858,7 @@ function App() {
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
               activeTab === 'returns' 
                 ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-md shadow-rose-500/30 scale-[1.02]' 
-                : 'bg-rose-50/80 text-rose-700 hover:bg-rose-100 border border-rose-200/70'
+                : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 border border-slate-700/60'
             }`}
           >
             <RotateCcw size={13} /> {t('tabReturns')}
@@ -1830,7 +1869,7 @@ function App() {
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
               activeTab === 'barcode_search' 
                 ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-500/30 scale-[1.02]' 
-                : 'bg-purple-50/80 text-purple-700 hover:bg-purple-100 border border-purple-200/70'
+                : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 border border-slate-700/60'
             }`}
           >
             🔍 {t('tabBarcodeHistory')}
@@ -1841,7 +1880,7 @@ function App() {
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
               activeTab === 'quotation' 
                 ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/30 scale-[1.02]' 
-                : 'bg-sky-50/80 text-sky-800 hover:bg-sky-100 border border-sky-200/70'
+                : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 border border-slate-700/60'
             }`}
           >
             📝 {t('tabQuotation')}
@@ -1852,7 +1891,7 @@ function App() {
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
               activeTab === 'customers' 
                 ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md shadow-teal-500/30 scale-[1.02]' 
-                : 'bg-teal-50/80 text-teal-800 hover:bg-teal-100 border border-teal-200/70'
+                : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 border border-slate-700/60'
             }`}
           >
             👥 {t('tabCustomers')}
@@ -1863,7 +1902,7 @@ function App() {
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
               activeTab === 'suppliers' 
                 ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-500/30 scale-[1.02]' 
-                : 'bg-cyan-50/80 text-cyan-800 hover:bg-cyan-100 border border-cyan-200/70'
+                : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 border border-slate-700/60'
             }`}
           >
             🚚 {t('tabSuppliers')}
@@ -1874,7 +1913,7 @@ function App() {
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
               activeTab === 'expenses' 
                 ? 'bg-gradient-to-r from-green-600 to-emerald-700 text-white shadow-md shadow-green-500/30 scale-[1.02]' 
-                : 'bg-green-50/80 text-green-800 hover:bg-green-100 border border-green-200/70'
+                : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 border border-slate-700/60'
             }`}
           >
             💰 {t('tabExpenses')}
@@ -1885,7 +1924,7 @@ function App() {
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
               chequeAlerts.length > 0 
                 ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-md animate-pulse' 
-                : 'bg-amber-50/80 text-amber-800 border border-amber-300 hover:bg-amber-100'
+                : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 border border-slate-700/60'
             }`}
           >
             <Bell size={13} /> {t('tabCheques')}
@@ -1902,30 +1941,40 @@ function App() {
               className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
                 activeTab === 'reports' 
                   ? 'bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white shadow-md shadow-fuchsia-500/30 scale-[1.02]' 
-                  : 'bg-fuchsia-50/80 text-fuchsia-800 hover:bg-fuchsia-100 border border-fuchsia-200/70'
+                  : 'bg-slate-800/80 text-slate-200 hover:bg-slate-700/80 border border-slate-700/60'
               }`}
             >
               📈 {t('tabReports')}
             </button>
           )}
 
+          {currentUser.role === 'admin' && (
+            <button 
+              onClick={() => setShowBackupModal(true)} 
+              className="px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white shadow-md shadow-emerald-700/20"
+              title={txt("১-ক্লিকে ডাটাবেজ ব্যাকআপ ও রিস্টোর", "1-Click Database Backup & Restore")}
+            >
+              <Database size={13} /> {txt("ডাটা ব্যাকআপ", "Backup")}
+            </button>
+          )}
+
           {/* ভাষা পরিবর্তন বাটন (Bangla <-> English) */}
           <button
             onClick={toggleLanguage}
-            className="px-2.5 py-1.5 rounded-xl text-xs font-black cursor-pointer transition flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 shadow-xs"
+            className="px-2.5 py-1.5 rounded-xl text-xs font-black cursor-pointer transition flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-100 border border-slate-700/80 shadow-xs"
             title={lang === 'bn' ? 'Switch to English' : 'বাংলা ভাষায় পরিবর্তন করুন'}
           >
-            <Globe size={14} className="text-blue-600" />
-            <span className={lang === 'bn' ? 'text-blue-700 font-bold' : 'text-slate-400 font-normal'}>বাংলা</span>
-            <span className="text-slate-300">|</span>
-            <span className={lang === 'en' ? 'text-blue-700 font-bold' : 'text-slate-400 font-normal'}>EN</span>
+            <Globe size={14} className="text-blue-400" />
+            <span className={lang === 'bn' ? 'text-blue-400 font-bold' : 'text-slate-400 font-normal'}>বাংলা</span>
+            <span className="text-slate-600">|</span>
+            <span className={lang === 'en' ? 'text-blue-400 font-bold' : 'text-slate-400 font-normal'}>EN</span>
           </button>
 
-          <div className="border-l border-slate-200 pl-3 ml-2 flex items-center gap-2">
+          <div className="border-l border-slate-700/60 pl-3 ml-2 flex items-center gap-2">
             <span className={`text-xs px-2.5 py-1 rounded-xl font-bold border flex items-center gap-1.5 shadow-xs ${
               currentUser.role === 'admin' 
-                ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-900 border-blue-200' 
-                : 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-900 border-emerald-200'
+                ? 'bg-blue-950/70 text-blue-200 border-blue-800/60' 
+                : 'bg-emerald-950/70 text-emerald-200 border-emerald-800/60'
             }`}>
               {currentUser.role === 'admin' ? '👑' : '👤'} {currentUser.fullname}
               <span className="text-[10px] font-normal opacity-80">
@@ -1936,7 +1985,7 @@ function App() {
             {currentUser.role === 'admin' && (
               <button 
                 onClick={() => setShowUserModal(true)} 
-                className="p-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer transition"
+                className="p-1.5 bg-purple-950/60 hover:bg-purple-900/60 text-purple-200 border border-purple-800/60 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer transition"
                 title={txt("নতুন ইউজার তৈরি করুন", "Create new user")}
               >
                 <UserPlus size={14} /> {t('addUser')}
@@ -1945,7 +1994,7 @@ function App() {
 
             <button 
               onClick={() => setShowLoginModal(true)} 
-              className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold cursor-pointer transition"
+              className="p-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold cursor-pointer transition"
               title={txt("ইউজার সুইচ করুন", "Switch user")}
             >
               {t('switchUser')}
@@ -1953,7 +2002,7 @@ function App() {
 
             <button 
               onClick={handleLogout} 
-              className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer transition"
+              className="p-1.5 bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer transition"
               title={txt("সফটওয়্যার থেকে লগআউট করুন", "Logout")}
             >
               <LogOut size={14} /> {t('logout')}
@@ -3505,6 +3554,17 @@ function App() {
               setActiveImageView({ src: imgSrc, title: title || txt('সাপ্লায়ার ওয়ারেন্টি স্লিপ', 'Supplier Warranty Slip') });
             }}
             suppliers={suppliers}
+            editSlipDirect={editWarrantySlipDirect}
+            onClearEditSlipDirect={() => setEditWarrantySlipDirect(null)}
+            lang={lang}
+            t={t}
+          />
+        )}
+
+        {/* আইএসপি ইন্টারনেট ম্যানেজমেন্ট মডিউল */}
+        {activeTab === 'isp_management' && (
+          <IspManagementModule
+            currentUser={currentUser}
             lang={lang}
             t={t}
           />
@@ -5309,12 +5369,13 @@ function App() {
             <div id="printable-content" className="invoice-printable p-6 md:p-7 bg-white text-gray-900 text-xs font-sans flex flex-col justify-between min-h-[950px] max-h-[1123px] box-border print:p-0 print:m-0 relative overflow-hidden">
 
 
-              {/* সেন্টারে FC Technology লোগো জলছাপ (Watermark) */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+              {/* সেন্টারে FC Technology লোগো জলছাপ (Watermark - লেখার কারণে মুছে না গিয়ে স্পষ্ট দৃশ্যমান) */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 select-none">
                 <img 
                   src="/fc_logo_watermark.png" 
                   alt="Watermark" 
-                  className="w-80 md:w-96 max-w-[75%] opacity-[0.07] select-none object-contain print:opacity-[0.08]" 
+                  className="w-96 md:w-[460px] max-w-[85%] opacity-[0.22] md:opacity-[0.24] select-none object-contain print:opacity-[0.22]" 
+                  onError={(e) => { e.target.src = '/fc_brand_watermark.png'; }}
                 />
               </div>
 
@@ -5426,7 +5487,7 @@ function App() {
                   </div>
 
                 {/* ক্রেতার তথ্য ও পেমেন্ট মেথড */}
-                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200 mb-2 flex justify-between items-center print:bg-white">
+                <div className="invoice-transparent-box bg-gray-50/60 p-2.5 rounded-lg border border-gray-200 mb-2 flex justify-between items-center print:bg-transparent">
                   <div>
                     <span className="text-[10px] font-bold text-gray-500">{txt("ক্রেতার তথ্য:", "Customer Info:")}</span>
                     <h3 className="text-sm font-bold text-gray-900 leading-tight">{completedInvoice.customer_name}</h3>
@@ -5514,7 +5575,7 @@ function App() {
                         <strong>{txt("ইনভয়েস বিশেষ নোট:", "Invoice Note:")}</strong> {completedInvoice.note}
                       </div>
                     )}
-                    <div className="border border-gray-200 rounded-lg p-2 text-[10px] text-gray-600 bg-gray-50/50 print:bg-white space-y-0.5">
+                    <div className="invoice-transparent-box border border-gray-200 rounded-lg p-2 text-[10px] text-gray-600 bg-gray-50/40 print:bg-transparent space-y-0.5">
                       <p className="font-bold text-gray-800 underline">{txt("বিক্রয়ের শর্তাবলী (Terms & Conditions):", "Terms & Conditions:")}</p>
                       <ul className="list-disc list-inside space-y-0.5 text-gray-600">
                         <li>{txt("উপযুক্ত কারণ প্রদর্শনপূর্বক বিক্রয়কৃত মাল ফেরত নেয়া হয় (শর্ত সাপেক্ষে ৩ দিনের মধ্যে)।", "Sold items may be returned within 3 days subject to valid reasons and condition.")}</li>
@@ -5538,7 +5599,7 @@ function App() {
                   </div>
 
                   {/* ডান পাশে: মোট আইটেম মূল্য ও ৫-পয়েন্ট পূর্ণাঙ্গ হিসাব (প্রতিটি রো মাঝ বরাবর) */}
-                  <div className="w-72 shrink-0 space-y-1 text-xs border border-gray-300 rounded-lg p-2.5 bg-gray-50/50 print:bg-white invoice-subtotal-box">
+                  <div className="w-72 shrink-0 space-y-1 text-xs border border-gray-300 rounded-lg p-2.5 bg-gray-50/40 print:bg-transparent invoice-subtotal-box invoice-transparent-box">
                     <div className="flex justify-between items-center py-0.5 text-gray-600">
                       <span className="leading-snug">{txt("আইটেম মোট মূল্য:", "Item Subtotal:")}</span>
                       <span className="font-mono font-medium leading-snug">৳ {Number(completedInvoice.sub_total || (completedInvoice.total_amount + Number(completedInvoice.discount_amount || 0))).toLocaleString()}</span>
@@ -5565,7 +5626,7 @@ function App() {
                       <span className="leading-snug">{txt("৪. কাস্টমারের পূর্বের মোট বাকি:", "4. Customer Previous Due:")}</span>
                       <span className="font-mono font-bold leading-snug">৳ {Number(completedInvoice.previous_due || 0).toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between items-center py-1 bg-red-50 border border-red-200 px-2 rounded font-black text-xs text-red-700 mt-0.5">
+                    <div className="flex justify-between items-center py-1 bg-red-50/70 border border-red-200 px-2 rounded font-black text-xs text-red-700 mt-0.5 print:bg-transparent">
                       <span className="leading-snug">{txt("৫. পূর্বের টাকাসহ মোট বাকি:", "5. Grand Total Due:")}</span>
                       <span className="font-mono leading-snug">৳ {Number(completedInvoice.total_due_after ?? (Number(completedInvoice.previous_due || 0) + Number(completedInvoice.due_amount || 0))).toLocaleString()}</span>
                     </div>
@@ -6387,12 +6448,13 @@ function App() {
 
             {/* প্রিন্ট উপযোগী কন্টেন্ট */}
             <div id="printable-content" className="money-receipt-printable p-6 md:p-8 bg-white text-gray-900 text-xs font-sans flex flex-col justify-between min-h-[580px] print:p-4 print:m-0 relative overflow-hidden border border-gray-100 rounded-b-2xl print:border-none">
-              {/* সেন্টার ওয়াটারমার্ক */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+              {/* সেন্টার ওয়াটারমার্ক - লেখার কারণে মুছে না গিয়ে স্পষ্ট দৃশ্যমান */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 select-none">
                 <img 
                   src="/fc_logo_watermark.png" 
                   alt="Watermark" 
-                  className="w-72 md:w-80 opacity-[0.06] select-none object-contain print:opacity-[0.07]" 
+                  className="w-80 md:w-[420px] max-w-[85%] opacity-[0.22] md:opacity-[0.24] select-none object-contain print:opacity-[0.22]" 
+                  onError={(e) => { e.target.src = '/fc_brand_watermark.png'; }}
                 />
               </div>
 
@@ -6431,7 +6493,7 @@ function App() {
                   </div>
 
                   {/* ২. গ্রাহকের তথ্য বক্স */}
-                  <div className="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 print:bg-white print:border-gray-300">
+                  <div className="invoice-transparent-box mt-3 bg-slate-50/60 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 print:bg-transparent print:border-gray-300">
                     <div>
                       <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">{txt("গ্রাহকের বিবরণ:", "Customer Details:")}</span>
                       <h2 className="text-base font-black text-gray-900">{activeMoneyReceipt.customer_name}</h2>
@@ -6442,7 +6504,7 @@ function App() {
                         <p className="text-[11px] text-gray-500">{txt("ঠিকানা:", "Address:")} {activeMoneyReceipt.customer_address}</p>
                       )}
                     </div>
-                    <div className="sm:text-right bg-white p-2 rounded-lg border border-slate-200 print:border-none">
+                    <div className="sm:text-right bg-white/70 p-2 rounded-lg border border-slate-200 print:bg-transparent print:border-none">
                       <span className="text-[10px] uppercase font-bold text-gray-500">{txt("পরিশোধের মাধ্যম:", "Payment Method:")}</span>
                       <p className="text-xs font-black text-emerald-800 flex items-center sm:justify-end gap-1">
                         {activeMoneyReceipt.payment_method === 'Cheque' ? txt('🏦 ব্যাংক চেক (Cheque)', '🏦 Bank Cheque') : 
@@ -6454,7 +6516,7 @@ function App() {
 
                   {/* ৩. চেকের বিস্তারিত (যদি চেক হয়) */}
                   {activeMoneyReceipt.payment_method === 'Cheque' && (
-                    <div className="mt-2.5 bg-amber-50/70 border border-amber-300 rounded-xl p-3 text-xs print:bg-white print:border-amber-400">
+                    <div className="invoice-transparent-box mt-2.5 bg-amber-50/60 border border-amber-300 rounded-xl p-3 text-xs print:bg-transparent print:border-amber-400">
                       <div className="font-bold text-amber-900 border-b border-amber-200 pb-1 mb-2 flex items-center justify-between">
                         <span>{txt("🏦 চেকের বিবরণী (Bank Cheque Details)", "🏦 Bank Cheque Details")}</span>
                         <span className="text-[10px] px-2 py-0.5 bg-amber-200 text-amber-900 rounded font-semibold">
@@ -6483,7 +6545,7 @@ function App() {
                   )}
 
                   {/* ৪. সমন্বয় ও টাকার হিসাব টেবিল */}
-                  <div className="mt-3 overflow-hidden rounded-xl border border-gray-300">
+                  <div className="invoice-transparent-box mt-3 overflow-hidden rounded-xl border border-gray-300 print:bg-transparent">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="bg-emerald-800 text-white font-bold uppercase print:bg-emerald-800 print:text-white">
@@ -6511,19 +6573,19 @@ function App() {
 
                   {/* ৫. পূর্বের বকেয়া, জমাকৃত টাকা ও বর্তমান অবশিষ্ট বকেয়া বিশ্লেষণ */}
                   <div className="mt-3 grid grid-cols-3 gap-2.5 text-center">
-                    <div className="p-2.5 rounded-xl border border-gray-200 bg-gray-50 print:bg-white">
+                    <div className="invoice-transparent-box p-2.5 rounded-xl border border-gray-200 bg-gray-50/60 print:bg-transparent">
                       <span className="text-[10px] text-gray-500 font-semibold block uppercase">{txt("১. পূর্বের মোট বকেয়া", "1. Previous Total Due")}</span>
                       <span className="text-sm md:text-base font-black font-mono text-gray-800">
                         ৳ {Number(activeMoneyReceipt.previous_due || 0).toLocaleString()}
                       </span>
                     </div>
-                    <div className="p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-50/80 print:bg-white shadow-xs">
+                    <div className="invoice-transparent-box p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-50/60 print:bg-transparent shadow-xs">
                       <span className="text-[10px] text-emerald-800 font-bold block uppercase">{txt("২. অত্র রসিদে জমাকৃত", "2. Amount Received")}</span>
                       <span className="text-base md:text-lg font-black font-mono text-emerald-700">
                         ৳ {Number(activeMoneyReceipt.amount).toLocaleString()}
                       </span>
                     </div>
-                    <div className="p-2.5 rounded-xl border border-rose-300 bg-rose-50/70 print:bg-white">
+                    <div className="invoice-transparent-box p-2.5 rounded-xl border border-rose-300 bg-rose-50/60 print:bg-transparent">
                       <span className="text-[10px] text-rose-800 font-bold block uppercase">{txt("৩. বর্তমান অবশিষ্ট বকেয়া", "3. Current Remaining Due")}</span>
                       <span className="text-sm md:text-base font-black font-mono text-rose-700">
                         ৳ {Number(activeMoneyReceipt.remaining_due || 0).toLocaleString()}
@@ -6532,7 +6594,7 @@ function App() {
                   </div>
 
                   {/* কথায় টাকার পরিমাণ */}
-                  <div className="mt-3 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs flex items-center justify-between print:bg-white print:border-gray-300">
+                  <div className="invoice-transparent-box mt-3 p-2.5 bg-slate-50/60 border border-slate-200 rounded-xl text-xs flex items-center justify-between print:bg-transparent print:border-gray-300">
                     <p className="text-gray-800 font-semibold">
                       <strong className="text-gray-900">{txt("কথায় (In Words): ", "In Words: ")}</strong>
                       <span className="italic font-bold text-emerald-900">
@@ -7443,7 +7505,25 @@ function App() {
             )
           });
         }}
+        onEdit={(slip) => {
+          setActiveWarrantySlip(null);
+          setActiveTab('warranty_service');
+          setEditWarrantySlipDirect(slip);
+        }}
         lang={lang}
+      />
+
+      {/* ১-ক্লিক ডাটাবেজ ব্যাকআপ ও রিস্টোর মডাল */}
+      <DatabaseBackupModal
+        isOpen={showBackupModal}
+        onClose={() => setShowBackupModal(false)}
+        lang={lang}
+        onRestoreSuccess={() => {
+          fetchProducts();
+          fetchCustomers();
+          fetchSuppliers();
+          fetchReports();
+        }}
       />
     </div>
   );

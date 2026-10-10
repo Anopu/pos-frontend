@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Printer, Share2, Wrench, Shield, CheckCircle, Clock, Edit3 } from 'lucide-react';
 
-export default function WarrantySlipPrintModal({ slip, onClose, onShare, lang = 'bn' }) {
+export default function WarrantySlipPrintModal({ slip, onClose, onShare, onEdit, lang = 'bn' }) {
   if (!slip) return null;
 
   const [slipDocTitle, setSlipDocTitle] = useState(lang === 'en' ? 'WARRANTY & SERVICE SLIP' : 'ওয়ারেন্টি ও সার্ভিসিং স্লিপ');
@@ -38,6 +38,16 @@ export default function WarrantySlipPrintModal({ slip, onClose, onShare, lang = 
           </div>
 
           <div className="flex items-center gap-2">
+            {onEdit && (
+              <button
+                onClick={() => {
+                  if (typeof onEdit === 'function') onEdit(slip);
+                }}
+                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition"
+              >
+                <Edit3 size={15} /> {lang === 'en' ? 'Edit Slip' : 'স্লিপ এডিট'}
+              </button>
+            )}
             {onShare && (
               <button
                 onClick={() => onShare({ ...slip, custom_title: slipDocTitle })}
@@ -72,7 +82,7 @@ export default function WarrantySlipPrintModal({ slip, onClose, onShare, lang = 
             <img 
               src="/fc_logo_watermark.png" 
               alt="FC Watermark" 
-              className="w-80 md:w-[460px] max-w-[85%] opacity-[0.12] select-none object-contain print:opacity-[0.14]" 
+              className="w-80 md:w-[460px] max-w-[85%] opacity-[0.22] md:opacity-[0.24] select-none object-contain print:opacity-[0.22]" 
               onError={(e) => {
                 e.target.src = '/fc_brand_watermark.png';
               }}

@@ -6,6 +6,9 @@ import {
   RefreshCw, PackageMinus, CheckCircle2, RotateCcw, X
 } from 'lucide-react';
 
+const API_HOST = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : '127.0.0.1';
+const API_BASE = `http://${API_HOST}:5010/api`;
+
 export default function WarrantyServiceModule({
   currentUser,
   onOpenSlip,
@@ -16,6 +19,8 @@ export default function WarrantyServiceModule({
   onStockUpdated,
   openDefectiveModalDirect = false,
   onCloseDefectiveModalDirect,
+  editSlipDirect = null,
+  onClearEditSlipDirect,
   lang = 'bn',
   t = (k) => k
 }) {
@@ -43,6 +48,7 @@ export default function WarrantyServiceModule({
   const [customerSearch, setCustomerSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [editingSlip, setEditingSlip] = useState(null);
   const [loading, setLoading] = useState(false);
 
   // কাস্টমার ইনটেক ফর্ম
@@ -66,7 +72,9 @@ export default function WarrantyServiceModule({
     service_type: 'ওয়ারেন্টি',
     estimated_cost: '',
     advance_paid: '',
-    status: 'গ্রহণকৃত'
+    status: 'গ্রহণকৃত',
+    delivery_date: '',
+    delivery_note: ''
   });
 
   // স্ট্যাটাস আপডেট মডাল স্টেট
@@ -136,7 +144,7 @@ export default function WarrantyServiceModule({
     if (products && products.length > 0) {
       setLocalProducts(products);
     } else {
-      fetch('http://127.0.0.1:5010/api/products')
+      fetch(`${API_BASE}/products`)
         .then(r => r.json())
         .then(d => setLocalProducts(Array.isArray(d) ? d : []))
         .catch(err => console.error('Products load error:', err));
@@ -158,7 +166,7 @@ export default function WarrantyServiceModule({
   const fetchCustomerWarranties = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://127.0.0.1:5010/api/warranty-services');
+      const res = await fetch(`${API_BASE}/warranty-services`);
       const data = await res.json();
       setWarrantyList(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -170,7 +178,7 @@ export default function WarrantyServiceModule({
 
   const fetchSupplierWarranties = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:5010/api/supplier-warranties');
+      const res = await fetch(`${API_BASE}/supplier-warranties`);
       const data = await res.json();
       setSupplierWarrantyList(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -183,63 +191,123 @@ export default function WarrantyServiceModule({
     fetchSupplierWarranties();
   }, []);
 
-  // কাস্টমার ওয়ারেন্টি সাবমিট
+  const resetCustomerForm = () => {
+    setEditingSlip(null);
+    setCustomerForm({
+      customer_name: '',
+      customer_mobile: '',
+      customer_address: '',
+      product_name: '',
+      model_no: '',
+      serial_no: '',
+      problem_description: '',
+      has_accessories: 'না',
+      accessories_received: '',
+      received_date: new Date().toISOString().slice(0, 10),
+      estimated_delivery_date: (() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 7);
+        return d.toISOString().slice(0, 10);
+      })(),
+      received_by: currentUser?.fullname || 'Admin',
+      service_type: 'ওয়ারেন্টি',
+      estimated_cost: '',
+      advance_paid: '',
+      status: 'গ্রহণকৃত',
+      delivery_date: '',
+      delivery_note: ''
+    });
+  };
+
+  const handleOpenEditSlip = (slip) => {
+    setEditingSlip(slip);
+    setCustomerForm({
+      customer_name: slip.customer_name || '',
+      customer_mobile: slip.customer_mobile || '',
+      customer_address: slip.customer_address || '',
+      product_name: slip.product_name || '',
+      model_no: slip.model_no || '',
+      serial_no: slip.serial_no || '',
+      problem_description: slip.problem_description || '',
+      has_accessories: slip.has_accessories || 'না',
+      accessories_received: slip.accessories_received || '',
+      received_date: slip.received_date ? slip.received_date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      estimated_delivery_date: slip.estimated_delivery_date ? slip.estimated_delivery_date.slice(0, 10) : '',
+      received_by: slip.received_by || currentUser?.fullname || 'Admin',
+      service_type: slip.service_type || 'ওয়ারেন্টি',
+      estimated_cost: slip.estimated_cost !== null && slip.estimated_cost !== undefined ? slip.estimated_cost : '',
+      advance_paid: slip.advance_paid !== null && slip.advance_paid !== undefined ? slip.advance_paid : '',
+      status: slip.status || 'গ্রহণকৃত',
+      delivery_date: slip.delivery_date ? slip.delivery_date.slice(0, 10) : '',
+      delivery_note: slip.delivery_note || ''
+    });
+    setShowCustomerModal(true);
+  };
+
+  useEffect(() => {
+    if (editSlipDirect) {
+      setActiveSubTab('customer');
+      handleOpenEditSlip(editSlipDirect);
+      if (typeof onClearEditSlipDirect === 'function') {
+        onClearEditSlipDirect();
+      }
+    }
+  }, [editSlipDirect]);
+
+  // কাস্টমার ওয়ারেন্টি সাবমিট (নতুন তৈরি অথবা এডিট সংরক্ষণ)
   const handleCustomerSubmit = async (e) => {
     e.preventDefault();
     if (!customerForm.customer_name || !customerForm.customer_mobile || !customerForm.product_name || !customerForm.problem_description) {
-      alert('অনুগ্রহ করে কাস্টমারের নাম, মোবাইল, পণ্য এবং সমস্যার বিবরণ দিন!');
+      alert(lang === 'en' ? 'Please fill in customer name, mobile, product and problem description!' : 'অনুগ্রহ করে কাস্টমারের নাম, মোবাইল, পণ্য এবং সমস্যার বিবরণ দিন!');
       return;
     }
 
     try {
-      const res = await fetch('http://127.0.0.1:5010/api/warranty-services', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(customerForm)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        alert(`সফলভাবে সংরক্ষিত হয়েছে! স্লিপ/টোকেন নং: ${data.token_no}`);
-        setShowCustomerModal(false);
-        fetchCustomerWarranties();
-
-        // অবিলম্বে স্লিপ ওপেন করে দেখানো
-        const createdSlip = {
-          ...customerForm,
-          id: data.id,
-          token_no: data.token_no,
-          created_at: new Date()
-        };
-        if (onOpenSlip) onOpenSlip(createdSlip);
-
-        // ফর্ম রিসেট
-        setCustomerForm({
-          customer_name: '',
-          customer_mobile: '',
-          customer_address: '',
-          product_name: '',
-          model_no: '',
-          serial_no: '',
-          problem_description: '',
-          has_accessories: 'না',
-          accessories_received: '',
-          received_date: new Date().toISOString().slice(0, 10),
-          estimated_delivery_date: (() => {
-            const d = new Date();
-            d.setDate(d.getDate() + 7);
-            return d.toISOString().slice(0, 10);
-          })(),
-          received_by: currentUser?.fullname || 'Admin',
-          service_type: 'ওয়ারেন্টি',
-          estimated_cost: '',
-          advance_paid: '',
-          status: 'গ্রহণকৃত'
+      if (editingSlip) {
+        // এডিট মোড (PUT)
+        const res = await fetch(`${API_BASE}/warranty-services/${editingSlip.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(customerForm)
         });
+        const data = await res.json();
+        if (res.ok) {
+          alert(lang === 'en' ? `Warranty slip updated successfully! (Token: ${editingSlip.token_no})` : `ওয়ারেন্টি স্লিপ সফলভাবে আপডেট হয়েছে! (টোকেন নং: ${editingSlip.token_no})`);
+          setShowCustomerModal(false);
+          resetCustomerForm();
+          fetchCustomerWarranties();
+        } else {
+          alert(data.error || (lang === 'en' ? 'Failed to update warranty slip!' : 'স্লিপ তথ্য আপডেটে ব্যর্থ হয়েছে!'));
+        }
       } else {
-        alert(data.error || 'সংরক্ষণে ব্যর্থ হয়েছে!');
+        // নতুন তৈরি মোড (POST)
+        const res = await fetch(`${API_BASE}/warranty-services`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(customerForm)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert(lang === 'en' ? `Successfully saved! Token No: ${data.token_no}` : `সফলভাবে সংরক্ষিত হয়েছে! স্লিপ/টোকেন নং: ${data.token_no}`);
+          setShowCustomerModal(false);
+          fetchCustomerWarranties();
+
+          // অবিলম্বে স্লিপ ওপেন করে দেখানো
+          const createdSlip = {
+            ...customerForm,
+            id: data.id,
+            token_no: data.token_no,
+            created_at: new Date()
+          };
+          if (onOpenSlip) onOpenSlip(createdSlip);
+
+          resetCustomerForm();
+        } else {
+          alert(data.error || (lang === 'en' ? 'Failed to save!' : 'সংরক্ষণে ব্যর্থ হয়েছে!'));
+        }
       }
     } catch {
-      alert('সার্ভার যোগাযোগে সমস্যা হয়েছে');
+      alert(lang === 'en' ? 'Server communication error!' : 'সার্ভার যোগাযোগে সমস্যা হয়েছে');
     }
   };
 
@@ -249,7 +317,7 @@ export default function WarrantyServiceModule({
     if (!statusUpdateItem) return;
 
     try {
-      const res = await fetch(`http://127.0.0.1:5010/api/warranty-services/${statusUpdateItem.id}`, {
+      const res = await fetch(`${API_BASE}/warranty-services/${statusUpdateItem.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -272,7 +340,7 @@ export default function WarrantyServiceModule({
   const handleDeleteCustomerSlip = async (id, tokenNo) => {
     if (!window.confirm(`আপনি কি নিশ্চিত যে স্লিপ #${tokenNo} মুছে ফেলতে চান?`)) return;
     try {
-      const res = await fetch(`http://127.0.0.1:5010/api/warranty-services/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/warranty-services/${id}`, { method: 'DELETE' });
       if (res.ok) {
         fetchCustomerWarranties();
       }
@@ -303,7 +371,7 @@ export default function WarrantyServiceModule({
     }
 
     try {
-      const res = await fetch('http://127.0.0.1:5010/api/supplier-warranties', {
+      const res = await fetch(`${API_BASE}/supplier-warranties`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(supplierForm)
@@ -392,7 +460,7 @@ export default function WarrantyServiceModule({
     }
 
     try {
-      const res = await fetch('http://127.0.0.1:5010/api/stock-defective-warranty', {
+      const res = await fetch(`${API_BASE}/stock-defective-warranty`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(defectiveStockForm)
@@ -439,7 +507,7 @@ export default function WarrantyServiceModule({
     if (!selectedWarrantyForReplace) return;
 
     try {
-      const res = await fetch('http://127.0.0.1:5010/api/supplier-warranty-replace', {
+      const res = await fetch(`${API_BASE}/supplier-warranty-replace`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -553,7 +621,10 @@ export default function WarrantyServiceModule({
         <div>
           {activeSubTab === 'customer' ? (
             <button
-              onClick={() => setShowCustomerModal(true)}
+              onClick={() => {
+                resetCustomerForm();
+                setShowCustomerModal(true);
+              }}
               className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/20"
             >
               <Plus size={15} /> {lang === 'en' ? '+ New Customer Intake Slip' : '+ নতুন সার্ভিসিং/ওয়ারেন্টি স্লিপ গ্রহণ'}
@@ -714,6 +785,15 @@ export default function WarrantyServiceModule({
                           <Share2 size={13} />
                         </button>
 
+                        {/* স্লিপের তথ্য এডিট */}
+                        <button
+                          onClick={() => handleOpenEditSlip(item)}
+                          className="p-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg cursor-pointer transition"
+                          title={lang === 'en' ? 'Edit Slip' : 'স্লিপ এডিট করুন'}
+                        >
+                          <Edit size={13} />
+                        </button>
+
                         {/* স্ট্যাটাস আপডেট */}
                         <button
                           onClick={() => {
@@ -727,7 +807,7 @@ export default function WarrantyServiceModule({
                           className="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 rounded-lg cursor-pointer transition"
                           title={lang === 'en' ? 'Change Status' : 'স্ট্যাটাস পরিবর্তন'}
                         >
-                          <Edit size={13} />
+                          <Clock size={13} />
                         </button>
 
                         {/* ডিলিট (Admin) */}
@@ -915,10 +995,18 @@ export default function WarrantyServiceModule({
               <div className="flex items-center gap-2">
                 <Wrench size={18} />
                 <h3 className="font-bold text-sm">
-                  {txt('ওয়ারেন্টি ও সার্ভিসিং এর জন্য পণ্য গ্রহণ এন্ট্রি', 'Customer Product Intake for Warranty & Servicing')}
+                  {editingSlip 
+                    ? (lang === 'en' ? `Edit Warranty & Servicing Slip (#${editingSlip.token_no})` : `ওয়ারেন্টি ও সার্ভিসিং স্লিপ এডিট করুন (#${editingSlip.token_no})`)
+                    : txt('ওয়ারেন্টি ও সার্ভিসিং এর জন্য পণ্য গ্রহণ এন্ট্রি', 'Customer Product Intake for Warranty & Servicing')}
                 </h3>
               </div>
-              <button onClick={() => setShowCustomerModal(false)} className="p-1 hover:bg-white/20 rounded-lg cursor-pointer">
+              <button 
+                onClick={() => {
+                  resetCustomerForm();
+                  setShowCustomerModal(false);
+                }} 
+                className="p-1 hover:bg-white/20 rounded-lg cursor-pointer"
+              >
                 <X size={18} />
               </button>
             </div>
@@ -1128,10 +1216,55 @@ export default function WarrantyServiceModule({
                 </div>
               </div>
 
+              {/* এডিট মোডে স্ট্যাটাস ও ডেলিভারি বিবরণ */}
+              {editingSlip && (
+                <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-bold text-amber-900 block mb-1">{txt('বর্তমান স্ট্যাটাস', 'Current Status')}</label>
+                      <select
+                        value={customerForm.status}
+                        onChange={e => setCustomerForm({ ...customerForm, status: e.target.value })}
+                        className="w-full border p-2 rounded-xl bg-white outline-none focus:border-amber-500 font-bold"
+                      >
+                        <option value="গ্রহণকৃত">{txt('গ্রহণকৃত', 'Received')}</option>
+                        <option value="প্রক্রিয়াধীন">{txt('প্রক্রিয়াধীন', 'In Progress')}</option>
+                        <option value="সার্ভিসিং সম্পন্ন">{txt('সার্ভিসিং সম্পন্ন', 'Ready for Delivery')}</option>
+                        <option value="ডেলিভারি সম্পন্ন">{txt('ডেলিভারি সম্পন্ন', 'Delivered')}</option>
+                        <option value="ফেরত প্রদানকৃত">{txt('ফেরত প্রদানকৃত', 'Returned')}</option>
+                        <option value="বাতিল">{txt('বাতিল', 'Cancelled')}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">{txt('ডেলিভারি তারিখ', 'Delivery Date')}</label>
+                      <input
+                        type="date"
+                        value={customerForm.delivery_date || ''}
+                        onChange={e => setCustomerForm({ ...customerForm, delivery_date: e.target.value })}
+                        className="w-full border p-2 rounded-xl bg-white outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">{txt('ডেলিভারি / সার্ভিস নোট', 'Delivery / Service Note')}</label>
+                    <input
+                      type="text"
+                      placeholder={txt('ডেলিভারি সংক্রান্ত মন্তব্য...', 'Delivery note...')}
+                      value={customerForm.delivery_note || ''}
+                      onChange={e => setCustomerForm({ ...customerForm, delivery_note: e.target.value })}
+                      className="w-full border p-2 rounded-xl bg-white outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="pt-3 border-t flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowCustomerModal(false)}
+                  onClick={() => {
+                    resetCustomerForm();
+                    setShowCustomerModal(false);
+                  }}
                   className="px-4 py-2 border rounded-xl font-bold cursor-pointer hover:bg-slate-50"
                 >
                   {txt('বাতিল', 'Cancel')}
@@ -1140,7 +1273,9 @@ export default function WarrantyServiceModule({
                   type="submit"
                   className="px-5 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl font-bold cursor-pointer shadow-md transition"
                 >
-                  {txt('সংরক্ষণ করুন ও স্লিপ তৈরি করুন', 'Save & Generate Slip')}
+                  {editingSlip 
+                    ? (lang === 'en' ? 'Save Slip Changes' : 'স্লিপ আপডেট সংরক্ষণ করুন') 
+                    : txt('সংরক্ষণ করুন ও স্লিপ তৈরি করুন', 'Save & Generate Slip')}
                 </button>
               </div>
             </form>

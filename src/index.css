@@ -3,7 +3,29 @@
 @tailwind utilities;
 
 html, body {
-  background-color: #f0f7ff;
+  background-color: #060b19;
+}
+
+@layer base {
+  input,
+  textarea,
+  select {
+    color: #0f172a;
+  }
+}
+
+
+/* ইনভয়েস ও ক্যাশ মেমোর টেবিল ও লেখার বক্সগুলোতে যাতে এফসি লোগো জলছাপ ঢেকে না যায় বা মুছে না যায় */
+.invoice-printable .invoice-transparent-box,
+.invoice-printable .invoice-subtotal-box,
+.invoice-printable table,
+.invoice-printable tbody tr,
+.invoice-printable tbody td,
+.money-receipt-printable .invoice-transparent-box,
+.money-receipt-printable table,
+.money-receipt-printable tbody tr,
+.money-receipt-printable tbody td {
+  background-color: transparent !important;
 }
 
 @media print {
@@ -76,6 +98,30 @@ html, body {
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
+  }
+
+  /* ইনভয়েস ও ক্যাশ মেমোর টেবিল ও বক্স ব্যাকগ্রাউন্ড প্রিন্টেও ট্রান্সপারেন্ট থাকবে যাতে এফসি লোগো জলছাপ সম্পূর্ণ স্পষ্ট থাকে */
+  .invoice-printable .invoice-transparent-box,
+  .invoice-printable .invoice-subtotal-box,
+  .invoice-printable table,
+  .invoice-printable tfoot,
+  .invoice-printable tbody tr,
+  .invoice-printable tbody td,
+  .invoice-printable .bg-gray-50,
+  .invoice-printable .bg-gray-50\/50,
+  .invoice-printable .bg-gray-50\/70,
+  .invoice-printable .bg-gray-50\/40,
+  .invoice-printable .print\:bg-white,
+  .money-receipt-printable .invoice-transparent-box,
+  .money-receipt-printable table,
+  .money-receipt-printable tbody tr,
+  .money-receipt-printable tbody td,
+  .money-receipt-printable .bg-gray-50,
+  .money-receipt-printable .bg-slate-50,
+  .money-receipt-printable .bg-emerald-50,
+  .money-receipt-printable .print\:bg-white {
+    background: transparent !important;
+    background-color: transparent !important;
   }
 
   .invoice-signatures {
