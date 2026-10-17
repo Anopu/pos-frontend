@@ -2,6 +2,92 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 /**
+ * Clean customer name for safe cross-platform filename
+ * @param {string} name 
+ * @returns {string}
+ */
+export function cleanCustomerNameForFilename(name) {
+  if (!name || typeof name !== 'string' || !name.trim()) return 'Customer';
+  // Remove illegal characters: \ / : * ? " < > |
+  let cleaned = name.trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_');
+  return cleaned || 'Customer';
+}
+
+/**
+ * Format date for safe filename (DD-MM-YYYY)
+ * @param {string|Date} dateInput 
+ * @returns {string}
+ */
+export function formatDateForFilename(dateInput) {
+  if (!dateInput) {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+  if (typeof dateInput === 'string' && dateInput.includes('/')) {
+    return dateInput.replace(/[\/\\]/g, '-');
+  }
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) {
+    return String(dateInput).replace(/[^a-zA-Z0-9_\u0980-\u09FF-]/g, '-');
+  }
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+/**
+ * Build document PDF filename formatted with Customer Name and Date
+ * e.g. CustomerName_DD-MM-YYYY_Bill.pdf
+ * @param {object} params
+ * @returns {string}
+ */
+export function buildDocumentPdfFilename({ customerName, date, type, number } = {}) {
+  const safeName = cleanCustomerNameForFilename(customerName);
+  const safeDate = formatDateForFilename(date);
+
+  let typeSuffix = '';
+  const lowerType = (type || '').toLowerCase();
+  if (lowerType === 'invoice' || lowerType === 'bill') {
+    typeSuffix = '_Bill';
+  } else if (lowerType === 'receipt' || lowerType === 'money_receipt' || lowerType === 'moneyreceipt') {
+    typeSuffix = '_Money_Receipt';
+  } else if (lowerType === 'quotation') {
+    typeSuffix = '_Quotation';
+  } else if (lowerType === 'isp' || lowerType === 'isp_receipt') {
+    typeSuffix = '_ISP_Receipt';
+  } else if (lowerType === 'isp_bill') {
+    typeSuffix = '_ISP_Bill';
+  } else if (lowerType === 'warranty' || lowerType === 'service' || lowerType === 'warranty_slip') {
+    typeSuffix = '_Warranty_Slip';
+  } else if (lowerType === 'ledger') {
+    typeSuffix = '_Ledger';
+  } else if (type) {
+    typeSuffix = `_${type.replace(/[^a-zA-Z0-9_\u0980-\u09FF-]/g, '_')}`;
+  }
+
+  return `${safeName}_${safeDate}${typeSuffix}.pdf`;
+}
+
+/**
+ * Safely trigger print with custom document.title so browser's "Save as PDF" suggests this filename
+ * @param {string} titleFilename 
+ */
+export function triggerPrintWithFilename(titleFilename) {
+  const originalTitle = document.title;
+  if (titleFilename) {
+    document.title = titleFilename.replace(/\.pdf$/i, '');
+  }
+  window.print();
+  setTimeout(() => {
+    document.title = originalTitle;
+  }, 1000);
+}
+
+/**
  * Trigger immediate browser download of a Blob or File
  * @param {Blob|File} blobOrFile 
  * @param {string} filename 

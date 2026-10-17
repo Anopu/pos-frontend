@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Printer, Share2, Wrench, Shield, CheckCircle, Clock, Edit3 } from 'lucide-react';
+import { buildDocumentPdfFilename, triggerPrintWithFilename } from '../utils/pdfGenerator';
 
 export default function WarrantySlipPrintModal({ slip, onClose, onShare, onEdit, lang = 'bn' }) {
   if (!slip) return null;
@@ -57,7 +58,12 @@ export default function WarrantySlipPrintModal({ slip, onClose, onShare, onEdit,
               </button>
             )}
             <button
-              onClick={() => window.print()}
+              onClick={() => triggerPrintWithFilename(buildDocumentPdfFilename({
+                customerName: slip.customer_name,
+                date: slip.received_date,
+                type: 'Warranty_Slip',
+                number: slip.token_no
+              }))}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition"
             >
               <Printer size={15} /> {lang === 'en' ? 'Print Slip / Save PDF' : 'প্রিন্ট স্লিপ / Save PDF'}

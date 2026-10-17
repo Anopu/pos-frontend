@@ -3,7 +3,7 @@ import {
   X, Printer, Download, Share2, MessageCircle, Phone, 
   Mail, Check, Copy, FileText, CheckCircle2, ShieldCheck, Sparkles, Loader2, Globe, Edit3 
 } from 'lucide-react';
-import { generatePdfFromElement, downloadPdfFile, sharePdfNative } from '../utils/pdfGenerator';
+import { generatePdfFromElement, downloadPdfFile, sharePdfNative, buildDocumentPdfFilename, triggerPrintWithFilename } from '../utils/pdfGenerator';
 
 export default function IspReceiptPrintModal({ 
   isOpen, 
@@ -189,18 +189,27 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
 হটলাইন: 09613-181920, 01812-091939
 ধন্যবাদ, FC Technology এর সাথেই থাকুন!`;
 
-  // সরাসরি প্রিন্ট ফাংশন
+  // সরাসরি প্রিন্ট ফাংশন (Save as PDF করলে কাস্টমারের নাম ও তারিখ সাজেস্ট করবে)
   const handlePrint = () => {
-    window.print();
+    const filename = buildDocumentPdfFilename({
+      customerName: customer_name,
+      date: payment_date || date || created_at,
+      type: docMode === 'receipt' ? 'ISP_Receipt' : 'ISP_Bill'
+    });
+    triggerPrintWithFilename(filename);
   };
 
-  // পিডিএফ তৈরি ও ডাউনলোড
+  // পিডিএফ তৈরি ও ডাউনলোড (কাস্টমারের নাম এবং তারিখ সহ সেভ হবে)
   const handleDownloadPdf = async () => {
     if (!printableRef.current) return;
     setIsPdfLoading(true);
     setAlertNotice(null);
     try {
-      const filename = `FC_Technology_ISP_${docMode === 'receipt' ? 'Receipt' : 'Bill'}_${receipt_no}.pdf`;
+      const filename = buildDocumentPdfFilename({
+        customerName: customer_name,
+        date: payment_date || date || created_at,
+        type: docMode === 'receipt' ? 'ISP_Receipt' : 'ISP_Bill'
+      });
       const result = await generatePdfFromElement(printableRef.current, filename, {
         singlePage: true,
         forceSinglePage: true
@@ -208,7 +217,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
       downloadPdfFile(result.blob, filename);
       setAlertNotice({
         type: 'success',
-        text: txt('পিডিএফ সফলভাবে ডাউনলোড হয়েছে!', 'PDF downloaded successfully!')
+        text: txt(`পিডিএফ "${filename}" সফলভাবে ডাউনলোড হয়েছে!`, `PDF "${filename}" downloaded successfully!`)
       });
     } catch (err) {
       console.error(err);
@@ -221,7 +230,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
     }
   };
 
-  // হোয়াটসঅ্যাপে সরাসরি পিডিএফ সহ মানি রিসিপ্ট পাঠানো
+  // হোয়াটসঅ্যাপে সরাসরি শুধুমাত্র পিডিএফ ফাইল পাঠানো (কোনো টেক্সট মেসেজ ছাড়া)
   const handleSendWhatsApp = async () => {
     if (!cleanMobile) {
       alert(txt('গ্রাহকের মোবাইল নম্বর দেওয়া নেই!', 'Customer mobile number is missing!'));
@@ -229,7 +238,8 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
     }
 
     if (!printableRef.current) {
-      const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(formattedSummary)}`;
+      // কোনো প্রিফিল্ড টেক্সট ছাড়া সরাসরি গ্রাহকের চ্যাট ওপেন
+      const url = `https://wa.me/${formattedMobile}`;
       window.open(url, '_blank');
       return;
     }
@@ -237,36 +247,26 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
     setIsPdfLoading(true);
     setAlertNotice(null);
     try {
-      const filename = `FC_Technology_ISP_${docMode === 'receipt' ? 'Receipt' : 'Bill'}_${receipt_no}.pdf`;
+      const filename = buildDocumentPdfFilename({
+        customerName: customer_name,
+        date: payment_date || date || created_at,
+        type: docMode === 'receipt' ? 'ISP_Receipt' : 'ISP_Bill'
+      });
       const result = await generatePdfFromElement(printableRef.current, filename, {
         singlePage: true,
         forceSinglePage: true
       });
 
-      const pdfCaption = `*FC TECHNOLOGY - ISP INTERNET ${docMode === 'receipt' ? 'PAYMENT RECEIPT' : 'BILL'}*\n` +
-        `------------------------------------\n` +
-        `📄 আপনার ইন্টারনেট বিলের অফিসিয়াল PDF মানি রিসিপ্ট প্রস্তুত হয়েছে।\n` +
-        `👤 গ্রাহক: ${customer_name}\n` +
-        `📡 প্যাকেজ: ${speed || 'Standard'}\n` +
-        `📅 বিলিং মাস: ${displayBillingMonth}\n` +
-        `💰 টাকার পরিমাণ: ৳ ${Number(amount).toLocaleString()} (${numberToWordsBn(amount)})\n` +
-        `🧾 মানি রিসিট নং: ${receipt_no}\n` +
-        `------------------------------------\n` +
-        `দোকান নং #১৮, আর এফ জোহরা টাওয়ার, আগ্রাবাদ, চট্টগ্রাম।\n` +
-        `হটলাইন: 09613-181920, 01812-091939\n` +
-        `ধন্যবাদ, FC Technology এর সাথেই থাকুন!`;
-
-      // ১. যদি ব্রাউজার ফাইল শেয়ার সাপোর্ট করে (মোবাইল / সাপোর্টেড ব্রাউজার) - সরাসরি পিডিএফ ফাইল হোয়াটসঅ্যাপে সেন্ড
+      // ১. যদি ব্রাউজার ফাইল শেয়ার সাপোর্ট করে (মোবাইল / সাপোর্টেড ব্রাউজার) - শুধুমাত্র পিডিএফ ফাইল যাবে, টেক্সট নয়
       if (navigator.canShare && navigator.canShare({ files: [result.file] })) {
         try {
           await navigator.share({
             files: [result.file],
-            title: `FC Technology - ISP ${docMode === 'receipt' ? 'Receipt' : 'Bill'} #${receipt_no}`,
-            text: pdfCaption
+            title: filename
           });
           setAlertNotice({
             type: 'success',
-            text: txt('পিডিএফ মানি রিসিপ্ট সরাসরি WhatsApp এ পাঠানো হয়েছে!', 'PDF receipt sent to WhatsApp successfully!')
+            text: txt('শুধুমাত্র পিডিএফ মানি রিসিপ্ট সরাসরি WhatsApp এ পাঠানো হয়েছে!', 'PDF receipt sent to WhatsApp successfully!')
           });
           return;
         } catch (shareErr) {
@@ -274,24 +274,21 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
         }
       }
 
-      // ২. ডেস্কটপ বা ব্রাউজারের ক্ষেত্রে: সরাসরি পিডিএফ ডাউনলোড হবে এবং গ্রাহকের WhatsApp চ্যাট ওপেন হবে
+      // ২. ডেস্কটপ বা ব্রাউজারের ক্ষেত্রে: সরাসরি পিডিএফ ডাউনলোড হবে এবং গ্রাহকের WhatsApp চ্যাট ওপেন হবে (কোনো প্রিফিল্ড টেক্সট ছাড়া)
       downloadPdfFile(result.blob, filename);
-      const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(
-        `${pdfCaption}\n\n(সংযুক্ত "${filename}" পিডিএফ ফাইলটি ডাউনলোড হয়েছে, অনুগ্রহ করে চ্যাটে অ্যাটাচ করুন)`
-      )}`;
+      const url = `https://wa.me/${formattedMobile}`;
       window.open(url, '_blank');
 
       setAlertNotice({
         type: 'success',
         text: txt(
-          `পিডিএফ ফাইল "${filename}" ডাউনলোড হয়েছে এবং গ্রাহকের WhatsApp ওপেন হয়েছে! চ্যাটে ডাউনলোডকৃত ফাইলটি ড্রপ/অ্যাটাচ করুন।`,
-          `PDF downloaded and customer WhatsApp opened! Please attach the downloaded PDF in chat.`
+          `পিডিএফ ফাইল "${filename}" ডাউনলোড হয়েছে এবং গ্রাহকের WhatsApp ওপেন হয়েছে! চ্যাটে ডাউনলোডকৃত পিডিএফ ফাইলটি ড্রপ/সেন্ড করুন।`,
+          `PDF "${filename}" downloaded and customer WhatsApp opened! Please attach and send the downloaded PDF file in chat.`
         )
       });
     } catch (err) {
       console.error('WhatsApp PDF send error:', err);
-      // ফলব্যাক টেক্সট মেসেজ
-      const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(formattedSummary)}`;
+      const url = `https://wa.me/${formattedMobile}`;
       window.open(url, '_blank');
     } finally {
       setIsPdfLoading(false);
@@ -331,12 +328,15 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
     if (!printableRef.current) return;
     setIsPdfLoading(true);
     try {
-      const filename = `FC_Technology_ISP_${receipt_no}.pdf`;
+      const filename = buildDocumentPdfFilename({
+        customerName: customer_name,
+        date: payment_date || date || created_at,
+        type: docMode === 'receipt' ? 'ISP_Receipt' : 'ISP_Bill'
+      });
       const { file } = await generatePdfFromElement(printableRef.current, filename, { singlePage: true });
       await sharePdfNative({
-        file,
-        title: `FC Technology - ISP ${receipt_no}`,
-        text: formattedSummary
+        files: [file],
+        title: filename
       });
     } catch (err) {
       console.error(err);

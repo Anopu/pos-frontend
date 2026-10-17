@@ -17,6 +17,7 @@ import IspManagementModule from './components/IspManagementModule';
 import DatabaseBackupModal from './components/DatabaseBackupModal';
 import FcTechnologyWebsite from './components/FcTechnologyWebsite';
 import { API_BASE } from './utils/apiConfig';
+import { buildDocumentPdfFilename, triggerPrintWithFilename } from './utils/pdfGenerator';
 
 const MASTER_CATEGORIES = [
   "General", "CC Camera", "Router", "Motherboard", "Keyboard", "Mouse", "Laptop", "Cable",
@@ -4497,7 +4498,12 @@ function App() {
                 customerName: slip.customer_name,
                 customerMobile: slip.customer_mobile,
                 amount: slip.estimated_cost,
-                filename: `FC_Technology_Warranty_Slip_${slip.token_no}`,
+                filename: buildDocumentPdfFilename({
+                  customerName: slip.customer_name,
+                  date: slip.received_date,
+                  type: 'Warranty_Slip',
+                  number: slip.token_no
+                }),
                 elementId: 'printable-content',
                 raw: slip,
                 details: txt(
@@ -6757,7 +6763,12 @@ function App() {
                           customerName: completedInvoice.customer_name,
                           customerMobile: completedInvoice.customer_mobile,
                           amount: completedInvoice.total_amount,
-                          filename: `FC_Technology_Invoice_${completedInvoice.invoice_no}`,
+                          filename: buildDocumentPdfFilename({
+                            customerName: completedInvoice.customer_name,
+                            date: completedInvoice.date || completedInvoice.created_at,
+                            type: 'Bill',
+                            number: completedInvoice.invoice_no
+                          }),
                           elementId: 'printable-content',
                           raw: completedInvoice,
                           details: lang === 'en' 
@@ -6769,7 +6780,15 @@ function App() {
                     >
                       <Share2 size={15} /> {lang === 'en' ? 'Share' : 'শেয়ার করুন'}
                     </button>
-                    <button onClick={() => window.print()} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition">
+                    <button 
+                      onClick={() => triggerPrintWithFilename(buildDocumentPdfFilename({
+                        customerName: completedInvoice.customer_name,
+                        date: completedInvoice.date || completedInvoice.created_at,
+                        type: 'Bill',
+                        number: completedInvoice.invoice_no
+                      }))} 
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition"
+                    >
                       <Printer size={15} /> {txt("প্রিন্ট / সেভ PDF", "Print / Save PDF")}
                     </button>
                     {currentUser?.role === 'admin' && (
@@ -8104,7 +8123,12 @@ function App() {
                       customerName: activeMoneyReceipt.customer_name,
                       customerMobile: activeMoneyReceipt.customer_mobile,
                       amount: activeMoneyReceipt.amount,
-                      filename: `FC_Technology_MoneyReceipt_${activeMoneyReceipt.receipt_no || activeMoneyReceipt.id}`,
+                      filename: buildDocumentPdfFilename({
+                        customerName: activeMoneyReceipt.customer_name,
+                        date: activeMoneyReceipt.created_at,
+                        type: 'Money_Receipt',
+                        number: activeMoneyReceipt.receipt_no || activeMoneyReceipt.id
+                      }),
                       elementId: 'printable-content',
                       raw: activeMoneyReceipt,
                       details: lang === 'en'
@@ -8117,7 +8141,12 @@ function App() {
                   <Share2 size={15} /> {lang === 'en' ? 'Share' : 'শেয়ার করুন'}
                 </button>
                 <button 
-                  onClick={() => window.print()} 
+                  onClick={() => triggerPrintWithFilename(buildDocumentPdfFilename({
+                    customerName: activeMoneyReceipt.customer_name,
+                    date: activeMoneyReceipt.created_at,
+                    type: 'Money_Receipt',
+                    number: activeMoneyReceipt.receipt_no || activeMoneyReceipt.id
+                  }))} 
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/20 transition"
                 >
                   <Printer size={15} /> {txt("প্রিন্ট মানি রিসিপ্ট / Save PDF", "Print Money Receipt / Save PDF")}
@@ -8365,7 +8394,12 @@ function App() {
                       customerName: activeQuotationPrint.customer_name,
                       customerMobile: activeQuotationPrint.customer_mobile,
                       amount: activeQuotationPrint.total_amount,
-                      filename: `FC_Technology_Quotation_${activeQuotationPrint.quotation_no}`,
+                      filename: buildDocumentPdfFilename({
+                        customerName: activeQuotationPrint.customer_name,
+                        date: activeQuotationPrint.date,
+                        type: 'Quotation',
+                        number: activeQuotationPrint.quotation_no
+                      }),
                       elementId: 'printable-content',
                       raw: activeQuotationPrint,
                       details: lang === 'en'
@@ -8378,7 +8412,12 @@ function App() {
                   <Share2 size={15} /> {lang === 'en' ? 'Share' : 'শেয়ার করুন'}
                 </button>
                 <button 
-                  onClick={() => window.print()} 
+                  onClick={() => triggerPrintWithFilename(buildDocumentPdfFilename({
+                    customerName: activeQuotationPrint.customer_name,
+                    date: activeQuotationPrint.date,
+                    type: 'Quotation',
+                    number: activeQuotationPrint.quotation_no
+                  }))} 
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow transition"
                 >
                   <Printer size={15} /> {txt("প্রিন্ট কোটেশন / Save PDF", "Print Quotation / Save PDF")}
@@ -8715,7 +8754,12 @@ function App() {
                       customerName: ledgerCustomer.name,
                       customerMobile: ledgerCustomer.mobile,
                       amount: ledgerCustomer.total_due,
-                      filename: `FC_Technology_Customer_Ledger_${ledgerCustomer.name?.replace(/\s+/g, '_') || ledgerCustomer.id}`,
+                      filename: buildDocumentPdfFilename({
+                        customerName: ledgerCustomer.name,
+                        date: new Date(),
+                        type: 'Ledger',
+                        number: `CUST-${ledgerCustomer.id}`
+                      }),
                       elementId: 'printable-content',
                       raw: ledgerCustomer,
                       details: lang === 'en'
@@ -8727,7 +8771,17 @@ function App() {
                 >
                   <Share2 size={15} /> {lang === 'en' ? 'Share' : 'শেয়ার করুন'}
                 </button>
-                <button onClick={() => window.print()} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow transition"><Printer size={15} /> {txt("প্রিন্ট লেজার", "Print Ledger")}</button>
+                <button 
+                  onClick={() => triggerPrintWithFilename(buildDocumentPdfFilename({
+                    customerName: ledgerCustomer.name,
+                    date: new Date(),
+                    type: 'Ledger',
+                    number: `CUST-${ledgerCustomer.id}`
+                  }))} 
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow transition"
+                >
+                  <Printer size={15} /> {txt("প্রিন্ট লেজার", "Print Ledger")}
+                </button>
                 <button onClick={() => setLedgerCustomer(null)} className="p-2 text-gray-400 hover:text-gray-600 cursor-pointer"><X size={20} /></button>
               </div>
             </div>
@@ -8969,7 +9023,12 @@ function App() {
                       customerName: supplierLedger.name,
                       customerMobile: supplierLedger.mobile,
                       amount: supplierLedger.total_payable,
-                      filename: `FC_Technology_Supplier_Ledger_${supplierLedger.name?.replace(/\s+/g, '_') || supplierLedger.id}`,
+                      filename: buildDocumentPdfFilename({
+                        customerName: supplierLedger.name,
+                        date: new Date(),
+                        type: 'Supplier_Ledger',
+                        number: `SUPP-${supplierLedger.id}`
+                      }),
                       elementId: 'printable-content',
                       raw: supplierLedger,
                       details: lang === 'en'
@@ -8981,7 +9040,17 @@ function App() {
                 >
                   <Share2 size={15} /> {lang === 'en' ? 'Share' : 'শেয়ার করুন'}
                 </button>
-                <button onClick={() => window.print()} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow transition"><Printer size={15} /> {txt("প্রিন্ট খতিয়ান", "Print Statement")}</button>
+                <button 
+                  onClick={() => triggerPrintWithFilename(buildDocumentPdfFilename({
+                    customerName: supplierLedger.name,
+                    date: new Date(),
+                    type: 'Supplier_Ledger',
+                    number: `SUPP-${supplierLedger.id}`
+                  }))} 
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow transition"
+                >
+                  <Printer size={15} /> {txt("প্রিন্ট খতিয়ান", "Print Statement")}
+                </button>
                 <button onClick={() => setSupplierLedger(null)} className="p-2 text-gray-400 hover:text-gray-600 cursor-pointer"><X size={20} /></button>
               </div>
             </div>
@@ -9416,7 +9485,12 @@ function App() {
             customerName: slip.customer_name,
             customerMobile: slip.customer_mobile,
             amount: slip.estimated_cost,
-            filename: `FC_Technology_Warranty_Slip_${slip.token_no}`,
+            filename: buildDocumentPdfFilename({
+              customerName: slip.customer_name,
+              date: slip.received_date,
+              type: 'Warranty_Slip',
+              number: slip.token_no
+            }),
             elementId: 'printable-content',
             raw: slip,
             details: txt(

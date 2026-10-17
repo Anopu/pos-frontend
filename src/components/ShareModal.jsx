@@ -8,7 +8,8 @@ import {
   downloadPdfFile, 
   sharePdfNative, 
   findPrintableElement, 
-  createFallbackPrintableElement 
+  createFallbackPrintableElement,
+  buildDocumentPdfFilename
 } from '../utils/pdfGenerator';
 
 export default function ShareModal({ isOpen, onClose, data, lang = 'bn' }) {
@@ -55,9 +56,12 @@ ${amount !== undefined && amount !== null ? `💰 পরিমাণ / বকে
       element = fallbackContainer;
     }
 
-    const safeNumber = (number || 'doc').toString().replace(/[^a-zA-Z0-9_-]/g, '_');
-    const safeType = type || 'document';
-    const finalFilename = customFilename || `FC_Technology_${safeType}_${safeNumber}.pdf`;
+    const finalFilename = customFilename || buildDocumentPdfFilename({
+      customerName: customerName,
+      date: date,
+      type: type || 'Document',
+      number: number
+    });
 
     try {
       const result = await generatePdfFromElement(element, finalFilename, {
@@ -147,19 +151,18 @@ ${amount !== undefined && amount !== null ? `💰 টাকার পরিম�
 হটলাইন: 09613-181920, 01812-091939
 ধন্যবাদ FC Technology এর সাথে থাকার জন্য!`;
 
-      // যদি নেটিভ ফাইল শেয়ার সাপোর্ট করে তবে সরাসরি শেয়ার ট্রেতে পাঠানো
+      // ১. যদি নেটিভ ফাইল শেয়ার সাপোর্ট করে তবে সরাসরি ফাইল পাঠানো (কোনো টেক্সট মেসেজ ছাড়া)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
           await navigator.share({
             files: [file],
-            title: `FC Technology - ${title} (#${number || ''})`,
-            text: waMessage
+            title: safeFilename
           });
           setStatusAlert({
             type: 'success',
             message: lang === 'en'
               ? 'PDF file sent to share sheet! Select WhatsApp to send.'
-              : 'পিডিএফ ফাইল সহ হোয়াটসঅ্যাপ শেয়ার উইন্ডো ওপেন হয়েছে!'
+              : 'শুধুমাত্র পিডিএফ ফাইল সহ হোয়াটসঅ্যাপ শেয়ার উইন্ডো ওপেন হয়েছে!'
           });
           return;
         } catch (e) {
@@ -167,23 +170,24 @@ ${amount !== undefined && amount !== null ? `💰 টাকার পরিম�
         }
       }
 
-      // ডেস্কটপ বা সাধারণ ব্রাউজারের ক্ষেত্রে হোয়াটসঅ্যাপ চ্যাট ওপেন করা
-      const encodedText = encodeURIComponent(waMessage);
+      // ২. ডেস্কটপ বা সাধারণ ব্রাউজারের ক্ষেত্রে সরাসরি হোয়াটসঅ্যাপ চ্যাট ওপেন করা (কোনো প্রিফিল্ড টেক্সট ছাড়া)
       let url = cleanMobile && cleanMobile.length >= 11
-        ? `https://wa.me/${cleanMobile}?text=${encodedText}`
-        : `https://api.whatsapp.com/send?text=${encodedText}`;
+        ? `https://wa.me/${cleanMobile}`
+        : `https://web.whatsapp.com/`;
 
       window.open(url, '_blank');
       setStatusAlert({
         type: 'success',
         message: lang === 'en'
           ? `PDF "${safeFilename}" downloaded and WhatsApp opened! Attach the downloaded PDF in chat.`
-          : `সম্পূর্ণ পিডিএফ ফাইল ডাউনলোড হয়েছে এবং গ্রাহকের হোয়াটসঅ্যাপ চ্যাট ওপেন হয়েছে। ডাউনলোডকৃত ফাইলটি চ্যাটে সেন্ড করুন!`
+          : `পিডিএফ ফাইল "${safeFilename}" ডাউনলোড হয়েছে এবং হোয়াটসঅ্যাপ চ্যাট ওপেন হয়েছে। চ্যাটে ফাইলটি সেন্ড করুন!`
       });
     } catch (err) {
       console.error('WhatsApp PDF error:', err);
-      // টেক্সট ভিত্তিক ব্যাকআপ
-      handleWhatsAppTextOnly();
+      let url = cleanMobile && cleanMobile.length >= 11
+        ? `https://wa.me/${cleanMobile}`
+        : `https://web.whatsapp.com/`;
+      window.open(url, '_blank');
     } finally {
       setIsGenerating(false);
       setGenerationType(null);
