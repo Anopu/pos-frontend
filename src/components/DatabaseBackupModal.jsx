@@ -21,7 +21,12 @@ export default function DatabaseBackupModal({ isOpen, onClose, lang = 'bn', onRe
     try {
       const response = await fetch(`${getApiBase()}/backup/download-sql`);
       if (!response.ok) {
-        throw new Error('সার্ভার থেকে SQL ব্যাকআপ তৈরি ব্যর্থ হয়েছে!');
+        let errMsg = 'সার্ভার থেকে SQL ব্যাকআপ তৈরি ব্যর্থ হয়েছে!';
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) errMsg = errData.error;
+        } catch (e) {}
+        throw new Error(errMsg);
       }
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -54,7 +59,12 @@ export default function DatabaseBackupModal({ isOpen, onClose, lang = 'bn', onRe
     try {
       const response = await fetch(`${getApiBase()}/backup/download-json`);
       if (!response.ok) {
-        throw new Error('সার্ভার থেকে JSON ব্যাকআপ তৈরি ব্যর্থ হয়েছে!');
+        let errMsg = 'সার্ভার থেকে JSON ব্যাকআপ তৈরি ব্যর্থ হয়েছে!';
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) errMsg = errData.error;
+        } catch (e) {}
+        throw new Error(errMsg);
       }
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
