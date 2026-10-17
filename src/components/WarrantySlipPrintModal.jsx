@@ -82,7 +82,7 @@ export default function WarrantySlipPrintModal({ slip, onClose, onShare, onEdit,
             <img 
               src="/fc_logo_watermark.png" 
               alt="FC Watermark" 
-              className="w-80 md:w-[460px] max-w-[85%] opacity-[0.22] md:opacity-[0.24] select-none object-contain print:opacity-[0.22]" 
+              className="w-80 md:w-[460px] max-w-[85%] opacity-[0.09] md:opacity-[0.11] select-none object-contain print:opacity-[0.09]" 
               onError={(e) => {
                 e.target.src = '/fc_brand_watermark.png';
               }}
@@ -240,12 +240,19 @@ export default function WarrantySlipPrintModal({ slip, onClose, onShare, onEdit,
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
                     {lang === 'en' ? 'Product Details & Tracking:' : 'পণ্যের বিবরণ ও ট্র্যাকিং:'}
                   </span>
-                  <h4 className="text-sm font-bold text-slate-900 leading-tight">{slip.product_name}</h4>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h4 className="text-sm font-bold text-slate-900 leading-tight">{slip.product_name}</h4>
+                    {slip.device_category && (
+                      <span className="text-[10px] font-bold text-purple-900 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded">
+                        {slip.device_category}
+                      </span>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-700 mt-1">
                     <p><strong>{lang === 'en' ? 'Model:' : 'মডেল:'}</strong> <span className="font-mono">{slip.model_no || '-'}</span></p>
                     <p><strong>{lang === 'en' ? 'Serial/Barcode:' : 'সিরিয়াল/বারকোড:'}</strong> <span className="font-mono text-purple-700">{slip.serial_no || '-'}</span></p>
                   </div>
-                  <div className="mt-2 pt-2 border-t border-slate-200/80 grid grid-cols-2 gap-1 text-[11px]">
+                  <div className="mt-2 pt-2 border-t border-slate-200/80 grid grid-cols-2 md:grid-cols-3 gap-1 text-[11px]">
                     <div>
                       <span className="text-slate-500 block text-[10px]">{lang === 'en' ? 'Received Date:' : 'গ্রহণের তারিখ:'}</span>
                       <span className="font-bold text-slate-800">{formatDateDMY(slip.received_date)}</span>
@@ -254,6 +261,12 @@ export default function WarrantySlipPrintModal({ slip, onClose, onShare, onEdit,
                       <span className="text-rose-600 font-bold block text-[10px]">{lang === 'en' ? 'Promised Delivery:' : 'সম্ভাব্য প্রদানের তারিখ:'}</span>
                       <span className="font-bold text-rose-700 font-mono">{formatDateDMY(slip.estimated_delivery_date)}</span>
                     </div>
+                    {slip.delivery_date && (
+                      <div>
+                        <span className="text-emerald-700 font-bold block text-[10px]">{lang === 'en' ? 'Delivered Date:' : 'ডেলিভারি তারিখ:'}</span>
+                        <span className="font-black text-emerald-800 font-mono">{formatDateDMY(slip.delivery_date)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -299,25 +312,58 @@ export default function WarrantySlipPrintModal({ slip, onClose, onShare, onEdit,
                   </div>
                 </div>
 
-                {/* আর্থিক বিবরণ (যদি সার্ভিসিং চার্জ থাকে) */}
-                {(Number(slip.estimated_cost || 0) > 0 || Number(slip.advance_paid || 0) > 0) && (
+                {/* আর্থিক বিবরণ: ডেলিভারি সম্পন্ন হলে চূড়ান্ত বিল ও পেমেন্ট বিবরণ, অথবা সম্ভাব্য খরচ */}
+                {(slip.status === 'ডেলিভারি সম্পন্ন' || Number(slip.final_cost || 0) > 0) ? (
+                  <div className="warranty-transparent-box bg-transparent border border-emerald-400 rounded-xl p-3 text-xs print:bg-transparent space-y-2">
+                    <div className="flex justify-between items-center border-b border-emerald-200/80 pb-1.5">
+                      <span className="font-bold text-emerald-950 uppercase text-[10px] tracking-wider flex items-center gap-1">
+                        <CheckCircle size={13} className="text-emerald-600" /> {lang === 'en' ? 'Service Bill & Payment Settlement' : 'সার্ভিসিং বিল ও পেমেন্ট নিষ্পত্তি'}
+                      </span>
+                      {slip.delivery_date && (
+                        <span className="font-bold text-slate-700 text-[11px]">
+                          {lang === 'en' ? 'Delivery Date: ' : 'ডেলিভারি তারিখ: '}<span className="text-emerald-800 font-mono">{formatDateDMY(slip.delivery_date)}</span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center">
+                      <div className="p-1.5 bg-slate-50/80 rounded border border-slate-200">
+                        <span className="text-[10px] text-slate-500 block">{lang === 'en' ? 'Total Bill:' : 'মোট চার্জ / বিল:'}</span>
+                        <span className="font-black text-sm text-slate-900 font-mono">৳{Number(slip.final_cost || slip.estimated_cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="p-1.5 bg-emerald-50/80 rounded border border-emerald-200">
+                        <span className="text-[10px] text-emerald-700 block">{lang === 'en' ? 'Paid Amount:' : 'পরিশোধিত (জমা):'}</span>
+                        <span className="font-black text-sm text-emerald-800 font-mono">৳{Number(slip.paid_amount || slip.advance_paid || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="p-1.5 bg-rose-50/80 rounded border border-rose-200">
+                        <span className="text-[10px] text-rose-700 block">{lang === 'en' ? 'Due Amount:' : 'বকেয়া (বাকি):'}</span>
+                        <span className="font-black text-sm text-rose-800 font-mono">৳{Number(slip.due_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="p-1.5 bg-amber-50/80 rounded border border-amber-200 flex flex-col justify-center">
+                        <span className="text-[10px] text-amber-800 block">{lang === 'en' ? 'Payment Status:' : 'পেমেন্ট ধরন:'}</span>
+                        <span className={`font-black text-xs uppercase ${Number(slip.due_amount || 0) > 0 || slip.payment_status === 'বাকি' ? 'text-rose-700' : 'text-emerald-700'}`}>
+                          {slip.payment_status || (Number(slip.due_amount || 0) > 0 ? (lang === 'en' ? 'Due' : 'বাকি') : (lang === 'en' ? 'Paid' : 'নগদ'))} {slip.payment_method ? `(${slip.payment_method})` : ''}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (Number(slip.estimated_cost || 0) > 0 || Number(slip.advance_paid || 0) > 0) ? (
                   <div className="warranty-transparent-box bg-transparent border border-emerald-300 rounded-xl p-2.5 flex justify-between items-center text-xs print:bg-transparent">
                     <div>
-                      <span className="text-emerald-800 font-bold">{lang === 'en' ? 'Estimated Cost:' : 'সম্ভাব্য সার্ভিসিং খরচ:'}</span>
-                      <span className="ml-1.5 font-mono font-bold text-slate-900">৳ {Number(slip.estimated_cost || 0).toLocaleString()}</span>
+                      <span className="text-emerald-800 font-bold">{lang === 'en' ? 'Estimated Cost (BDT):' : 'সম্ভাব্য সার্ভিসিং খরচ (৳):'}</span>
+                      <span className="ml-1.5 font-mono font-bold text-slate-900">{Number(slip.estimated_cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div>
-                      <span className="text-emerald-800 font-bold">{lang === 'en' ? 'Advance Paid:' : 'অগ্রিম জমা:'}</span>
-                      <span className="ml-1.5 font-mono font-bold text-emerald-700">৳ {Number(slip.advance_paid || 0).toLocaleString()}</span>
+                      <span className="text-emerald-800 font-bold">{lang === 'en' ? 'Advance Paid (BDT):' : 'অগ্রিম জমা (৳):'}</span>
+                      <span className="ml-1.5 font-mono font-bold text-emerald-700">{Number(slip.advance_paid || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div>
-                      <span className="text-rose-700 font-bold">{lang === 'en' ? 'Due on Delivery:' : 'ডেলিভারির সময় প্রদেয়:'}</span>
+                      <span className="text-rose-700 font-bold">{lang === 'en' ? 'Due on Delivery (BDT):' : 'ডেলিভারির সময় প্রদেয় (৳):'}</span>
                       <span className="ml-1.5 font-mono font-black text-rose-700">
-                        ৳ {Math.max(0, Number(slip.estimated_cost || 0) - Number(slip.advance_paid || 0)).toLocaleString()}
+                        {Math.max(0, Number(slip.estimated_cost || 0) - Number(slip.advance_paid || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
                   </div>
-                )}
+                ) : null}
               </div>
 
               {/* নীতিমালা ও শর্তাবলী - ট্রান্সপারেন্ট ব্যাকগ্রাউন্ড */}

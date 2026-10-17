@@ -1,31 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 html, body {
   background-color: #060b19;
+  font-family: 'Hind Siliguri', 'Noto Sans Bengali', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Kalpurush', 'SolaimanLipi', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @layer base {
+  button,
   input,
   textarea,
   select {
+    font-family: 'Hind Siliguri', 'Noto Sans Bengali', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Kalpurush', 'SolaimanLipi', sans-serif;
     color: #0f172a;
+  }
+
+  .bg-white,
+  [class*="bg-white/"] {
+    color: #1e293b;
   }
 }
 
+/* প্রিন্ট ও স্লিপ ডকুমেন্টে ক্রিস্টাল-ক্লিয়ার বাংলা ফন্ট ও হাই-কন্ট্রাস্ট ব্যাকগ্রাউন্ড */
+.invoice-printable,
+.quotation-printable,
+.statement-printable,
+.money-receipt-printable,
+.warranty-slip-printable {
+  font-family: 'Hind Siliguri', 'Noto Sans Bengali', 'Kalpurush', -apple-system, sans-serif !important;
+  color: #0f172a !important;
+  -webkit-font-smoothing: antialiased !important;
+}
 
-/* ইনভয়েস ও ক্যাশ মেমোর টেবিল ও লেখার বক্সগুলোতে যাতে এফসি লোগো জলছাপ ঢেকে না যায় বা মুছে না যায় */
+/* ইনভয়েস, মানি রিসিপ্ট ও ওয়ারেন্টি স্লিপে লেখার স্পষ্টতা নিশ্চিত করতে সেমি-ট্রান্সপারেন্ট ব্যাকগ্রাউন্ড */
 .invoice-printable .invoice-transparent-box,
 .invoice-printable .invoice-subtotal-box,
-.invoice-printable table,
-.invoice-printable tbody tr,
-.invoice-printable tbody td,
 .money-receipt-printable .invoice-transparent-box,
+.warranty-transparent-box {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(1.5px);
+  -webkit-backdrop-filter: blur(1.5px);
+}
+
+.invoice-printable table,
 .money-receipt-printable table,
-.money-receipt-printable tbody tr,
-.money-receipt-printable tbody td {
-  background-color: transparent !important;
+.warranty-slip-printable table {
+  background-color: rgba(255, 255, 255, 0.92) !important;
 }
 
 @media print {

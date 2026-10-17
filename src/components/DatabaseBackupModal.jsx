@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Database, Download, Upload, ShieldCheck, AlertTriangle, CheckCircle2, RefreshCw, X, Server, HardDrive, Globe, Info, FileCode } from 'lucide-react';
+import { getApiBase } from '../utils/apiConfig';
 
 export default function DatabaseBackupModal({ isOpen, onClose, lang = 'bn', onRestoreSuccess }) {
   const [isExporting, setIsExporting] = useState(false);
@@ -12,11 +13,6 @@ export default function DatabaseBackupModal({ isOpen, onClose, lang = 'bn', onRe
   if (!isOpen) return null;
 
   const txt = (bn, en) => (lang === 'en' ? en : bn);
-
-  const getApiBase = () => {
-    const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : '127.0.0.1';
-    return `http://${host}:5010/api`;
-  };
 
   // ১. SQL ব্যাকআপ ডাউনলোড
   const handleDownloadSql = async () => {

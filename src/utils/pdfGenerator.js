@@ -48,6 +48,14 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
   const safeFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
   const a4WidthPx = 794; // Standard 210mm at 96 DPI
 
+  if (document.fonts && document.fonts.ready) {
+    try {
+      await document.fonts.ready;
+    } catch {
+      // ignore font timeout
+    }
+  }
+
   const canvas = await html2canvas(element, {
     scale: 2, // 2x crispness
     useCORS: true,
@@ -61,8 +69,10 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
       // Inject high-precision print styles to fix html2canvas text baseline drop and pin signatures to bottom
       const styleTag = clonedDoc.createElement('style');
       styleTag.innerHTML = `
+        @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;600;700&display=swap');
         * {
           box-sizing: border-box !important;
+          font-family: 'Hind Siliguri', 'Noto Sans Bengali', -apple-system, sans-serif !important;
           -webkit-font-smoothing: antialiased !important;
         }
         body {
@@ -70,6 +80,7 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
           padding: 0 !important;
           background: #ffffff !important;
           color: #0f172a !important;
+          font-family: 'Hind Siliguri', 'Noto Sans Bengali', -apple-system, sans-serif !important;
         }
         /* Fix text vertical alignment in table rows and calculation boxes */
         .invoice-printable table,

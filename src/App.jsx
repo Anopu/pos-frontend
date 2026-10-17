@@ -4,7 +4,7 @@ import {
   Edit, Edit3, History, ArrowDownRight, ArrowUpRight, LogOut, Shield, Truck, FileText, CheckCircle, 
   UserPlus, Calendar, RotateCcw, Wrench, Bell, AlertTriangle, CheckSquare, Clock, Filter, Eye, 
   AlertCircle, Receipt, Globe, Camera, Image as ImageIcon, Share2, Languages,
-  RefreshCw, PackageMinus, CheckCircle2, Wifi, Database 
+  RefreshCw, PackageMinus, CheckCircle2, Wifi, Database, Package 
 } from 'lucide-react';
 import LoginPage from './components/LoginPage';
 import { translations } from './translations';
@@ -15,6 +15,8 @@ import DashboardView from './components/DashboardView';
 import WarrantyServiceModule from './components/WarrantyServiceModule';
 import IspManagementModule from './components/IspManagementModule';
 import DatabaseBackupModal from './components/DatabaseBackupModal';
+import FcTechnologyWebsite from './components/FcTechnologyWebsite';
+import { API_BASE } from './utils/apiConfig';
 
 const MASTER_CATEGORIES = [
   "General", "CC Camera", "Router", "Motherboard", "Keyboard", "Mouse", "Laptop", "Cable",
@@ -23,7 +25,10 @@ const MASTER_CATEGORIES = [
   "IPS", "Battery", "Camera Accessories", "Wifi Dongle", "Mobile Charger", "Data/Charging Cable",
   "Hard drive Encloser", "Laptop Accessories", "DVR", "NVR", "POE Switch", "Desktop Switch",
   "Fingerprint device", "Brand PC", "TV Monitor", "Mouse Pad", "Desktop Accessories",
-  "PABX", "IP Phone", "Telephone set", "Intercom Accessories", "Public Address"
+  "PABX", "IP Phone", "Telephone set", "Intercom Accessories", "Public Address", "Printer INK",
+  "Other", "Memory Card", "USB Hub", "Microphone", "Antivirus", "CPU Cooling fan", "Bluetooth dongle",
+  "Air Bud", "Power Stripe", "Headphone",
+  "প্রিন্টার সার্ভিস", "ক্যামেরা ইনস্টলেশন", "ক্যামেরা সার্ভিস", "ইউপিএস সার্ভিস", "ল্যাপটপ সার্ভিসিং", "ডেস্কটপ সার্ভিসিং", "সাধারণ সার্ভিসিং"
 ];
 
 const EXPENSE_CATEGORIES = [
@@ -31,9 +36,7 @@ const EXPENSE_CATEGORIES = [
   "স্টাফ বেতন", "ইন্টারনেট বিল", "মেরামত ও রক্ষণাবেক্ষণ", "অন্যান্য খরচ"
 ];
 
-// স্বয়ংক্রিয় নেটওয়ার্ক/হোস্ট ডিটেকশন (দোকান, বাসা বা ভিপিএন থেকে একই সাথে চালানোর জন্য)
-const API_HOST = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : '127.0.0.1';
-const API_BASE = `http://${API_HOST}:5010/api`;
+// স্বয়ংক্রিয় নেটওয়ার্ক/হোস্ট ডিটেকশন apiConfig থেকে ইম্পোর্ট করা হয়েছে
 
 function App() {
   // ভাষা স্টেট ও ট্রান্সলেশন হেল্পার (বাংলা এবং ইংরেজি সুইচিং)
@@ -76,6 +79,43 @@ function App() {
     } catch {}
   };
 
+  // ভিউ স্টেট: ওয়েবসাইট নাকি পজ সিস্টেম (Website vs POS Counter View)
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      const hash = window.location.hash.toLowerCase();
+      if (hash === '#pos' || hash === '#pos-login') return 'pos';
+      const saved = sessionStorage.getItem('pos_current_view');
+      return saved === 'pos' ? 'pos' : 'website';
+    } catch {
+      return 'website';
+    }
+  });
+
+  const switchView = (mode) => {
+    setViewMode(mode);
+    try {
+      sessionStorage.setItem('pos_current_view', mode);
+      if (mode === 'pos') {
+        window.location.hash = 'pos';
+      } else {
+        window.location.hash = '';
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash === '#pos' || hash === '#pos-login') {
+        setViewMode('pos');
+      } else if (hash === '#website') {
+        setViewMode('website');
+      }
+    };
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
+
   // শেয়ার, ইমেজ ভিউ ও ওয়ারেন্টি স্লিপ স্টেট
   const [shareData, setShareData] = useState(null);
   const [activeImageView, setActiveImageView] = useState(null);
@@ -103,6 +143,9 @@ function App() {
   });
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [switchTwoFaData, setSwitchTwoFaData] = useState(null);
+  const [switchOtp, setSwitchOtp] = useState('');
+  const [switch2faLoading, setSwitch2faLoading] = useState(false);
 
   const [quotationList, setQuotationList] = useState([]);
   const [selectedQuotation, setSelectedQuotation] = useState(null);
@@ -112,7 +155,7 @@ function App() {
   const [usersList, setUsersList] = useState([]);
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
-  const [newUserForm, setNewUserForm] = useState({ username: '', password: '', fullname: '', role: 'sales' });
+  const [newUserForm, setNewUserForm] = useState({ username: '', password: '', fullname: '', role: 'sales', email: '' });
 
   // সার্ভিসিং স্টেট (ল্যাপটপ ও ডেস্কটপ সার্ভিসিং বিলের জন্য)
   const [showServiceModal, setShowServiceModal] = useState(false);
@@ -154,9 +197,14 @@ function App() {
   const [editingProductId, setEditingProductId] = useState(null);
   const [formData, setFormData] = useState({
     name: '', brand: '', model: '', category: 'CC Camera', barcode: '', warranty: '',
-    purchase_price: '', selling_price: '', current_stock: '', alert_quantity: 5,
+    purchase_price: '', selling_price: '', min_selling_price: '', current_stock: '', alert_quantity: 5,
     supplier_id: '', bill_image: ''
   });
+
+  // বিক্রয় বিল / কার্ট ব্রেকডাউন ড্রপডাউন স্টেট
+  const [activeCartDropdown, setActiveCartDropdown] = useState(null);
+  const [breakdownCategory, setBreakdownCategory] = useState('All');
+  const [breakdownSearch, setBreakdownSearch] = useState('');
 
   // সিরিয়াল স্টক ইন স্টেট
   const [showStockInModal, setShowStockInModal] = useState(false);
@@ -177,6 +225,11 @@ function App() {
   const [supplierForm, setSupplierForm] = useState({ name: '', company: '', mobile: '', address: '' });
   const [supplierPayModal, setSupplierPayModal] = useState(null);
   const [supplierPayAmount, setSupplierPayAmount] = useState('');
+  const [supplierPayDate, setSupplierPayDate] = useState(new Date().toISOString().slice(0, 10));
+  const [supplierPayMethod, setSupplierPayMethod] = useState('Cash');
+  const [supplierPayNote, setSupplierPayNote] = useState('');
+  const [supplierLedgerTab, setSupplierLedgerTab] = useState('statement'); // 'statement' | 'deleted_history'
+  const [supplierDeletedPayments, setSupplierDeletedPayments] = useState([]);
 
   // ডাটাবেজ ব্যাকআপ ও রিস্টোর মডাল স্টেট
   const [showBackupModal, setShowBackupModal] = useState(false);
@@ -184,9 +237,22 @@ function App() {
   // কাস্টমার পেমেন্ট ও মানি রিসিপ্ট স্টেট
   const [payModal, setPayModal] = useState(null);
   const [collectAmount, setCollectAmount] = useState('');
+  const [collectDiscount, setCollectDiscount] = useState('');
   const [collectMethod, setCollectMethod] = useState('Cash');
   const [collectNote, setCollectNote] = useState('');
   const [activeMoneyReceipt, setActiveMoneyReceipt] = useState(null);
+  const [editingPayment, setEditingPayment] = useState(null);
+  const [editPaymentForm, setEditPaymentForm] = useState({
+    amount: '',
+    discount: '',
+    payment_method: 'Cash',
+    note: '',
+    bank_name: '',
+    cheque_no: '',
+    cheque_date: '',
+    deposit_date: '',
+    cheque_status: 'Pending'
+  });
 
   // POS কার্ট ও ইনভয়েস স্টেট (কাস্টমার অটো-সাজেশন সহ)
   const [cart, setCart] = useState([]);
@@ -207,10 +273,14 @@ function App() {
 
   // ইনভয়েস এডিট ও নতুন পণ্য সংযোজন স্টেট
   const [editingInvoice, setEditingInvoice] = useState(null);
+  const [editCustomerId, setEditCustomerId] = useState(null);
   const [editCustomerName, setEditCustomerName] = useState('');
   const [editCustomerMobile, setEditCustomerMobile] = useState('');
+  const [editCustomerSuggestions, setEditCustomerSuggestions] = useState([]);
+  const [showEditCustSuggestions, setShowEditCustSuggestions] = useState(false);
   const [editItems, setEditItems] = useState([]);
   const [editDiscount, setEditDiscount] = useState(0);
+  const [editPaidAmount, setEditPaidAmount] = useState(0);
   const [editAdditionalPaid, setEditAdditionalPaid] = useState('');
   const [editPaymentType, setEditPaymentType] = useState('Cash');
   const [editNote, setEditNote] = useState('');
@@ -454,6 +524,24 @@ function App() {
     }
   }, [currentUser, selectedDate]);
 
+  const breakdownDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (activeCartDropdown !== null) {
+        if (breakdownDropdownRef.current && breakdownDropdownRef.current.contains(e.target)) {
+          return;
+        }
+        if (e.target.closest && e.target.closest('.cart-product-cell')) {
+          return;
+        }
+        setActiveCartDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [activeCartDropdown]);
+
   // কাস্টমার নাম টাইপ করার সাথে সাথে অটো-সাজেশন ফিল্টার
   const customerSuggestions = customers.filter(c => {
     if (!customerName.trim()) return false;
@@ -476,7 +564,7 @@ function App() {
     setVerifiedBarcodeItem(null);
 
     try {
-      const res = await fetch(`http://127.0.0.1:5010/api/returns/verify-barcode/${encodeURIComponent(returnBarcodeScan.trim())}`);
+      const res = await fetch(`${API_BASE}/returns/verify-barcode/${encodeURIComponent(returnBarcodeScan.trim())}`);
       const data = await res.json();
       if (res.ok) {
         setVerifiedBarcodeItem(data);
@@ -501,7 +589,7 @@ function App() {
     if (!verifiedBarcodeItem) return;
 
     try {
-      const res = await fetch('http://127.0.0.1:5010/api/returns/by-barcode', {
+      const res = await fetch(`${API_BASE}/returns/by-barcode`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -538,7 +626,7 @@ function App() {
     setSelectedReturnItem(null);
 
     try {
-      const res = await fetch(`http://127.0.0.1:5010/api/returns/invoice-details/${encodeURIComponent(manualInvoiceSearch.trim())}`);
+      const res = await fetch(`${API_BASE}/returns/invoice-details/${encodeURIComponent(manualInvoiceSearch.trim())}`);
       const data = await res.json();
       if (res.ok) {
         setManualInvoiceData(data);
@@ -557,7 +645,7 @@ function App() {
     if (!manualInvoiceData || !selectedReturnItem) return;
 
     try {
-      const res = await fetch('http://127.0.0.1:5010/api/returns/manual', {
+      const res = await fetch(`${API_BASE}/returns/manual`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -596,7 +684,7 @@ function App() {
     if (!expenseForm.amount || Number(expenseForm.amount) <= 0) return alert(txt('টাকার সঠিক পরিমাণ দিন!', 'Please enter a valid amount!'));
 
     try {
-      const res = await fetch('http://127.0.0.1:5010/api/expenses', {
+      const res = await fetch(`${API_BASE}/expenses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...expenseForm, expense_date: selectedDate })
@@ -617,7 +705,7 @@ function App() {
 
   const handleDeleteExpense = async (id) => {
     if (!window.confirm(txt('এই খরচের রেকর্ডটি মুছে ফেলতে চান?', 'Do you want to delete this expense record?'))) return;
-    await fetch(`http://127.0.0.1:5010/api/expenses/${id}`, { method: 'DELETE' });
+    await fetch(`${API_BASE}/expenses/${id}`, { method: 'DELETE' });
     fetchExpenses(selectedDate);
     fetchDailySummary(selectedDate);
   };
@@ -629,7 +717,7 @@ function App() {
   const handleDeleteQuotation = async (id, no) => {
     if (!window.confirm(txt(`আপনি কি "${no}" কোটেশনটি মুছে ফেলতে চান?`, `Do you want to delete quotation "${no}"?`))) return;
     try {
-      const res = await fetch(`http://127.0.0.1:5010/api/quotations/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/quotations/${id}`, { method: 'DELETE' });
       const data = await res.json();
       alert(data.message);
       fetchQuotations();
@@ -640,7 +728,7 @@ function App() {
 
   const handleViewInvoiceDetails = async (invoiceId) => {
     try {
-      const res = await fetch(`http://127.0.0.1:5010/api/invoices/${invoiceId}`);
+      const res = await fetch(`${API_BASE}/invoices/${invoiceId}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
@@ -660,13 +748,16 @@ function App() {
   // ইনভয়েস এডিট ও নতুন পণ্য সংযোজন হ্যান্ডলার
   const handleOpenEditInvoice = async (invoiceId) => {
     try {
-      const res = await fetch(`http://127.0.0.1:5010/api/invoices/${invoiceId}`);
+      const res = await fetch(`${API_BASE}/invoices/${invoiceId}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
       setEditingInvoice(data);
+      setEditCustomerId(data.customer_id || null);
       setEditCustomerName(data.customer_name || '');
       setEditCustomerMobile(data.customer_mobile || '');
+      setEditCustomerSuggestions([]);
+      setShowEditCustSuggestions(false);
       setEditItems((data.items || []).map(it => {
         const rawSn = it.serial_numbers || '';
         const serialsArr = Array.isArray(it.selected_serials) && it.selected_serials.length > 0
@@ -685,6 +776,7 @@ function App() {
         };
       }));
       setEditDiscount(Number(data.discount_amount || 0));
+      setEditPaidAmount(Number(data.paid_amount || 0));
       setEditAdditionalPaid('');
       setEditPaymentType(data.payment_type || 'Cash');
       setEditNote(data.note || '');
@@ -809,26 +901,44 @@ function App() {
       const editSubTotal = editItems.reduce((sum, it) => sum + (Number(it.unit_price || it.selling_price || 0) * Number(it.qty || 1)), 0);
       const editDiscountNum = Math.max(0, Number(editDiscount || 0));
       const editNetTotal = Math.max(0, editSubTotal - editDiscountNum);
-      const editOldPaid = Number(editingInvoice.paid_amount || 0);
-      const editAddPaidNum = Number(editAdditionalPaid || 0);
-      const editCalculatedPaid = editOldPaid + editAddPaidNum;
-      const editNewDue = Math.max(0, editNetTotal - editCalculatedPaid);
+
+      // পরিশোধিত টাকা ও বকেয়া নির্ধারণ
+      const currentPaidNum = Math.max(0, Number(editPaidAmount === '' ? 0 : editPaidAmount));
+      const editNewDue = Math.max(0, editNetTotal - currentPaidNum);
 
       const finalCustName = editCustomerName.trim() || 'নগদ ক্রেতা';
       const finalCustMobile = editCustomerMobile.trim();
 
+      // যদি বাকি থাকে কিন্তু কাস্টমার নাম নগদ ক্রেতা রাখা হয়
+      if (editNewDue > 0 && finalCustName === 'নগদ ক্রেতা') {
+        const proceedAnon = window.confirm(
+          txt(
+            `⚠️ এই বিলে ৳ ${editNewDue.toLocaleString()} বকেয়া/ডিউ রয়েছে কিন্তু ক্রেতার নাম "নগদ ক্রেতা"। নির্দিষ্ট কাস্টমারের নাম ও মোবাইল নম্বর দিলে বকেয়া হিসাব কাস্টমার লেজার/খাতায় সংরক্ষিত থাকবে। আপনি কি এই অবস্থাতেই সেভ করতে চান?`,
+            `⚠️ This bill has remaining due of ৳ ${editNewDue.toLocaleString()} but customer name is "Cash Customer". Entering customer name & mobile will track it in customer ledger. Do you want to proceed anyway?`
+          )
+        );
+        if (!proceedAnon) {
+          setEditSaving(false);
+          return;
+        }
+      }
+
+      const finalPaymentType = editNewDue <= 0 
+        ? (editPaymentType === 'Due' ? 'Cash' : editPaymentType) 
+        : (currentPaidNum <= 0 ? 'Due' : editPaymentType);
+
       const payload = {
+        customer_id: editCustomerId,
         customer_name: finalCustName,
         customer_mobile: finalCustMobile,
         items: editItems,
         discount_amount: editDiscountNum,
-        additional_paid: editAddPaidNum,
-        paid_amount: editCalculatedPaid,
+        paid_amount: currentPaidNum,
         note: editNote.trim(),
-        payment_type: editNewDue <= 0 ? (editPaymentType === 'Due' ? 'Cash' : editPaymentType) : (editCalculatedPaid <= 0 ? 'Due' : editPaymentType)
+        payment_type: finalPaymentType
       };
 
-      const res = await fetch(`http://127.0.0.1:5010/api/invoices/${editingInvoice.id}`, {
+      const res = await fetch(`${API_BASE}/invoices/${editingInvoice.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -848,8 +958,9 @@ function App() {
         customer_mobile: finalCustMobile,
         discount_amount: editDiscountNum,
         total_amount: data.total_amount ?? editNetTotal,
-        paid_amount: data.paid_amount ?? editCalculatedPaid,
+        paid_amount: data.paid_amount ?? currentPaidNum,
         due_amount: data.due_amount ?? editNewDue,
+        payment_type: data.payment_type ?? finalPaymentType,
         items: editItems
       } : prev);
 
@@ -861,7 +972,7 @@ function App() {
       // যদি কাস্টমার লেজার ওপেন থাকে তবে সমন্বয় রিলোড
       if (savedCustomerId) {
         handleFilterCustomerLedger(savedCustomerId);
-        fetch('http://127.0.0.1:5010/api/customers')
+        fetch(`${API_BASE}/customers`)
           .then(r => r.json())
           .then(custs => {
             if (Array.isArray(custs)) {
@@ -881,6 +992,70 @@ function App() {
       alert(txt('ইনভয়েস সংরক্ষণ ব্যর্থ: ', 'Failed to save invoice: ') + err.message);
     } finally {
       setEditSaving(false);
+    }
+  };
+
+  // বিক্রয় বিল ডিলিট করার হ্যান্ডলার (কাস্টমার লেজারে ভুলবশত এক বিল দুইবার তৈরি হলে ডিলিট এবং সেলস রিপোর্ট থেকে মাইনাস)
+  const handleDeleteInvoice = async (invoiceId, invoiceNo) => {
+    const confirmMsg = txt(
+      `⚠️ আপনি কি নিশ্চিতভাবে বিক্রয় বিল (${invoiceNo || `ID: ${invoiceId}`}) ডিলিট করতে চান?\n\n` +
+      `ভুলবশত এক বিল দুইবার তৈরি হয়ে থাকলে এটি ডিলিট করলে:\n` +
+      `১. কাস্টমার লেজার / খতিয়ান থেকে এই বিলের বকেয়া বাদ (মাইনাস) হবে।\n` +
+      `২. সেলস রিপোর্ট (Sales Report) ও দৈনিক মোট বিক্রয় থেকে সম্পূর্ণ মাইনাস হয়ে যাবে।\n` +
+      `৩. বিক্রিত পণ্যসমূহ এবং সিরিয়াল পুনরায় স্টকে ফেরত যোগ হবে।`,
+      `⚠️ Are you sure you want to delete invoice (${invoiceNo || `ID: ${invoiceId}`})?\n\n` +
+      `If this bill was accidentally created twice, deleting will:\n` +
+      `1. Deduct this invoice's due from customer ledger.\n` +
+      `2. Deduct/minus from sales report and daily sales.\n` +
+      `3. Restore sold items and serials back to inventory stock.`
+    );
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/invoices/${invoiceId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deleted_by: currentUser?.fullname || currentUser?.username || 'Admin',
+          user_role: currentUser?.role || 'admin',
+          reason: 'ভুলবশত এক বিল দুইবার হওয়ায় কাস্টমার লেজার থেকে ডিলিট করা হয়েছে'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      alert(data.message || txt('বিল সফলভাবে ডিলিট করা হয়েছে এবং সেলস রিপোর্ট থেকে মাইনাস হয়েছে!', 'Invoice deleted and sales report adjusted!'));
+
+      // ১. যদি বর্তমানে ওই ইনভয়েসের প্রিভিউ ওপেন থাকে, বন্ধ করা
+      if (completedInvoice && completedInvoice.id === invoiceId) {
+        setCompletedInvoice(null);
+      }
+      if (editingInvoice && editingInvoice.id === invoiceId) {
+        setEditingInvoice(null);
+      }
+
+      // ২. কাস্টমার লেজার রিফ্রেশ
+      const targetCustId = ledgerCustomer?.id;
+      if (targetCustId) {
+        handleFilterCustomerLedger(targetCustId);
+        if (data.customer) {
+          setLedgerCustomer(prev => (prev && prev.id === data.customer.id) ? { ...prev, total_due: data.customer.total_due } : prev);
+        } else if (data.deleted_due) {
+          setLedgerCustomer(prev => prev ? { ...prev, total_due: Math.max(0, Number(prev.total_due || 0) - Number(data.deleted_due || 0)) } : prev);
+        }
+      }
+
+      // ৩. ডাটা রিফ্রেশ (সেলস রিপোর্ট, কাস্টমার, স্টক, রিটার্ন, দৈনিক হিসাব)
+      fetchReports();
+      fetchCustomers();
+      fetchProducts();
+      fetchReturnsHistory();
+      if (typeof fetchDailySummary === 'function') {
+        fetchDailySummary(selectedDate);
+      }
+    } catch (err) {
+      alert(txt('বিল ডিলিট ব্যর্থ: ', 'Failed to delete invoice: ') + err.message);
     }
   };
 
@@ -906,16 +1081,20 @@ function App() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    fetch('http://127.0.0.1:5010/api/login', {
+    fetch(`${API_BASE}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(loginForm)
     })
       .then(r => r.json())
       .then(d => {
-        if (d.user) {
+        if (d.requires_2fa) {
+          setSwitchTwoFaData(d);
+          setSwitchOtp('');
+        } else if (d.user) {
           handleLoginSuccess(d.user);
           setShowLoginModal(false);
+          setSwitchTwoFaData(null);
           setLoginForm({ username: '', password: '' });
         } else {
           alert(d.error || txt('লগইন ব্যর্থ হয়েছে', 'Login failed'));
@@ -924,11 +1103,39 @@ function App() {
       .catch(err => alert(txt('লগইন সার্ভার কানেকশন এরর: ', 'Login server connection error: ') + err.message));
   };
 
+  const handleVerifySwitch2fa = (e) => {
+    e.preventDefault();
+    if (!switchOtp.trim()) {
+      alert(txt('অনুগ্রহ করে ৬-সংখ্যার ওটিপি কোড দিন', 'Please enter 6-digit OTP code'));
+      return;
+    }
+    setSwitch2faLoading(true);
+    fetch(`${API_BASE}/verify-2fa`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: switchTwoFaData?.user_id, otp: switchOtp.trim() })
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && d.user) {
+          handleLoginSuccess(d.user);
+          setShowLoginModal(false);
+          setSwitchTwoFaData(null);
+          setSwitchOtp('');
+          setLoginForm({ username: '', password: '' });
+        } else {
+          alert(d.error || txt('ভেরিফিকেশন কোড ভুল বা মেয়াদোত্তীর্ণ!', 'Invalid or expired verification code!'));
+        }
+      })
+      .catch(err => alert(txt('ভেরিফিকেশন এরর: ', 'Verification error: ') + err.message))
+      .finally(() => setSwitch2faLoading(false));
+  };
+
   const handleSaveUser = async (e) => {
     e.preventDefault();
     try {
       if (editingUserId) {
-        const res = await fetch(`http://127.0.0.1:5010/api/users/${editingUserId}`, {
+        const res = await fetch(`${API_BASE}/users/${editingUserId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newUserForm)
@@ -943,7 +1150,8 @@ function App() {
             ...currentUser,
             username: newUserForm.username,
             fullname: newUserForm.fullname,
-            role: newUserForm.role
+            role: newUserForm.role,
+            email: newUserForm.email || null
           };
           setCurrentUser(updatedCurrentUser);
           try {
@@ -952,7 +1160,7 @@ function App() {
         }
         setEditingUserId(null);
       } else {
-        const res = await fetch('http://127.0.0.1:5010/api/users', {
+        const res = await fetch(`${API_BASE}/users`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newUserForm)
@@ -962,7 +1170,7 @@ function App() {
 
         alert(data.message || txt('নতুন ইউজার সফলভাবে তৈরি হয়েছে!', 'New user created successfully!'));
       }
-      setNewUserForm({ username: '', password: '', fullname: '', role: 'sales' });
+      setNewUserForm({ username: '', password: '', fullname: '', role: 'sales', email: '' });
       fetchUsers();
     } catch (err) {
       alert(txt('এরর: ', 'Error: ') + err.message);
@@ -972,7 +1180,7 @@ function App() {
   const handleDeleteUser = async (userId, username) => {
     if (!window.confirm(txt(`আপনি কি নিশ্চিতভাবে "${username}" ইউজারটি মুছে ফেলতে চান?`, `Are you sure you want to delete user "${username}"?`))) return;
     try {
-      const res = await fetch(`http://127.0.0.1:5010/api/users/${userId}`, {
+      const res = await fetch(`${API_BASE}/users/${userId}`, {
         method: 'DELETE'
       });
       const data = await res.json();
@@ -980,7 +1188,7 @@ function App() {
       alert(data.message || txt('ইউজার মুছে ফেলা হয়েছে!', 'User deleted successfully!'));
       if (editingUserId === userId) {
         setEditingUserId(null);
-        setNewUserForm({ username: '', password: '', fullname: '', role: 'sales' });
+        setNewUserForm({ username: '', password: '', fullname: '', role: 'sales', email: '' });
       }
       fetchUsers();
     } catch (err) {
@@ -1024,9 +1232,94 @@ function App() {
     });
   };
 
+  const handleAddCartRow = () => {
+    const newRowId = 'row_' + Date.now() + Math.random().toString(36).substring(2, 6);
+    const newRow = {
+      id: newRowId,
+      is_empty_row: true,
+      name: '',
+      model: '',
+      category: '',
+      warranty: '1 Year',
+      qty: 1,
+      selling_price: '',
+      min_selling_price: 0,
+      discount: '',
+      selected_serials: [],
+      raw_serials_input: ''
+    };
+    setCart([...cart, newRow]);
+    setActiveCartDropdown(cart.length);
+    setBreakdownSearch('');
+    setBreakdownCategory('All');
+  };
+
+  const selectProductIntoCartRow = (rowIndex, product, autoSerial = null) => {
+    if (Number(product.current_stock) <= 0) {
+      return alert(txt('এই পণ্যটির স্টক শেষ!', 'This product is out of stock!'));
+    }
+
+    // অন্য কোনো সারিতে একই পণ্য ইতোমধ্যে আছে কিনা চেক করা
+    const existingIdx = cart.findIndex((c, i) => i !== rowIndex && c.id === product.id && !c.is_empty_row);
+    if (existingIdx !== -1) {
+      const existing = cart[existingIdx];
+      if (existing.qty >= product.current_stock) {
+        return alert(txt('স্টকের চেয়ে বেশি বিক্রি সম্ভব নয়!', 'Cannot sell more than available stock!'));
+      }
+      let updatedSerials = existing.selected_serials ? [...existing.selected_serials] : [];
+      if (autoSerial && !updatedSerials.includes(autoSerial)) {
+        updatedSerials.push(autoSerial);
+      }
+      const updated = [...cart];
+      updated[existingIdx] = {
+        ...existing,
+        qty: existing.qty + 1,
+        selected_serials: updatedSerials,
+        raw_serials_input: updatedSerials.join(', ')
+      };
+      if (updated[rowIndex]?.is_empty_row) {
+        updated.splice(rowIndex, 1);
+      }
+      setCart(updated);
+      setActiveCartDropdown(null);
+      return;
+    }
+
+    const initSerials = autoSerial ? [autoSerial] : [];
+    const updated = [...cart];
+    updated[rowIndex] = {
+      ...product,
+      id: product.id,
+      name: product.name,
+      model: product.model || '',
+      category: product.category || 'General',
+      warranty: product.warranty || '1 Year',
+      selling_price: product.selling_price || 0,
+      min_selling_price: Number(product.min_selling_price || 0),
+      current_stock: product.current_stock,
+      available_serials: product.available_serials || '',
+      qty: 1,
+      discount: '',
+      selected_serials: initSerials,
+      raw_serials_input: initSerials.join(', '),
+      is_empty_row: false
+    };
+    setCart(updated);
+    setActiveCartDropdown(null);
+  };
+
   const addToCart = (product, autoSerial = null) => {
     if (Number(product.current_stock) <= 0) return alert(txt('এই পণ্যটির স্টক শেষ!', 'This product is out of stock!'));
-    const existing = cart.find(item => item.id === product.id);
+    
+    // ১. কার্টে কোনো ফাঁকা সারি থাকলে সেখানে সেট করা
+    const emptyRowIdx = cart.findIndex(item => item.is_empty_row);
+    if (emptyRowIdx !== -1) {
+      selectProductIntoCartRow(emptyRowIdx, product);
+      return;
+    }
+
+    // ২. পণ্য ইতোমধ্যে কার্টে থাকলে পরিমাণ ১ বাড়ানো
+    const existing = cart.find(item => item.id === product.id && !item.is_empty_row);
     if (existing) {
       if (existing.qty >= product.current_stock) return alert(txt('স্টকের চেয়ে বেশি বিক্রি সম্ভব নয়!', 'Cannot sell more than available stock!'));
       
@@ -1034,23 +1327,64 @@ function App() {
       if (autoSerial && !updatedSerials.includes(autoSerial)) {
         updatedSerials.push(autoSerial);
       }
-      setCart(cart.map(item => item.id === product.id ? { 
+      setCart(cart.map(item => item.id === product.id && !item.is_empty_row ? { 
         ...item, 
         qty: item.qty + 1,
         selected_serials: updatedSerials,
         raw_serials_input: updatedSerials.join(', ')
       } : item));
     } else {
+      // ৩. নতুন আইটেম হিসেবে কার্টে যোগ করা
       const initSerials = autoSerial ? [autoSerial] : [];
       setCart([...cart, { 
         ...product, 
+        id: product.id,
+        name: product.name,
+        model: product.model || '',
+        category: product.category || 'General',
+        warranty: product.warranty || '1 Year',
+        selling_price: product.selling_price || 0,
+        min_selling_price: Number(product.min_selling_price || 0),
+        current_stock: product.current_stock,
+        available_serials: product.available_serials || '',
         qty: 1, 
         discount: '',
         selected_serials: initSerials, 
-        raw_serials_input: initSerials.join(', ') 
+        raw_serials_input: initSerials.join(', '),
+        is_empty_row: false
       }]);
     }
   };
+
+  const handleCartPriceChange = (index, val) => {
+    setCart(cart.map((c, i) => i === index ? { ...c, selling_price: val, sale_price: val } : c));
+  };
+
+  const handleCartPriceBlur = (index) => {
+    const item = cart[index];
+    if (!item || item.is_service || item.is_empty_row) return;
+    const minLimit = Number(item.min_selling_price || 0);
+    const entered = Number(item.selling_price || 0);
+    if (minLimit > 0 && entered < minLimit) {
+      alert(txt(
+        `"${item.name}" পণ্যের বিক্রয় দর সর্বনিম্ন ৳ ${minLimit} এর কম করা যাবে না! বিক্রয় দর ৳ ${minLimit} সেট করা হলো।`,
+        `Selling price for "${item.name}" cannot be less than minimum ৳ ${minLimit}! Reset to ৳ ${minLimit}.`
+      ));
+      setCart(cart.map((c, i) => i === index ? { ...c, selling_price: minLimit, sale_price: minLimit } : c));
+    }
+  };
+
+  const breakdownFilteredProducts = products.filter(p => {
+    const matchCat = breakdownCategory === 'All' || p.category === breakdownCategory;
+    const query = breakdownSearch.trim().toLowerCase();
+    if (!query) return matchCat;
+    const matchSearch = (p.name && p.name.toLowerCase().includes(query)) ||
+      (p.model && p.model.toLowerCase().includes(query)) ||
+      (p.barcode && p.barcode.toLowerCase().includes(query)) ||
+      (p.category && p.category.toLowerCase().includes(query)) ||
+      (p.available_serials && p.available_serials.toLowerCase().includes(query));
+    return matchCat && matchSearch;
+  });
 
   const handleBarcodeScan = (e) => {
     if (e.key === 'Enter') {
@@ -1139,8 +1473,9 @@ function App() {
     }
   };
 
-  const subTotal = cart.reduce((sum, item) => sum + (Number(item.selling_price || item.sale_price || 0) * item.qty), 0);
-  const itemDiscountsTotal = cart.reduce((sum, item) => sum + Math.max(0, Number(item.discount || 0)), 0);
+  const validCartItems = cart.filter(item => !item.is_empty_row && item.name && item.name.trim() !== '');
+  const subTotal = validCartItems.reduce((sum, item) => sum + (Number(item.selling_price || item.sale_price || 0) * item.qty), 0);
+  const itemDiscountsTotal = validCartItems.reduce((sum, item) => sum + Math.max(0, Number(item.discount || 0)), 0);
   const extraDiscount = Math.max(0, Number(discountAmount || 0));
   const netDiscount = itemDiscountsTotal + extraDiscount;
   const netBillTotal = Math.max(0, subTotal - netDiscount);
@@ -1152,12 +1487,76 @@ function App() {
   const customerPreviousDue = selectedCustomerObj ? Number(selectedCustomerObj.total_due || 0) : 0;
   const totalDueWithPrevious = customerPreviousDue + currentBillDue;
 
+  // বিল কনফার্ম করার আগে প্রিভিউ দেখার হ্যান্ডলার (অসংরক্ষিত ড্রাফট প্রিভিউ)
+  const handlePreviewBill = () => {
+    const validItems = cart.filter(item => !item.is_empty_row && item.name && item.name.trim() !== '');
+    if (validItems.length === 0) {
+      return alert(txt('কার্ট খালি! প্রিভিউ দেখতে অন্তত একটি পণ্য কার্টে যোগ করুন।', 'Cart is empty! Add at least one product to preview.'));
+    }
+
+    // প্রিভিউ ইনভয়েস অবজেক্ট তৈরি
+    setCompletedInvoice({
+      id: null,
+      is_preview: true,
+      invoice_no: 'DRAFT-' + Date.now().toString().slice(-4),
+      customer_name: customerName.trim() || txt('নগদ ক্রেতা', 'Cash Customer'),
+      customer_mobile: customerMobile.trim() || '',
+      payment_type: paymentType || 'Cash',
+      items: validItems.map(item => {
+        let serials = [];
+        if (typeof item.raw_serials_input === 'string' && item.raw_serials_input.trim()) {
+          serials = item.raw_serials_input.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+        } else if (Array.isArray(item.selected_serials)) {
+          serials = item.selected_serials.map(s => String(s).trim()).filter(Boolean);
+        }
+
+        return {
+          id: item.is_service ? 0 : (Number(item.id) || 0),
+          is_service: Boolean(item.is_service),
+          name: item.name,
+          model: item.model || '',
+          qty: Number(item.qty || 1),
+          selling_price: Number(item.selling_price || item.sale_price || 0),
+          discount: 0,
+          warranty: item.warranty || '',
+          selected_serials: serials
+        };
+      }),
+      sub_total: subTotal,
+      discount_amount: extraDiscount,
+      total_amount: netBillTotal,
+      paid_amount: actualPaidAmount,
+      due_amount: currentBillDue,
+      previous_due: customerPreviousDue,
+      total_due_after: totalDueWithPrevious,
+      note: billNote ? billNote.trim() : '',
+      salesman_name: currentUser ? (currentUser.fullname || currentUser.username) : 'Admin',
+      user_id: currentUser ? currentUser.id : null,
+      date: formatDateDMY(new Date())
+    });
+  };
+
   // ইনভয়েস ও চেকআউট হ্যান্ডলার
   const handleCheckout = async () => {
-    if (cart.length === 0) return alert(txt('কার্ট খালি!', 'Cart is empty!'));
+    const validItems = cart.filter(item => !item.is_empty_row && item.name && item.name.trim() !== '');
+    if (validItems.length === 0) return alert(txt('কার্ট খালি বা কোনো পণ্য নির্বাচন করা হয়নি!', 'Cart is empty or no product selected!'));
+
+    // বিক্রয় প্রাইসের সর্বনিম্ন সীমা ভ্যালিডেশন
+    for (const item of validItems) {
+      if (!item.is_service && item.id) {
+        const minLimit = Number(item.min_selling_price || 0);
+        const price = Number(item.selling_price || item.sale_price || 0);
+        if (minLimit > 0 && price < minLimit) {
+          return alert(txt(
+            `"${item.name}" পণ্যের বিক্রয় দর সর্বনিম্ন ৳ ${minLimit} এর কম রাখা যাবে না! (বর্তমান দর: ৳ ${price})`,
+            `Selling price for "${item.name}" cannot be less than minimum ৳ ${minLimit}! (Current price: ৳ ${price})`
+          ));
+        }
+      }
+    }
 
     // সিরিয়াল প্রয়োজনীয়তা ও সঠিকতা ভ্যালিডেশন (শুধুমাত্র যেসব পণ্যে স্টকে সিরিয়াল আছে)
-    for (const item of cart) {
+    for (const item of validItems) {
       const hasSerials = item.available_serials && item.available_serials.trim();
       if (hasSerials) {
         let serials = [];
@@ -1195,7 +1594,7 @@ function App() {
       note: billNote ? billNote.trim() : '',
       user_id: currentUser ? currentUser.id : null,
       salesman_name: currentUser ? (currentUser.fullname || currentUser.username) : 'Admin',
-      items: cart.map(item => {
+      items: validItems.map(item => {
         let serials = [];
         if (typeof item.raw_serials_input === 'string' && item.raw_serials_input.trim()) {
           serials = item.raw_serials_input.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
@@ -1218,7 +1617,7 @@ function App() {
     };
 
     try {
-      const res = await fetch('http://127.0.0.1:5010/api/invoices', {
+      const res = await fetch(`${API_BASE}/invoices`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -1280,7 +1679,7 @@ function App() {
 
   const handleProductSubmit = async (e) => {
     e.preventDefault();
-    const url = editingProductId ? `http://127.0.0.1:5010/api/products/${editingProductId}` : 'http://127.0.0.1:5010/api/products';
+    const url = editingProductId ? `${API_BASE}/products/${editingProductId}` : `${API_BASE}/products`;
     const method = editingProductId ? 'PUT' : 'POST';
 
     try {
@@ -1309,7 +1708,7 @@ function App() {
       setEditingProductId(null);
       setFormData({
         name: '', brand: '', model: '', category: 'CC Camera', barcode: '', warranty: '',
-        purchase_price: '', selling_price: '', current_stock: '', alert_quantity: 5,
+        purchase_price: '', selling_price: '', min_selling_price: '', current_stock: '', alert_quantity: 5,
         supplier_id: ''
       });
       fetchProducts();
@@ -1322,7 +1721,7 @@ function App() {
   const handleDeleteProduct = async (id, name) => {
     if (!window.confirm(txt(`আপনি কি নিশ্চিতভাবে "${name}" পণ্যটি মুছে ফেলতে চান?`, `Are you sure you want to delete product "${name}"?`))) return;
     try {
-      const res = await fetch(`http://127.0.0.1:5010/api/products/${id}`, { 
+      const res = await fetch(`${API_BASE}/products/${id}`, { 
         method: 'DELETE',
         headers: {
           'Accept': 'application/json',
@@ -1350,7 +1749,7 @@ function App() {
   const handleDeleteSupplier = async (id, name) => {
     if (!window.confirm(txt(`আপনি কি "${name}" সাপ্লায়ারের রেকর্ড মুছে ফেলতে চান?`, `Are you sure you want to delete supplier "${name}"?`))) return;
     try {
-      const res = await fetch(`http://127.0.0.1:5010/api/suppliers/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/suppliers/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       alert(data.message || txt('সাপ্লায়ার মুছে ফেলা হয়েছে!', 'Supplier deleted successfully!'));
@@ -1363,7 +1762,7 @@ function App() {
   const handleDeleteCustomer = async (id, name) => {
     if (!window.confirm(txt(`আপনি কি "${name}" কাস্টমারের রেকর্ড মুছে ফেলতে চান?`, `Are you sure you want to delete customer "${name}"?`))) return;
     try {
-      const res = await fetch(`http://127.0.0.1:5010/api/customers/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/customers/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       alert(data.message || txt('কাস্টমার মুছে ফেলা হয়েছে!', 'Customer deleted successfully!'));
@@ -1376,7 +1775,7 @@ function App() {
   const handleSupplierSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://127.0.0.1:5010/api/suppliers', {
+      const res = await fetch(`${API_BASE}/suppliers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(supplierForm)
@@ -1396,7 +1795,7 @@ function App() {
   const handleBarcodeSearch = (e) => {
     e.preventDefault();
     if (!barcodeSearch.trim()) return;
-    fetch(`http://127.0.0.1:5010/api/serials/history/${encodeURIComponent(barcodeSearch.trim())}`)
+    fetch(`${API_BASE}/serials/history/${encodeURIComponent(barcodeSearch.trim())}`)
       .then(r => r.json())
       .then(d => {
         if (d.error) alert(d.error);
@@ -1410,7 +1809,7 @@ function App() {
     const serialList = serialsInput.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
     if (serialList.length === 0) return alert(txt('কমপক্ষে একটি সিরিয়াল নম্বর দিন', 'Enter at least one serial number'));
 
-    fetch('http://127.0.0.1:5010/api/products/stock-in-serials', {
+    fetch(`${API_BASE}/products/stock-in-serials`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1442,7 +1841,7 @@ function App() {
       return;
     }
     try {
-      const res = await fetch('http://127.0.0.1:5010/api/suppliers/purchases', {
+      const res = await fetch(`${API_BASE}/suppliers/purchases`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(supplierPurchaseForm)
@@ -1489,8 +1888,9 @@ function App() {
   };
 
   const handleImportCartToQuotation = () => {
-    if (cart.length === 0) return alert(txt('POS কার্টে কোনো পণ্য নেই!', 'No products in POS cart!'));
-    const newItems = cart.map(c => ({
+    const validCart = cart.filter(c => !c.is_empty_row && c.name && c.name.trim() !== '');
+    if (validCart.length === 0) return alert(txt('POS কার্টে কোনো পণ্য নেই!', 'No products in POS cart!'));
+    const newItems = validCart.map(c => ({
       id: Date.now() + Math.random(),
       name: c.name + (c.model ? ` (${c.model})` : ''),
       warranty: c.warranty || '1 Year',
@@ -1526,7 +1926,7 @@ function App() {
     };
 
     try {
-      const res = await fetch('http://127.0.0.1:5010/api/quotations', {
+      const res = await fetch(`${API_BASE}/quotations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -1548,7 +1948,7 @@ function App() {
 
   const handleViewSavedQuotation = async (qId) => {
     try {
-      const res = await fetch(`http://127.0.0.1:5010/api/quotations/${qId}`);
+      const res = await fetch(`${API_BASE}/quotations/${qId}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
@@ -1584,7 +1984,7 @@ function App() {
     const shortage = Math.max(0, expected - actual);
 
     try {
-      const res = await fetch('http://127.0.0.1:5010/api/cash-reconciliation', {
+      const res = await fetch(`${API_BASE}/cash-reconciliation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1610,7 +2010,7 @@ function App() {
   const handleToggleReconciliationStatus = async (id, currentStatus) => {
     const newStatus = currentStatus === 'অমীমাংসিত' ? 'মীমাংসিত' : 'অমীমাংসিত';
     try {
-      const res = await fetch(`http://127.0.0.1:5010/api/cash-reconciliation/${id}/status`, {
+      const res = await fetch(`${API_BASE}/cash-reconciliation/${id}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -1627,7 +2027,7 @@ function App() {
   const handleDeleteCashReconciliation = async (id) => {
     if (!window.confirm(txt('আপনি কি এই রিকনসিলিয়েশন রেকর্ডটি মুছে ফেলতে চান?', 'Do you want to delete this reconciliation record?'))) return;
     try {
-      await fetch(`http://127.0.0.1:5010/api/cash-reconciliation/${id}`, { method: 'DELETE' });
+      await fetch(`${API_BASE}/cash-reconciliation/${id}`, { method: 'DELETE' });
       fetchDailySummary(selectedDate);
       fetchCashReconciliations();
     } catch (err) {
@@ -1638,7 +2038,7 @@ function App() {
   // চেক স্ট্যাটাস পরিবর্তন
   const handleUpdateChequeStatus = async (id, newStatus) => {
     try {
-      const res = await fetch(`http://127.0.0.1:5010/api/cheques/${id}/status`, {
+      const res = await fetch(`${API_BASE}/cheques/${id}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cheque_status: newStatus })
@@ -1657,7 +2057,7 @@ function App() {
   const handleViewMoneyReceipt = async (t) => {
     try {
       if (t.id) {
-        const res = await fetch(`http://127.0.0.1:5010/api/money-receipts/${t.id}`);
+        const res = await fetch(`${API_BASE}/money-receipts/${t.id}`);
         if (res.ok) {
           const data = await res.json();
           if (data && data.id) {
@@ -1675,6 +2075,7 @@ function App() {
         customer_mobile: t.customer_mobile || ledgerCustomer?.mobile || '-',
         customer_address: t.customer_address || ledgerCustomer?.address || '',
         amount: t.amount,
+        discount: t.discount || 0,
         payment_method: t.payment_method || 'Cash',
         bank_name: t.bank_name || null,
         cheque_no: t.cheque_no || null,
@@ -1682,7 +2083,7 @@ function App() {
         deposit_date: t.deposit_date || null,
         cheque_status: t.cheque_status || null,
         note: t.note || (t.payment_method === 'Cheque' ? txt(`চেক নং: ${t.cheque_no || ''}`, `Cheque No: ${t.cheque_no || ''}`) : txt('বকেয়া সমন্বয় বাবদ নগদ জমা', 'Cash received for due adjustment')),
-        previous_due: t.previous_due ?? (ledgerCustomer?.total_due !== undefined ? (Number(ledgerCustomer.total_due) + Number(t.amount)) : t.amount),
+        previous_due: t.previous_due ?? (ledgerCustomer?.total_due !== undefined ? (Number(ledgerCustomer.total_due) + Number(t.amount || 0) + Number(t.discount || 0)) : t.amount),
         remaining_due: t.remaining_due ?? (ledgerCustomer?.total_due !== undefined ? Number(ledgerCustomer.total_due) : 0),
         received_by: t.received_by || 'Admin',
         created_at: t.created_at || new Date().toISOString()
@@ -1692,11 +2093,86 @@ function App() {
     }
   };
 
+  // কাস্টমার পেমেন্ট / মানি রিসিপ্ট এডিট হ্যান্ডলার (শুধুমাত্র অ্যাডমিন)
+  const handleOpenEditPayment = (payment) => {
+    if (currentUser?.role !== 'admin') {
+      alert(txt("অননুমোদিত অ্যাক্সেস! শুধুমাত্র অ্যাডমিন কাস্টমারের টাকা গ্রহণ ও মানি রিসিপ্ট সংশোধন করতে পারবেন।", "Unauthorized! Only Admin can edit received payments and money receipts."));
+      return;
+    }
+    setEditingPayment(payment);
+    setEditPaymentForm({
+      amount: payment.amount || '',
+      discount: payment.discount !== undefined ? payment.discount : '',
+      payment_method: payment.payment_method || 'Cash',
+      note: payment.note || '',
+      bank_name: payment.bank_name || '',
+      cheque_no: payment.cheque_no || '',
+      cheque_date: payment.cheque_date ? payment.cheque_date.slice(0, 10) : '',
+      deposit_date: payment.deposit_date ? payment.deposit_date.slice(0, 10) : '',
+      cheque_status: payment.cheque_status || 'Pending'
+    });
+  };
+
+  const handleUpdatePayment = async (e) => {
+    e.preventDefault();
+    if (currentUser?.role !== 'admin') {
+      alert(txt("অননুমোদিত অ্যাক্সেস! শুধুমাত্র অ্যাডমিন এডিট করতে পারবেন।", "Unauthorized! Only Admin can edit."));
+      return;
+    }
+    const amt = Number(editPaymentForm.amount);
+    if (!amt || amt <= 0) {
+      alert(txt("সঠিক টাকার পরিমাণ দিন (টাকা শূন্য বা ঋণাত্মক হতে পারবে না)!", "Please enter a valid amount!"));
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/customer-payments/${editingPayment.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...editPaymentForm,
+          amount: amt,
+          discount: Number(editPaymentForm.discount) || 0,
+          user_role: currentUser.role,
+          admin_name: currentUser.fullname || currentUser.username || 'Admin'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      alert(data.message || txt("সফলভাবে টাকা ও মানি রিসিপ্ট সংশোধন সম্পন্ন হয়েছে এবং লেজার সমন্বয় করা হয়েছে!", "Payment and receipt updated successfully!"));
+      setEditingPayment(null);
+
+      // ১. কাস্টমার লিস্ট এবং লেজার কাস্টমার আপডেট
+      if (data.customer) {
+        setCustomers(prev => prev.map(c => c.id === data.customer.id ? { ...c, total_due: data.customer.total_due } : c));
+        setLedgerCustomer(prev => (prev && prev.id === data.customer.id) ? { ...prev, total_due: data.customer.total_due } : prev);
+      }
+
+      // ২. কাস্টমার লেজার ট্রানজেকশন তালিকা রিলোড
+      const targetCustId = editingPayment.customer_id || ledgerCustomer?.id;
+      if (targetCustId) {
+        fetch(`${API_BASE}/customers/${targetCustId}/transactions${(custLedgerFromDate || custLedgerToDate) ? `?from_date=${custLedgerFromDate}&to_date=${custLedgerToDate}` : ''}`)
+          .then(r => r.json())
+          .then(d => setTransactions(d || []));
+      }
+
+      // ৩. মানি রিসিপ্ট যদি বর্তমানে ওপেন থাকে, সেটিও সাথে সাথে আপডেট করা
+      if (activeMoneyReceipt && activeMoneyReceipt.id === editingPayment.id) {
+        setActiveMoneyReceipt(data.receipt);
+      }
+
+      fetchCustomers();
+    } catch (err) {
+      alert(txt("সংশোধন ব্যর্থ হয়েছে: ", "Update failed: ") + err.message);
+    }
+  };
+
   // কাস্টমার লেজার ফিল্টার
   const handleFilterCustomerLedger = (customerId) => {
     const id = customerId || ledgerCustomer?.id;
     if (!id) return;
-    fetch(`http://127.0.0.1:5010/api/customers/${id}/transactions?from_date=${custLedgerFromDate}&to_date=${custLedgerToDate}`)
+    fetch(`${API_BASE}/customers/${id}/transactions?from_date=${custLedgerFromDate}&to_date=${custLedgerToDate}`)
       .then(r => r.json())
       .then(d => setTransactions(d || []));
   };
@@ -1706,16 +2182,79 @@ function App() {
     setCustLedgerToDate('');
     const id = customerId || ledgerCustomer?.id;
     if (!id) return;
-    fetch(`http://127.0.0.1:5010/api/customers/${id}/transactions`)
+    fetch(`${API_BASE}/customers/${id}/transactions`)
       .then(r => r.json())
       .then(d => setTransactions(d || []));
   };
 
-  // সাপ্লায়ার লেজার ফিল্টার
+  // সাপ্লায়ার লেজার ও হিস্ট্রি
+  const fetchSupplierLedger = (supplierId) => {
+    const id = supplierId || supplierLedger?.id;
+    if (!id) return;
+    const url = (suppLedgerFromDate || suppLedgerToDate)
+      ? `${API_BASE}/suppliers/${id}/ledger?from_date=${suppLedgerFromDate}&to_date=${suppLedgerToDate}`
+      : `${API_BASE}/suppliers/${id}/ledger`;
+    fetch(url)
+      .then(r => r.json())
+      .then(d => {
+        setSupplierTransactions(d || []);
+        // আপডেট পাওনা রিফ্রেশ
+        fetch(`${API_BASE}/suppliers`)
+          .then(res => res.json())
+          .then(allSupps => {
+            const found = allSupps.find(s => s.id === id);
+            if (found) setSupplierLedger(found);
+          })
+          .catch(() => {});
+      })
+      .catch(() => setSupplierTransactions([]));
+  };
+
+  const fetchDeletedPayments = (supplierId) => {
+    const id = supplierId || supplierLedger?.id;
+    if (!id) return;
+    fetch(`${API_BASE}/suppliers/${id}/deleted-payments`)
+      .then(r => r.json())
+      .then(d => setSupplierDeletedPayments(d || []))
+      .catch(() => setSupplierDeletedPayments([]));
+  };
+
+  const handleDeleteSupplierPayment = (trans) => {
+    if (!window.confirm(txt(
+      `আপনি কি নিশ্চিতভাবে এই ${Number(trans.amount).toLocaleString()} টাকার পেমেন্টটি ডিলিট করতে চান?\n\nএটি ডিলিট করলে:\n১. সাপ্লায়ারের বকেয়া পাওনাতে ৳ ${Number(trans.amount).toLocaleString()} ফেরত যোগ হবে।\n২. নির্বাচিত তারিখের খরচের তালিকা হতে এটি বাদ যাবে এবং প্রত্যাশিত ক্যাশ সমন্বয় হবে।\n৩. মুছে ফেলা পেমেন্ট হিস্ট্রিতে এর সম্পূর্ণ রেকর্ড সংরক্ষিত থাকবে।`,
+      `Are you sure you want to delete this payment of ৳ ${Number(trans.amount).toLocaleString()}?\n\nThis will restore the supplier balance and remove it from expenses.`
+    ))) {
+      return;
+    }
+
+    fetch(`${API_BASE}/suppliers/transactions/${trans.id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        deleted_by: currentUser.fullname || currentUser.username || 'Admin',
+        reason: 'সাপ্লায়ার লেজার থেকে মুছে ফেলা হয়েছে'
+      })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
+      alert(data.message || txt('পেমেন্ট সফলভাবে মুছে ফেলা হয়েছে!', 'Payment deleted successfully!'));
+      fetchSupplierLedger(supplierLedger?.id);
+      fetchDeletedPayments(supplierLedger?.id);
+      fetchSuppliers();
+      fetchExpenses(selectedDate);
+      fetchDailySummary(selectedDate);
+    })
+    .catch(err => alert(err.message));
+  };
+
   const handleFilterSupplierLedger = (supplierId) => {
     const id = supplierId || supplierLedger?.id;
     if (!id) return;
-    fetch(`http://127.0.0.1:5010/api/suppliers/${id}/ledger?from_date=${suppLedgerFromDate}&to_date=${suppLedgerToDate}`)
+    fetch(`${API_BASE}/suppliers/${id}/ledger?from_date=${suppLedgerFromDate}&to_date=${suppLedgerToDate}`)
       .then(r => r.json())
       .then(d => setSupplierTransactions(d || []));
   };
@@ -1725,7 +2264,7 @@ function App() {
     setSuppLedgerToDate('');
     const id = supplierId || supplierLedger?.id;
     if (!id) return;
-    fetch(`http://127.0.0.1:5010/api/suppliers/${id}/ledger`)
+    fetch(`${API_BASE}/suppliers/${id}/ledger`)
       .then(r => r.json())
       .then(d => setSupplierTransactions(d || []));
   };
@@ -1756,9 +2295,28 @@ function App() {
     (p.category && p.category.toLowerCase().includes(inventorySearch.toLowerCase()))
   );
 
+  // এফসি টেকনোলজি ওয়েবসাইট ভিউ মোড
+  if (viewMode === 'website') {
+    return (
+      <FcTechnologyWebsite
+        onOpenPos={() => switchView('pos')}
+        lang={lang}
+        onToggleLang={toggleLanguage}
+        currentUser={currentUser}
+      />
+    );
+  }
+
   // ব্যবহারকারী লগইন না থাকলে সরাসরি অ্যাডমিনিস্ট্রেটর ও বিক্রয় প্রতিনিধির লগইন পেইজ প্রদর্শিত হবে
   if (!currentUser) {
-    return <LoginPage onLogin={handleLoginSuccess} lang={lang} onToggleLang={toggleLanguage} />;
+    return (
+      <LoginPage 
+        onLogin={handleLoginSuccess} 
+        lang={lang} 
+        onToggleLang={toggleLanguage} 
+        onBackToWebsite={() => switchView('website')}
+      />
+    );
   }
 
   return (
@@ -1787,6 +2345,16 @@ function App() {
         </div>
 
         <div className="flex gap-2 items-center flex-wrap">
+          {/* মূল ওয়েবসাইটে ফিরে যাওয়ার বাটন */}
+          <button 
+            onClick={() => switchView('website')} 
+            className="px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer transition flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white shadow-md shadow-emerald-950/40 border border-emerald-400/40 hover:scale-[1.03]"
+            title={txt("এফসি টেকনোলজি মূল ওয়েবসাইটে ফিরে যান", "Back to FC Technology Website")}
+          >
+            <Globe size={13} className="text-emerald-200" />
+            <span>{txt("🌐 ওয়েবসাইট", "🌐 Website")}</span>
+          </button>
+
           {/* ড্যাশবোর্ড ট্যাব */}
           <button 
             onClick={() => setActiveTab('dashboard')} 
@@ -2012,7 +2580,7 @@ function App() {
       </nav>
 
       {/* মূল কন্টেন্ট এরিয়া */}
-      <div className="p-6 flex-1 max-w-7xl mx-auto w-full print:hidden">
+      <div className="p-6 flex-1 max-w-7xl mx-auto w-full print:hidden text-slate-800">
         
         {/* চেক জমা দেওয়ার সতর্কতা ব্যানার (আগের দিন ও আজকের সতর্কতা) */}
         {chequeAlerts && chequeAlerts.length > 0 && (
@@ -2050,425 +2618,801 @@ function App() {
 
         {/* ১. POS কাউন্টার ট্যাব */}
         {activeTab === 'pos' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                <div className="relative">
-                  <Barcode className="absolute left-3 top-2.5 text-gray-400" size={18} />
-                  <input
-                    ref={barcodeInputRef}
-                    type="text"
-                    placeholder={txt("বারকোড স্ক্যান করুন...", "Scan barcode...")}
-                    value={barcodeInput}
-                    onChange={(e) => setBarcodeInput(e.target.value)}
-                    onKeyDown={handleBarcodeScan}
-                    className="w-full pl-10 pr-3 py-2 border rounded-lg text-sm bg-blue-50/40 border-blue-200 focus:outline-blue-500"
-                    autoFocus
-                  />
-                </div>
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
-                  <input
-                    type="text"
-                    placeholder={txt("পণ্য বা মডেল দিয়ে খুঁজুন...", "Search by product or model...")}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* ক্যাটাগরি ফিল্টার ও সার্ভিসিং বাটন */}
-              <div className="flex justify-between items-center gap-2 pb-2 mb-2 border-b">
-                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin flex-1">
-                  {['All', ...MASTER_CATEGORIES].map((cat, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setSelectedCategory(cat)}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                        selectedCategory === cat ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {cat === 'All' ? txt('সব পণ্য', 'All Products') : cat}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={() => setShowServiceModal(true)}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer whitespace-nowrap shrink-0"
-                  title={txt("ল্যাপটপ বা ডেস্কটপ সার্ভিসিং বিল তৈরি করুন", "Create laptop or desktop service bill")}
-                >
-                  <Wrench size={14} /> {txt('🔧 সার্ভিসিং বিল যোগ', '🔧 Add Service Bill')}
-                </button>
-              </div>
-
-              {/* প্রোডাক্ট গ্রিড */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[58vh] overflow-y-auto pr-1">
-                {filteredProducts.map(p => (
-                  <div
-                    key={p.id}
-                    onClick={() => addToCart(p)}
-                    className="p-3.5 border rounded-xl hover:border-blue-500 hover:shadow cursor-pointer transition flex flex-col justify-between bg-gray-50/50"
+          <div className="space-y-6">
+            {/* ১.১ বিক্রয় বিল / কার্ট (Sale Bill / Cart) - এখন উপরে পাশাপাশি (কোটেশন প্যাটার্ন) */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+              {/* কার্ট হেডার */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-3 mb-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white p-3.5 rounded-xl shadow-xs">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h2 className="text-base font-bold flex items-center gap-2">
+                    <ShoppingCart size={18} /> {txt('বিক্রয় বিল / কার্ট', 'Sale Bill / Cart')}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={handleAddCartRow}
+                    className="px-2.5 py-1 bg-white/20 hover:bg-white/30 text-white border border-white/30 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition shadow-2xs"
+                    title={txt("নতুন পণ্য সারি যোগ করুন", "Add new item row")}
                   >
-                    <div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">{p.category || 'General'}</span>
-                        {p.model && <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-mono">{p.model}</span>}
-                      </div>
-                      <h4 className="font-semibold text-gray-800 leading-tight mt-1.5 text-sm">{p.name}</h4>
-                      <p className="text-xs text-gray-400 mt-0.5 font-mono">{p.barcode || '-'}</p>
+                    <Plus size={13} /> {txt('+ পণ্য যোগ', '+ Add Item')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowServiceModal(true)}
+                    className="px-2.5 py-1 bg-white/20 hover:bg-white/30 text-white border border-white/30 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition shadow-2xs"
+                    title={txt("ল্যাপটপ/ডেস্কটপ সার্ভিসিং বিল যোগ করুন", "Add laptop/desktop service bill")}
+                  >
+                    <Wrench size={13} /> {txt('+ সার্ভিসিং', '+ Service')}
+                  </button>
+                  {cart.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm(txt('আপনি কি নিশ্চিত কার্ট খালি করতে চান?', 'Are you sure you want to clear the cart?'))) {
+                          setCart([]);
+                        }
+                      }}
+                      className="px-2 py-1 bg-rose-500/80 hover:bg-rose-600 text-white rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition"
+                      title={txt("কার্টের সকল পণ্য মুছুন", "Clear cart")}
+                    >
+                      <Trash2 size={12} /> {txt('খালি করুন', 'Clear')}
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs bg-white/20 backdrop-blur-xs text-white px-3 py-1 rounded-full font-bold border border-white/20 flex items-center gap-1.5">
+                    <User size={13} /> {txt('সেলসম্যান: ', 'Salesman: ')}{currentUser.fullname || currentUser.username}
+                  </span>
+                </div>
+              </div>
+
+              {/* কাস্টমার ইনফরমেশন বার (পাশাপাশি / Horizontal Layout) */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-gray-50/80 rounded-xl border border-gray-200 mb-4 text-xs">
+                {/* কাস্টমার নাম ও অটো-সাজেশন */}
+                <div className="relative">
+                  <label className="font-bold text-gray-700 block mb-1">
+                    {txt('কাস্টমারের নাম:', 'Customer Name:')}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={txt("কাস্টমারের নাম লিখুন (পূর্বে থাকলে তালিকা আসবে)...", "Enter customer name (auto-suggests existing)...")}
+                    value={customerName}
+                    onChange={e => {
+                      setCustomerName(e.target.value);
+                      setSelectedCustomerId(null);
+                      setShowSuggestions(true);
+                    }}
+                    onFocus={() => setShowSuggestions(true)}
+                    className="w-full border border-gray-300 p-2 rounded-lg outline-none focus:border-blue-500 font-medium bg-white"
+                  />
+                  {showSuggestions && customerSuggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 top-14 bg-white border border-blue-300 shadow-xl rounded-lg max-h-48 overflow-y-auto z-50 divide-y">
+                      {customerSuggestions.map(c => (
+                        <div
+                          key={c.id}
+                          onClick={() => selectSuggestedCustomer(c)}
+                          className="p-2.5 hover:bg-blue-50 cursor-pointer flex justify-between items-center text-xs"
+                        >
+                          <div>
+                            <p className="font-bold text-gray-800">{c.name}</p>
+                            <p className="text-[10px] text-gray-500">{txt('মোবাইল: ', 'Mobile: ')}{c.mobile || txt('নেই', 'None')}</p>
+                          </div>
+                          <span className="text-[11px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">
+                            {txt('পূর্বের বকেয়া: ৳', 'Previous Due: ৳')}{c.total_due}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                    <div className="mt-3 flex justify-between items-center">
-                      <span className="font-bold text-blue-600 text-sm">৳ {p.selling_price}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded font-medium ${p.current_stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {txt('স্টক: ', 'Stock: ')}{p.current_stock}
+                  )}
+                </div>
+
+                {/* মোবাইল নম্বর */}
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">
+                    {txt('মোবাইল নম্বর:', 'Mobile Number:')}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={txt("মোবাইল নম্বর (ঐচ্ছিক)", "Mobile number (optional)")}
+                    value={customerMobile}
+                    onChange={e => setCustomerMobile(e.target.value)}
+                    className="w-full border border-gray-300 p-2 rounded-lg outline-none focus:border-blue-500 bg-white"
+                  />
+                </div>
+
+                {/* কাস্টমার স্ট্যাটাস ও পূর্বের বাকি */}
+                <div className="flex flex-col justify-end">
+                  {selectedCustomerId ? (
+                    <div className="text-xs text-green-700 font-bold bg-green-50 p-2 rounded-lg border border-green-200 flex justify-between items-center">
+                      <span className="truncate">✓ {txt('কাস্টমার: ', 'Customer: ')}{customerName}</span>
+                      <span className="text-red-600 shrink-0 ml-1">
+                        {txt('পূর্বের বাকি: ৳', 'Previous Due: ৳')}{customerPreviousDue.toLocaleString()}
                       </span>
                     </div>
+                  ) : (
+                    <div className="text-xs text-gray-500 bg-gray-100 p-2 rounded-lg border border-gray-200 flex justify-between items-center">
+                      <span>{txt('ডিফল্ট: নগদ ক্রেতা', 'Default: Cash Customer')}</span>
+                      <button
+                        type="button"
+                        onClick={() => { setCustomerName(txt('নগদ ক্রেতা', 'Cash Customer')); setCustomerMobile(''); setSelectedCustomerId(null); }}
+                        className="text-blue-600 hover:underline font-bold text-[11px] cursor-pointer"
+                      >
+                        {txt('রিসেট', 'Reset')}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* কোটেশন স্টাইল কার্ট আইটেমস টেবিল */}
+              <div className="border rounded-xl overflow-visible bg-white shadow-xs">
+                <div className="overflow-x-auto min-h-[460px] pb-16">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-gray-100 border-b text-gray-700 font-bold">
+                        <th className="p-2.5 text-center w-10">{txt('নং', 'SL')}</th>
+                        <th className="p-2.5 min-w-[280px]">{txt('পণ্যের নাম ও বিবরণ * (ক্লিক বা বারকোড স্ক্যান)', 'Product Name & Description * (Click or Barcode)')}</th>
+                        <th className="p-2.5 w-32">{txt('ওয়ারেন্টি', 'Warranty')}</th>
+                        <th className="p-2.5 text-center w-28">{txt('পরিমাণ', 'Quantity')}</th>
+                        <th className="p-2.5 text-right w-36">{txt('বিক্রয় দর (৳)', 'Sales Price (৳)')}</th>
+                        <th className="p-2.5 text-right w-32">{txt('মোট মূল্য (৳)', 'Total (৳)')}</th>
+                        <th className="p-2.5 text-center w-12">{txt('মুছুন', 'Action')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {cart.length === 0 ? (
+                        <tr>
+                          <td colSpan="7" className="p-8 text-center text-gray-400">
+                            <ShoppingCart size={32} className="mx-auto mb-2 opacity-40 text-blue-500" />
+                            <p className="font-semibold text-sm text-gray-500">{txt('কার্টে কোনো পণ্য নেই!', 'Cart is empty!')}</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              {txt('উপরের "+ পণ্য যোগ" বাটনে ক্লিক করুন অথবা নিচের পণ্য তালিকা থেকে সিলেক্ট করুন।', 'Click "+ Add Item" above or select from product list below.')}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={handleAddCartRow}
+                              className="mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
+                            >
+                              <Plus size={14} /> {txt('+ প্রথম পণ্য যোগ করুন', '+ Add First Item')}
+                            </button>
+                          </td>
+                        </tr>
+                      ) : (
+                        cart.map((item, index) => {
+                          const unitPrice = Number(item.selling_price !== undefined ? item.selling_price : (item.sale_price || 0));
+                          const minLimit = Number(item.min_selling_price || 0);
+                          const isBelowMin = !item.is_service && !item.is_empty_row && minLimit > 0 && unitPrice < minLimit;
+                          const lineTotal = Math.max(0, unitPrice * Number(item.qty || 1));
+                          const isDropdownOpen = activeCartDropdown === index;
+
+                          return (
+                            <tr key={item.id || index} className="hover:bg-gray-50/80 align-top">
+                              {/* SL */}
+                              <td className="p-2.5 text-center text-gray-500 font-bold">{index + 1}</td>
+
+                              {/* Product Name with Breakdown Catalog Dropdown */}
+                              <td className="p-2.5 relative cart-product-cell">
+                                <div className="space-y-1.5">
+                                  {item.is_service ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[10px] font-bold shrink-0">
+                                        🔧 {txt('সার্ভিসিং', 'Service')}
+                                      </span>
+                                      <input
+                                        type="text"
+                                        value={item.name}
+                                        onChange={e => setCart(cart.map((c, i) => i === index ? { ...c, name: e.target.value } : c))}
+                                        className="w-full border p-1.5 rounded text-xs outline-none focus:border-indigo-500 font-bold text-gray-800"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="relative">
+                                      <div className="relative">
+                                        <input
+                                          type="text"
+                                          placeholder={txt("পণ্যের নাম বা মডেল দিয়ে খুঁজুন / বারকোড স্ক্যান...", "Search product, model or scan barcode...")}
+                                          value={item.name || ''}
+                                          onFocus={() => {
+                                            setActiveCartDropdown(index);
+                                          }}
+                                          onClick={() => {
+                                            setActiveCartDropdown(index);
+                                          }}
+                                          onChange={e => {
+                                            const val = e.target.value;
+                                            // বারকোড হুবহু মিললে সাথে সাথে পণ্য সিলেক্ট করা
+                                            const trimmed = val.trim();
+                                            if (trimmed.length >= 3) {
+                                              const exactBarcodeProduct = products.find(p => p.barcode && p.barcode.trim().toLowerCase() === trimmed.toLowerCase());
+                                              if (exactBarcodeProduct) {
+                                                selectProductIntoCartRow(index, exactBarcodeProduct);
+                                                return;
+                                              }
+                                            }
+                                            setCart(cart.map((c, i) => i === index ? { ...c, name: val, is_empty_row: false } : c));
+                                            if (activeCartDropdown !== index) setActiveCartDropdown(index);
+                                          }}
+                                          onKeyDown={e => {
+                                            if (e.key === 'Enter') {
+                                              e.preventDefault();
+                                              const code = (e.target.value || item.name || '').trim();
+                                              if (!code) return;
+
+                                              // ১. হুবহু বারকোড মিল আছে কিনা
+                                              let found = products.find(p => p.barcode && p.barcode.trim().toLowerCase() === code.toLowerCase());
+                                              let matchedSerial = null;
+
+                                              // ২. স্টকে থাকা সিরিয়ালগুলোতে চেক করা
+                                              if (!found) {
+                                                for (const p of products) {
+                                                  if (p.available_serials) {
+                                                    const snList = p.available_serials.split(',').map(s => s.trim().toLowerCase());
+                                                    if (snList.includes(code.toLowerCase())) {
+                                                      found = p;
+                                                      matchedSerial = code;
+                                                      break;
+                                                    }
+                                                  }
+                                                }
+                                              }
+
+                                              // ৩. পণ্যের মডেল দিয়ে হুবহু মিল
+                                              if (!found) {
+                                                found = products.find(p => p.model && p.model.trim().toLowerCase() === code.toLowerCase());
+                                              }
+
+                                              // ৪. নামের ফিল্টার থেকে মিল
+                                              if (!found) {
+                                                const matches = products.filter(p => 
+                                                  (p.name && p.name.toLowerCase().includes(code.toLowerCase())) ||
+                                                  (p.model && p.model.toLowerCase().includes(code.toLowerCase())) ||
+                                                  (p.barcode && p.barcode.toLowerCase().includes(code.toLowerCase()))
+                                                );
+                                                if (matches.length > 0) {
+                                                  found = matches[0];
+                                                }
+                                              }
+
+                                              if (found) {
+                                                selectProductIntoCartRow(index, found, matchedSerial);
+                                              } else {
+                                                alert(txt(`বারকোড বা সিরিয়াল "${code}" স্টকে নেই বা খুঁজে পাওয়া যায়নি!`, `Barcode or serial "${code}" not found in stock!`));
+                                              }
+                                            }
+                                          }}
+                                          className={`w-full border p-1.5 rounded text-xs outline-none font-bold transition ${
+                                            item.is_empty_row 
+                                              ? 'border-blue-400 bg-blue-50/50 text-blue-900 focus:bg-white' 
+                                              : 'border-gray-300 text-gray-800 focus:border-blue-500'
+                                          }`}
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (activeCartDropdown === index) {
+                                              setActiveCartDropdown(null);
+                                            } else {
+                                              setActiveCartDropdown(index);
+                                            }
+                                          }}
+                                          className="absolute right-1.5 top-1.5 text-gray-400 hover:text-blue-600 p-0.5 cursor-pointer"
+                                          title={txt("পূর্বের পণ্য তালিকা দেখুন", "View recorded products dropdown")}
+                                        >
+                                          <Package size={14} />
+                                        </button>
+                                      </div>
+
+                                      {/* পূর্বের লিপিবদ্ধকৃত পণ্যের সরাসরি সহজ ব্রেকডাউন তালিকা */}
+                                      {isDropdownOpen && (
+                                        <div
+                                          ref={breakdownDropdownRef}
+                                          className="absolute left-0 top-full mt-1.5 z-50 w-full min-w-[420px] max-w-[600px] bg-white border-2 border-blue-500 shadow-2xl rounded-xl max-h-[380px] overflow-y-auto divide-y divide-gray-100 text-left"
+                                        >
+                                          {(() => {
+                                            const q = (item.name || '').trim().toLowerCase();
+                                            const filteredRecorded = products.filter(p => {
+                                              if (!q || item.is_empty_row) return true;
+                                              return (p.name && p.name.toLowerCase().includes(q)) ||
+                                                     (p.model && p.model.toLowerCase().includes(q)) ||
+                                                     (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+                                                     (p.category && p.category.toLowerCase().includes(q));
+                                            });
+
+                                            return (
+                                              <>
+                                                <div className="p-2 bg-blue-50/90 border-b border-blue-100 text-[11px] font-semibold text-blue-900 flex justify-between items-center sticky top-0 backdrop-blur z-10">
+                                                  <span>📦 {txt('পূর্বের লিপিবদ্ধকৃত পণ্য তালিকা', 'Recorded Products')} ({filteredRecorded.length})</span>
+                                                  <span className="text-[10px] text-gray-500 font-normal">{txt('ক্লিক অথবা বারকোড স্ক্যান করে যুক্ত করুন', 'Click or scan barcode')}</span>
+                                                </div>
+
+                                                {filteredRecorded.length === 0 ? (
+                                                  <div className="p-4 text-center text-xs text-gray-400">
+                                                    {txt('পূর্বের লিপিবদ্ধকৃত কোনো পণ্য পাওয়া যায়নি', 'No recorded products found')}
+                                                  </div>
+                                                ) : (
+                                                  filteredRecorded.map(p => (
+                                                    <div
+                                                      key={p.id}
+                                                      onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        selectProductIntoCartRow(index, p);
+                                                      }}
+                                                      className={`p-2.5 hover:bg-blue-50 cursor-pointer transition flex items-center justify-between gap-2 text-xs ${
+                                                        p.current_stock <= 0 ? 'opacity-50 cursor-not-allowed bg-gray-50' : ''
+                                                      }`}
+                                                    >
+                                                      <div className="flex-1 min-w-0">
+                                                        <p className="font-bold text-gray-900 truncate">{p.name}</p>
+                                                        <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mt-0.5">
+                                                          {p.model && <span className="bg-gray-100 text-gray-700 font-mono px-1 rounded">{p.model}</span>}
+                                                          {p.category && <span className="text-gray-500">{p.category}</span>}
+                                                          {p.barcode && <span className="text-gray-400 font-mono">#{p.barcode}</span>}
+                                                        </div>
+                                                      </div>
+                                                      <div className="text-right shrink-0">
+                                                        <div className="font-bold text-blue-700">৳ {Number(p.selling_price).toLocaleString()}</div>
+                                                        {Number(p.min_selling_price || 0) > 0 && (
+                                                          <div className="text-[10px] text-rose-600 font-medium">
+                                                            {txt('সর্বনিম্ন: ৳', 'Min: ৳')}{Number(p.min_selling_price).toLocaleString()}
+                                                          </div>
+                                                        )}
+                                                        <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${p.current_stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                          {txt('স্টক: ', 'Stock: ')}{p.current_stock}
+                                                        </span>
+                                                      </div>
+                                                    </div>
+                                                  ))
+                                                )}
+                                              </>
+                                            );
+                                          })()}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* সিরিয়াল সেকশন (যদি স্টকে সিরিয়াল থাকে) */}
+                                  {item.available_serials ? (() => {
+                                    const availableList = item.available_serials.split(',').map(s => s.trim()).filter(Boolean);
+                                    const availableUpper = availableList.map(s => s.toUpperCase());
+                                    const currentSerials = (typeof item.raw_serials_input === 'string')
+                                      ? item.raw_serials_input.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+                                      : (Array.isArray(item.selected_serials) ? item.selected_serials : []);
+                                    const invalidSerials = currentSerials.filter(sn => !availableUpper.includes(sn.toUpperCase()));
+                                    const isCountMatch = currentSerials.length === item.qty && invalidSerials.length === 0;
+
+                                    return (
+                                      <div className="mt-1 space-y-1 bg-blue-50/30 p-2 rounded-lg border border-blue-100">
+                                        <div className="flex items-center gap-1.5">
+                                          <input
+                                            type="text"
+                                            placeholder={txt("সিরিয়াল স্ক্যান বা লিখুন (SN01, SN02)...", "Scan or enter serials (SN01, SN02)...")}
+                                            value={item.raw_serials_input !== undefined ? item.raw_serials_input : (Array.isArray(item.selected_serials) ? item.selected_serials.join(', ') : '')}
+                                            onChange={(e) => handleSerialChange(index, e.target.value)}
+                                            onKeyDown={(e) => handleSerialKeyDown(index, e)}
+                                            className={`w-full text-[11px] border rounded p-1 font-mono outline-none shadow-inner transition ${
+                                              invalidSerials.length > 0 
+                                                ? 'border-red-400 bg-red-50 text-red-900 focus:border-red-600' 
+                                                : isCountMatch
+                                                ? 'border-green-400 bg-green-50/40 text-green-900 focus:border-green-600'
+                                                : 'border-blue-300 bg-yellow-50 focus:bg-white focus:border-blue-600'
+                                            }`}
+                                          />
+                                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap ${
+                                            isCountMatch ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+                                          }`}>
+                                            {currentSerials.length}/{item.qty} {isCountMatch && '✓'}
+                                          </span>
+                                        </div>
+
+                                        {invalidSerials.length > 0 && (
+                                          <p className="text-[10px] text-red-600 font-bold bg-red-50 p-1 rounded border border-red-200">
+                                            ⚠️ {txt('স্টকে নেই বা ভুল সিরিয়াল: ', 'Not in stock or invalid serial: ')}"{invalidSerials.join(', ')}"
+                                          </p>
+                                        )}
+
+                                        {/* স্টকে থাকা সিরিয়াল ব্যাজ */}
+                                        {availableList.length > 0 && (
+                                          <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto pt-0.5 scrollbar-thin">
+                                            {availableList.map((sn, sIdx) => {
+                                              const isSelected = currentSerials.some(s => s.toUpperCase() === sn.toUpperCase());
+                                              return (
+                                                <button
+                                                  key={sIdx}
+                                                  type="button"
+                                                  onClick={() => toggleCartSerial(index, sn)}
+                                                  className={`text-[9px] font-mono px-1.5 py-0.2 rounded border transition cursor-pointer flex items-center gap-0.5 ${
+                                                    isSelected 
+                                                      ? 'bg-blue-600 text-white border-blue-600 font-bold' 
+                                                      : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50'
+                                                  }`}
+                                                  title={isSelected ? txt('বাদ দিতে ক্লিক করুন', 'Click to remove') : txt('যোগ করতে ক্লিক করুন', 'Click to add')}
+                                                >
+                                                  {isSelected ? `✓ ${sn}` : `+ ${sn}`}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })() : null}
+                                </div>
+                              </td>
+
+                              {/* Warranty */}
+                              <td className="p-2.5">
+                                <div className="space-y-1">
+                                  <input
+                                    type="text"
+                                    placeholder={txt("যেমন: 1 Year", "e.g. 1 Year")}
+                                    value={item.warranty || ''}
+                                    onChange={e => setCart(cart.map((c, i) => i === index ? { ...c, warranty: e.target.value } : c))}
+                                    className="w-full border p-1 rounded text-xs outline-none focus:border-blue-500"
+                                  />
+                                  <select
+                                    value={['1 month', '3 months', '6 months', '1 year', '2 years', '3 years', 'লাইফটাইম', 'নন-ওয়ারেন্টি'].includes(item.warranty) ? item.warranty : ''}
+                                    onChange={e => {
+                                      if (e.target.value) {
+                                        setCart(cart.map((c, i) => i === index ? { ...c, warranty: e.target.value } : c));
+                                      }
+                                    }}
+                                    className="w-full border border-gray-200 rounded p-0.5 text-[10px] bg-gray-50 text-gray-700 outline-none cursor-pointer"
+                                  >
+                                    <option value="">{txt('বাছাই', 'Select')}</option>
+                                    <option value="1 month">1 mo</option>
+                                    <option value="3 months">3 mo</option>
+                                    <option value="6 months">6 mo</option>
+                                    <option value="1 year">1 yr</option>
+                                    <option value="2 years">2 yr</option>
+                                    <option value="3 years">3 yr</option>
+                                    <option value="লাইফটাইম">{txt('লাইফটাইম', 'Lifetime')}</option>
+                                    <option value="নন-ওয়ারেন্টি">{txt('নন-ওয়ারেন্টি', 'None')}</option>
+                                  </select>
+                                </div>
+                              </td>
+
+                              {/* Quantity */}
+                              <td className="p-2.5 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setCart(cart.map((c, i) => i === index ? { ...c, qty: Math.max(1, Number(c.qty || 1) - 1) } : c))}
+                                    className="w-6 h-6 bg-gray-200 hover:bg-gray-300 rounded font-bold cursor-pointer flex items-center justify-center text-xs"
+                                  >
+                                    -
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max={item.current_stock || 9999}
+                                    value={item.qty}
+                                    onChange={e => {
+                                      const val = Math.max(1, Number(e.target.value) || 1);
+                                      if (item.current_stock && val > item.current_stock) {
+                                        alert(txt('স্টকের চেয়ে বেশি বিক্রি সম্ভব নয়!', 'Cannot sell more than available stock!'));
+                                        return;
+                                      }
+                                      setCart(cart.map((c, i) => i === index ? { ...c, qty: val } : c));
+                                    }}
+                                    className="w-12 border p-1 rounded text-xs outline-none focus:border-blue-500 text-center font-bold"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (item.current_stock && item.qty >= item.current_stock) {
+                                        alert(txt('স্টকের চেয়ে বেশি বিক্রি সম্ভব নয়!', 'Cannot sell more than available stock!'));
+                                        return;
+                                      }
+                                      setCart(cart.map((c, i) => i === index ? { ...c, qty: Number(c.qty || 1) + 1 } : c));
+                                    }}
+                                    className="w-6 h-6 bg-gray-200 hover:bg-gray-300 rounded font-bold cursor-pointer flex items-center justify-center text-xs"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                                {item.current_stock !== undefined && (
+                                  <span className="text-[10px] text-gray-400 block mt-0.5">
+                                    {txt('স্টক: ', 'Stock: ')}{item.current_stock}
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Sales Unit Price (কমবেশি করা যাবে কিন্তু সর্বনিম্নসীমার নিচে নয়) */}
+                              <td className="p-2.5 text-right">
+                                <div>
+                                  <input
+                                    type="number"
+                                    min={minLimit > 0 ? minLimit : 0}
+                                    value={item.selling_price !== undefined ? item.selling_price : (item.sale_price || '')}
+                                    onChange={e => handleCartPriceChange(index, e.target.value)}
+                                    onBlur={() => handleCartPriceBlur(index)}
+                                    className={`w-24 border p-1.5 rounded text-xs outline-none text-right font-mono font-bold transition ${
+                                      isBelowMin 
+                                        ? 'border-red-500 bg-red-50 text-red-700 focus:border-red-600' 
+                                        : 'border-blue-300 bg-white text-blue-900 focus:border-blue-500'
+                                    }`}
+                                  />
+                                  {minLimit > 0 && (
+                                    <span className="text-[10px] text-rose-600 font-bold block mt-0.5">
+                                      {txt('সর্বনিম্ন: ৳', 'Min: ৳')}{minLimit.toLocaleString()}
+                                    </span>
+                                  )}
+                                  {isBelowMin && (
+                                    <span className="text-[10px] text-red-600 font-bold block">
+                                      ⚠️ {txt('সর্বনিম্ন সীমার কম!', 'Below min limit!')}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+
+
+                              {/* Total Price */}
+                              <td className="p-2.5 text-right font-mono font-black text-sm text-blue-700 bg-gray-50/60">
+                                ৳ {lineTotal.toLocaleString()}
+                              </td>
+
+                              {/* Delete */}
+                              <td className="p-2.5 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setCart(cart.filter((_, i) => i !== index))}
+                                  className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer transition"
+                                  title={txt("এই সারি মুছুন", "Delete this row")}
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* টেবিল ফুটার টুলবার */}
+                <div className="bg-gray-50 p-3 border-t flex flex-col sm:flex-row justify-between items-center gap-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAddCartRow}
+                      className="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 cursor-pointer bg-white px-2.5 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50 transition shadow-xs"
+                    >
+                      <Plus size={14} /> {txt('+ আরও একটি পণ্য যোগ করুন', '+ Add Another Item')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowServiceModal(true)}
+                      className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer bg-white px-2.5 py-1.5 rounded-lg border border-indigo-200 hover:bg-indigo-50 transition shadow-xs"
+                    >
+                      <Wrench size={13} /> {txt('+ সার্ভিসিং চার্জ যোগ', '+ Add Service Charge')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handlePreviewBill}
+                      className="text-amber-800 hover:text-amber-950 font-bold flex items-center gap-1.5 cursor-pointer bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg border border-amber-300 transition shadow-xs"
+                      title={txt("বিল কনফার্ম করার পূর্বে প্রিভিউ দেখুন", "Preview bill before confirmation")}
+                    >
+                      <Eye size={15} className="text-amber-600" /> {txt('বিল প্রিভিউ দেখুন', 'Preview Bill')}
+                    </button>
                   </div>
-                ))}
+                  <div className="text-gray-600 font-semibold flex items-center gap-3">
+                    <span>{txt('মোট আইটেম: ', 'Total Items: ')}<strong className="text-blue-700">{validCartItems.length}</strong> {txt('টি', 'pcs')}</span>
+                    <span>{txt('মোট পণ্যের সংখ্যা: ', 'Total Qty: ')}<strong className="text-blue-700">{validCartItems.reduce((s, it) => s + Number(it.qty || 1), 0)}</strong> {txt('টি', 'pcs')}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* বিল ক্যালকুলেশন ও চেকআউট সেকশন (পাশাপাশি ২ কলাম / Side-by-Side) */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-4 pt-4 border-t">
+                {/* বাম পাশ: পেমেন্ট মেথড, অতিরিক্ত ডিসকাউন্ট ও বিল নোট */}
+                <div className="lg:col-span-6 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-700 block mb-1">
+                        {txt('পেমেন্ট মেথড:', 'Payment Method:')}
+                      </label>
+                      <select 
+                        value={paymentType} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          setPaymentType(val);
+                          if (val === 'Due') {
+                            setPaidAmount('0');
+                          }
+                        }} 
+                        className="w-full text-xs border border-gray-300 p-2 rounded-lg bg-white outline-none focus:border-blue-500 font-medium"
+                      >
+                        <option value="Cash">Cash {txt('(নগদ)', '(Cash)')}</option>
+                        <option value="Due">Due {txt('(বাকি বিক্রয়)', '(Due Sale)')}</option>
+                        <option value="Bank">Bank {txt('(ব্যাংক)', '(Bank)')}</option>
+                        <option value="bKash">bKash {txt('(বিকাশ)', '(bKash)')}</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-gray-700 block mb-1">
+                        {txt('অতিরিক্ত / বিশেষ ছাড় (৳):', 'Extra Special Discount (৳):')}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder={txt("অতিরিক্ত ছাড়...", "Extra discount...")}
+                        value={discountAmount}
+                        onChange={e => setDiscountAmount(e.target.value)}
+                        className="w-full text-xs border border-orange-300 bg-orange-50/50 p-2 rounded-lg outline-none font-bold text-orange-700 focus:bg-white focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-1">
+                      {txt('ইনভয়েস বিশেষ নোট (ঐচ্ছিক):', 'Invoice Special Note (Optional):')}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={txt('যেমন: ৩ দিন পর বাকি পরিশোধ / বিশেষ নির্দেশনা...', 'e.g. Due clearance in 3 days / special notes...')}
+                      value={billNote}
+                      onChange={e => setBillNote(e.target.value)}
+                      className="w-full text-xs border border-gray-300 p-2 rounded-lg outline-none focus:border-blue-500 bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* ডান পাশ: ৫-পয়েন্ট পূর্ণাঙ্গ হিসাবের কার্ড ও কনফার্ম বাটন */}
+                <div className="lg:col-span-6 space-y-3">
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 space-y-1.5 text-xs">
+                    <div className="flex justify-between text-gray-700">
+                      <span>{txt('আইটেম মোট মূল্য:', 'Items Total Price:')}</span>
+                      <span className="font-mono">৳ {subTotal.toLocaleString()}</span>
+                    </div>
+                    {extraDiscount > 0 && (
+                      <div className="flex justify-between text-orange-600 font-bold border-t border-orange-200 pt-0.5">
+                        <span>{txt('বিশেষ ছাড় (ডিসকাউন্ট):', 'Special Discount:')}</span>
+                        <span className="font-mono font-black">- ৳ {extraDiscount.toLocaleString()}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold text-blue-700 border-t pt-1 text-sm">
+                      <span>{txt('১. বর্তমান মোট বিল:', '1. Current Bill Total:')}</span>
+                      <span className="font-mono">৳ {netBillTotal.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <span className="font-semibold text-gray-700 whitespace-nowrap">{txt('২. বর্তমান বিল বাবদ প্রদান:', '2. Paid for Current Bill:')}</span>
+                      <input
+                        type="number"
+                        placeholder={txt('টাকার পরিমাণ...', 'Amount...')}
+                        value={paidAmount}
+                        onChange={e => setPaidAmount(e.target.value)}
+                        className="w-32 text-xs border border-green-400 bg-green-50/50 p-1 rounded-lg font-bold text-green-700 text-right outline-none focus:bg-white"
+                      />
+                    </div>
+                    <div className="flex justify-between font-bold text-red-600">
+                      <span>{txt('৩. বর্তমান বিলের বাকি:', '3. Current Bill Due:')}</span>
+                      <span className="font-mono">৳ {currentBillDue.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600 border-t pt-1">
+                      <span>{txt('৪. কাস্টমারের পূর্বের মোট বাকি:', '4. Customer Previous Due:')}</span>
+                      <span className="font-mono font-bold">৳ {customerPreviousDue.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between font-black text-sm text-red-700 bg-red-50 p-2 rounded-lg border border-red-200">
+                      <span>{txt('৫. পূর্বের টাকাসহ মোট বাকি:', '5. Total Due with Previous:')}</span>
+                      <span className="font-mono">৳ {totalDueWithPrevious.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handlePreviewBill}
+                      className="w-2/5 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs sm:text-sm transition cursor-pointer shadow-md shadow-amber-500/20 flex items-center justify-center gap-1.5"
+                      title={txt('বিল কনফার্ম করার আগে প্রিভিউ দেখুন', 'Preview bill before confirmation')}
+                    >
+                      <Eye size={17} /> {txt('বিল প্রিভিউ', 'Preview Bill')}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleCheckout}
+                      className="w-3/5 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold rounded-xl text-xs sm:text-sm transition cursor-pointer shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5"
+                    >
+                      <CheckCircle size={18} /> {txt('কনফার্ম ও ইনভয়েস প্রিন্ট', 'Confirm & Print Invoice')}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* কার্ট সেকশন */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-center border-b pb-2 mb-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white p-3 rounded-xl shadow-xs">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-bold flex items-center gap-1.5"><ShoppingCart size={16} /> {txt('বিক্রয় বিল / কার্ট', 'Sale Bill / Cart')}</h2>
-                    <button
-                      onClick={() => setShowServiceModal(true)}
-                      className="px-2 py-0.5 bg-white/20 hover:bg-white/30 text-white border border-white/30 rounded text-[11px] font-bold flex items-center gap-1 cursor-pointer transition"
-                      title={txt("ল্যাপটপ/ডেস্কটপ সার্ভিসিং বিল যোগ করুন", "Add laptop/desktop service bill")}
-                    >
-                      <Wrench size={12} /> {txt('+ সার্ভিসিং', '+ Service')}
-                    </button>
-                  </div>
-                  <span className="text-[11px] bg-white/20 backdrop-blur-xs text-white px-2.5 py-0.5 rounded-full font-bold border border-white/20">
-                    {txt('সেলসম্যান: ', 'Salesman: ')}{currentUser.fullname}
-                  </span>
+            {/* ১.২ সমস্ত পণ্য (All Products Catalog) - কার্টের নিচে */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 pb-3 border-b">
+                <div>
+                  <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+                    <Package size={18} className="text-blue-600" /> {txt('সমস্ত পণ্য ক্যাটালগ (All Products Catalog)', 'All Products Catalog')}
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {txt('বারকোড স্ক্যান করুন বা যেকোনো পণ্যে ক্লিক করে সরাসরি বিক্রয় বিলে যোগ করুন।', 'Scan barcode or click any product to add directly to sale bill.')}
+                  </p>
                 </div>
-                
-                {/* কাস্টমার অটো-সাজেশন */}
-                <div className="space-y-2 mb-3 relative">
-                  <div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-56">
+                    <Barcode className="absolute left-3 top-2.5 text-gray-400" size={16} />
+                    <input
+                      ref={barcodeInputRef}
+                      type="text"
+                      placeholder={txt("বারকোড স্ক্যান...", "Scan barcode...")}
+                      value={barcodeInput}
+                      onChange={(e) => setBarcodeInput(e.target.value)}
+                      onKeyDown={handleBarcodeScan}
+                      className="w-full pl-9 pr-3 py-1.5 border rounded-lg text-xs bg-blue-50/40 border-blue-200 focus:outline-blue-500"
+                    />
+                  </div>
+                  <div className="relative flex-1 sm:w-56">
+                    <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
                     <input
                       type="text"
-                      placeholder={txt("কাস্টমারের নাম লিখুন (পূর্বে থাকলে তালিকা আসবে)...", "Enter customer name (auto-suggests existing)...")}
-                      value={customerName}
-                      onChange={e => {
-                        setCustomerName(e.target.value);
-                        setSelectedCustomerId(null);
-                        setShowSuggestions(true);
-                      }}
-                      onFocus={() => setShowSuggestions(true)}
-                      className="w-full text-xs border border-gray-300 p-2 rounded outline-none focus:border-blue-500 font-medium"
+                      placeholder={txt("পণ্য বা মডেল খুঁজুন...", "Search product/model...")}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-blue-500"
                     />
-
-                    {showSuggestions && customerSuggestions.length > 0 && (
-                      <div className="absolute left-0 right-0 top-9 bg-white border border-blue-300 shadow-xl rounded-lg max-h-48 overflow-y-auto z-50 divide-y">
-                        {customerSuggestions.map(c => (
-                          <div
-                            key={c.id}
-                            onClick={() => selectSuggestedCustomer(c)}
-                            className="p-2.5 hover:bg-blue-50 cursor-pointer flex justify-between items-center text-xs"
-                          >
-                            <div>
-                              <p className="font-bold text-gray-800">{c.name}</p>
-                              <p className="text-[10px] text-gray-500">{txt('মোবাইল: ', 'Mobile: ')}{c.mobile || txt('নেই', 'None')}</p>
-                            </div>
-                            <span className="text-[11px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">
-                              {txt('পূর্বের বকেয়া: ৳', 'Previous Due: ৳')}{c.total_due}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
-
-                  <input
-                    type="text"
-                    placeholder={txt("মোবাইল নম্বর", "Mobile number")}
-                    value={customerMobile}
-                    onChange={e => setCustomerMobile(e.target.value)}
-                    className="w-full text-xs border border-gray-300 p-2 rounded outline-none focus:border-blue-500"
-                  />
-                  {selectedCustomerId && (
-                    <div className="text-[11px] text-green-700 font-bold bg-green-50 p-1.5 rounded flex justify-between">
-                      <span>✓ {txt('কাস্টমার নির্বাচিত: ', 'Customer Selected: ')}{customerName}</span>
-                      <span className="text-red-600">{txt('পূর্বের বাকি: ৳', 'Previous Due: ৳')}{customerPreviousDue}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="max-h-56 overflow-y-auto space-y-3 border-t pt-2">
-                  {cart.length === 0 ? (
-                    <p className="text-center text-xs text-gray-400 py-6">{txt('কার্ট খালি', 'Cart is empty')}</p>
-                  ) : (
-                    cart.map((item, index) => (
-                      <div key={item.id || index} className="border-b pb-2.5">
-                        <div className="flex justify-between items-start text-xs">
-                          <div className="flex-1 pr-1">
-                            <p className="font-bold text-gray-800 flex items-center flex-wrap gap-1">
-                              {item.is_service && (
-                                <span className="px-1.5 py-0.2 bg-indigo-100 text-indigo-700 border border-indigo-200 rounded text-[10px] font-bold">
-                                  🔧 {txt('সার্ভিসিং', 'Service')}
-                                </span>
-                              )}
-                              <span>{item.name}</span>
-                              {item.model && <span className="text-[11px] text-gray-500 font-mono font-normal">[{item.model}]</span>}
-                            </p>
-                            <div className="text-[11px] text-gray-500 flex items-center gap-1.5 mt-0.5 flex-wrap">
-                              <span>৳ {item.selling_price || item.sale_price} x {item.qty} = ৳ {(Number(item.selling_price || item.sale_price || 0) * item.qty)}</span>
-                              {Number(item.discount || 0) > 0 && (
-                                <span className="text-amber-700 font-bold text-[10px] bg-amber-100/80 px-1.5 py-0.2 rounded border border-amber-300">
-                                  -৳{Number(item.discount).toLocaleString()} ({txt('নিট:', 'Net:')} ৳{Math.max(0, (Number(item.selling_price || item.sale_price || 0) * item.qty) - Number(item.discount)).toLocaleString()})
-                                </span>
-                              )}
-                            </div>
-
-                            {/* বিক্রয় বিলকার্টে পণ্যের ওয়ারেন্টি ও আলাদা ডিসকাউন্ট */}
-                            <div className="flex items-center gap-1.5 mt-1 text-[11px] flex-wrap">
-                              <span className="text-gray-500 font-semibold whitespace-nowrap">{txt('ওয়ারেন্টি:', 'Warranty:')}</span>
-                              <input
-                                type="text"
-                                placeholder={txt("ওয়ারেন্টি লিখুন...", "Enter warranty...")}
-                                value={item.warranty || ''}
-                                onChange={e => setCart(cart.map((c, i) => i === index ? { ...c, warranty: e.target.value } : c))}
-                                className="border border-blue-200 bg-blue-50/40 rounded px-1.5 py-0.5 text-[11px] text-blue-800 font-medium w-24 outline-none focus:bg-white focus:border-blue-500"
-                              />
-                              <select
-                                value={['1 month', '3 months', '6 months', '1 year', '2 years', '3 years', 'লাইফটাইম', 'নন-ওয়ারেন্টি'].includes(item.warranty) ? item.warranty : ''}
-                                onChange={e => {
-                                  if (e.target.value) {
-                                    setCart(cart.map((c, i) => i === index ? { ...c, warranty: e.target.value } : c));
-                                  }
-                                }}
-                                className="border border-gray-200 rounded px-1 py-0.5 text-[10px] bg-white text-gray-600 outline-none cursor-pointer"
-                                title={txt("কুইক ওয়ারেন্টি সিলেক্ট", "Quick warranty select")}
-                              >
-                                <option value="">{txt('বাছাই', 'Select')}</option>
-                                <option value="1 month">1 mo</option>
-                                <option value="3 months">3 mo</option>
-                                <option value="6 months">6 mo</option>
-                                <option value="1 year">1 yr</option>
-                                <option value="2 years">2 yr</option>
-                                <option value="3 years">3 yr</option>
-                                <option value="লাইফটাইম">{txt('লাইফটাইম', 'Lifetime')}</option>
-                                <option value="নন-ওয়ারেন্টি">{txt('নন-ওয়ারেন্টি', 'None')}</option>
-                              </select>
-
-                              {/* প্রতিটি পণ্যের আলাদা ডিসকাউন্ট ইনপুট */}
-                              <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
-                                <span className="text-amber-800 font-bold text-[10px] whitespace-nowrap">{txt('ছাড় (৳):', 'Disc (৳):')}</span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  placeholder="0"
-                                  value={item.discount !== undefined ? item.discount : ''}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setCart(cart.map((c, i) => i === index ? { ...c, discount: val } : c));
-                                  }}
-                                  className="w-16 border border-amber-300 bg-white rounded px-1 py-0.2 text-[11px] text-amber-900 font-mono font-bold text-right outline-none focus:border-amber-500"
-                                  title={txt("এই নির্দিষ্ট পণ্যের জন্য আলাদা ছাড় / ডিসকাউন্ট (৳)", "Individual discount (৳) for this product")}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0 ml-1">
-                            <button onClick={() => setCart(cart.map((c, i) => i === index ? { ...c, qty: Math.max(1, c.qty - 1) } : c))} className="px-2 bg-gray-200 rounded font-bold cursor-pointer hover:bg-gray-300">-</button>
-                            <span className="font-bold px-1">{item.qty}</span>
-                            <button onClick={() => setCart(cart.map((c, i) => i === index ? { ...c, qty: Math.min(item.current_stock || 9999, c.qty + 1) } : c))} className="px-2 bg-gray-200 rounded font-bold cursor-pointer hover:bg-gray-300">+</button>
-                            <button onClick={() => setCart(cart.filter((_, i) => i !== index))} className="text-red-500 hover:text-red-700 ml-1 cursor-pointer"><Trash2 size={14} /></button>
-                          </div>
-                        </div>
-
-                        {/* সিরিয়াল ফিল্ড: শুধুমাত্র যেসব পণ্যে স্টকে সিরিয়াল রয়েছে */}
-                        {item.available_serials ? (() => {
-                          const availableList = item.available_serials.split(',').map(s => s.trim()).filter(Boolean);
-                          const availableUpper = availableList.map(s => s.toUpperCase());
-                          const currentSerials = (typeof item.raw_serials_input === 'string')
-                            ? item.raw_serials_input.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
-                            : (Array.isArray(item.selected_serials) ? item.selected_serials : []);
-                          const invalidSerials = currentSerials.filter(sn => !availableUpper.includes(sn.toUpperCase()));
-                          const isCountMatch = currentSerials.length === item.qty && invalidSerials.length === 0;
-
-                          return (
-                            <div className="mt-1.5 space-y-1">
-                              <input
-                                type="text"
-                                placeholder={txt("স্টকের সিরিয়াল স্ক্যান বা লিখুন (যেমন: SN01, SN02)...", "Scan or enter stock serials (e.g. SN01, SN02)...")}
-                                value={item.raw_serials_input !== undefined ? item.raw_serials_input : (Array.isArray(item.selected_serials) ? item.selected_serials.join(', ') : '')}
-                                onChange={(e) => handleSerialChange(index, e.target.value)}
-                                onKeyDown={(e) => handleSerialKeyDown(index, e)}
-                                className={`w-full text-xs border rounded p-1.5 font-mono outline-none shadow-inner transition ${
-                                  invalidSerials.length > 0 
-                                    ? 'border-red-400 bg-red-50 text-red-900 focus:border-red-600' 
-                                    : isCountMatch
-                                    ? 'border-green-400 bg-green-50/40 text-green-900 focus:border-green-600'
-                                    : 'border-blue-300 bg-yellow-50 focus:bg-white focus:border-blue-600'
-                                }`}
-                              />
-                              <div className="text-[10px] flex justify-between font-medium">
-                                <span className="text-gray-500">{txt('প্রয়োজনীয়: ', 'Required: ')}<strong className="text-blue-600">{item.qty}</strong> {txt('টি', 'pcs')}</span>
-                                <span className={isCountMatch ? 'text-green-700 font-bold' : invalidSerials.length > 0 ? 'text-red-600 font-bold' : 'text-orange-600 font-bold'}>
-                                  {txt('যুক্ত হয়েছে: ', 'Added: ')}<strong>{currentSerials.length}</strong> {txt('টি', 'pcs')} {isCountMatch && '✓'}
-                                </span>
-                              </div>
-
-                              {/* ভুল সিরিয়াল থাকলে ওয়ার্নিং মেসেজ */}
-                              {invalidSerials.length > 0 && (
-                                <p className="text-[10px] text-red-600 font-bold bg-red-50 p-1 rounded border border-red-200">
-                                  ⚠️ {txt('স্টকে নেই বা ভুল সিরিয়াল: ', 'Not in stock or invalid serial: ')}"{invalidSerials.join(', ')}"
-                                </p>
-                              )}
-
-                              {/* দ্রুত নির্বাচনের জন্য স্টকে থাকা সিরিয়াল ব্যাজ */}
-                              {availableList.length > 0 && (
-                                <div className="pt-0.5">
-                                  <div className="text-[10px] text-gray-500 font-medium mb-1 flex items-center justify-between">
-                                    <span>{txt('স্টক সিরিয়াল (ক্লিক করে নির্বাচন করুন):', 'Stock Serials (click to select):')}</span>
-                                  </div>
-                                  <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto scrollbar-thin">
-                                    {availableList.map((sn, sIdx) => {
-                                      const isSelected = currentSerials.some(s => s.toUpperCase() === sn.toUpperCase());
-                                      return (
-                                        <button
-                                          key={sIdx}
-                                          type="button"
-                                          onClick={() => toggleCartSerial(index, sn)}
-                                          className={`text-[10px] font-mono px-1.5 py-0.5 rounded border transition cursor-pointer flex items-center gap-1 ${
-                                            isSelected 
-                                              ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-xs' 
-                                              : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50 hover:border-blue-400'
-                                          }`}
-                                          title={isSelected ? txt('বাদ দিতে ক্লিক করুন', 'Click to remove') : txt('যোগ করতে ক্লিক করুন', 'Click to add')}
-                                        >
-                                          {isSelected ? `✓ ${sn}` : `+ ${sn}`}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })() : (
-                          <p className="text-[10px] text-gray-400 font-mono mt-1 bg-gray-50 p-1 rounded">✓ {txt('নন-বারকোড সাধারণ পণ্য (সিরিয়াল ছাড়া বিক্রয়যোগ্য)', 'Non-barcode regular item (sold without serial)')}</p>
-                        )}
-                      </div>
-                    ))
-                  )}
                 </div>
               </div>
 
-              {/* বিল ক্যালকুলেশন, ডিসকাউন্ট, নোট ও ৫-পয়েন্ট ডিউ সামারি */}
-              <div className="border-t pt-2 space-y-2 mt-2">
-                {/* ডিসকাউন্ট ও পেমেন্ট মেথড */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[11px] font-bold text-gray-700">{txt('অতিরিক্ত / বিশেষ ছাড় (৳):', 'Extra Special Discount (৳):')}</label>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder={txt("অতিরিক্ত ছাড়...", "Extra discount...")}
-                      value={discountAmount}
-                      onChange={e => setDiscountAmount(e.target.value)}
-                      className="w-full text-xs border border-orange-300 bg-orange-50/50 p-1.5 rounded outline-none font-bold text-orange-700 focus:bg-white"
-                    />
+              {/* ক্যাটাগরি ফিল্টার চিপস */}
+              <div className="flex gap-2 overflow-x-auto pb-2 mb-3 scrollbar-thin">
+                {['All', ...MASTER_CATEGORIES].map((cat, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                      selectedCategory === cat ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {cat === 'All' ? txt('সব পণ্য', 'All Products') : cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* প্রোডাক্ট গ্রিড */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 max-h-[50vh] overflow-y-auto pr-1">
+                {filteredProducts.length === 0 ? (
+                  <div className="col-span-full py-12 text-center text-gray-400">
+                    <Package size={32} className="mx-auto mb-2 opacity-30 text-gray-400" />
+                    <p className="text-xs font-semibold">{txt('কোনো পণ্য পাওয়া যায়নি!', 'No products found!')}</p>
                   </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-gray-700">{txt('পেমেন্ট মেথড:', 'Payment Method:')}</label>
-                    <select 
-                      value={paymentType} 
-                      onChange={e => {
-                        const val = e.target.value;
-                        setPaymentType(val);
-                        if (val === 'Due') {
-                          setPaidAmount('0');
-                        }
-                      }} 
-                      className="w-full text-xs border p-1.5 rounded bg-white outline-none"
+                ) : (
+                  filteredProducts.map(p => (
+                    <div
+                      key={p.id}
+                      onClick={() => addToCart(p)}
+                      className="p-3 border rounded-xl hover:border-blue-500 hover:shadow-md cursor-pointer transition flex flex-col justify-between bg-white hover:bg-blue-50/20 group"
                     >
-                      <option value="Cash">Cash {txt('(নগদ)', '(Cash)')}</option>
-                      <option value="Due">Due {txt('(বাকি বিক্রয়)', '(Due Sale)')}</option>
-                      <option value="Bank">Bank {txt('(ব্যাংক)', '(Bank)')}</option>
-                      <option value="bKash">bKash {txt('(বিকাশ)', '(bKash)')}</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* বিল নোট */}
-                <div>
-                  <label className="text-[11px] font-bold text-gray-700">{txt('ইনভয়েস বিশেষ নোট (ঐচ্ছিক):', 'Invoice Special Note (Optional):')}</label>
-                  <input
-                    type="text"
-                    placeholder={txt('যেমন: ৩ দিন পর বাকি পরিশোধ / বিশেষ নির্দেশনা...', 'e.g. Due clearance in 3 days / special notes...')}
-                    value={billNote}
-                    onChange={e => setBillNote(e.target.value)}
-                    className="w-full text-xs border border-gray-300 p-1.5 rounded outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                {/* ৫-পয়েন্ট পূর্ণাঙ্গ হিসাবের কার্ড */}
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-2.5 space-y-1 text-xs">
-                  <div className="flex justify-between text-gray-700">
-                    <span>{txt('আইটেম মোট মূল্য:', 'Items Total Price:')}</span>
-                    <span className="font-mono">৳ {subTotal.toLocaleString()}</span>
-                  </div>
-                  {itemDiscountsTotal > 0 && (
-                    <div className="flex justify-between text-amber-700 font-medium">
-                      <span>{txt('পণ্যের আলাদা ছাড় মোট:', 'Item Discounts Total:')}</span>
-                      <span className="font-mono font-bold">- ৳ {itemDiscountsTotal.toLocaleString()}</span>
+                      <div>
+                        <div className="flex justify-between items-center gap-1">
+                          <span className="text-[9px] font-semibold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 truncate">{p.category || 'General'}</span>
+                          {p.model && <span className="text-[9px] bg-gray-100 text-gray-600 px-1 py-0.5 rounded font-mono truncate">{p.model}</span>}
+                        </div>
+                        <h4 className="font-bold text-gray-800 leading-tight mt-1.5 text-xs line-clamp-2 group-hover:text-blue-700 transition">{p.name}</h4>
+                        <p className="text-[10px] text-gray-400 mt-0.5 font-mono truncate">{p.barcode || '-'}</p>
+                      </div>
+                      <div className="mt-2.5 pt-2 border-t flex justify-between items-end">
+                        <div>
+                          <span className="font-extrabold text-blue-600 text-xs block">৳ {p.selling_price}</span>
+                          {Number(p.min_selling_price || 0) > 0 && (
+                            <span className="text-[9px] text-rose-600 font-medium block">
+                              {txt('সর্বনিম্ন: ৳', 'Min: ৳')}{p.min_selling_price}
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${p.current_stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {txt('স্টক: ', 'Stock: ')}{p.current_stock}
+                        </span>
+                      </div>
                     </div>
-                  )}
-                  {extraDiscount > 0 && (
-                    <div className="flex justify-between text-orange-600 font-medium">
-                      <span>{txt('অতিরিক্ত বিশেষ ছাড়:', 'Extra Special Discount:')}</span>
-                      <span className="font-mono font-bold">- ৳ {extraDiscount.toLocaleString()}</span>
-                    </div>
-                  )}
-                  {netDiscount > 0 && (
-                    <div className="flex justify-between text-orange-700 font-bold border-t border-orange-200 pt-0.5">
-                      <span>{txt('সর্বমোট ছাড় (ডিসকাউন্ট):', 'Total Discount:')}</span>
-                      <span className="font-mono font-black">- ৳ {netDiscount.toLocaleString()}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between font-bold text-blue-700 border-t pt-1">
-                    <span>{txt('১. বর্তমান মোট বিল:', '1. Current Bill Total:')}</span>
-                    <span className="font-mono">৳ {netBillTotal.toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 pt-1">
-                    <span className="font-semibold text-gray-700 whitespace-nowrap">{txt('২. বর্তমান বিল বাবদ প্রদান:', '2. Paid for Current Bill:')}</span>
-                    <input
-                      type="number"
-                      placeholder={txt('টাকার পরিমাণ...', 'Amount...')}
-                      value={paidAmount}
-                      onChange={e => setPaidAmount(e.target.value)}
-                      className="w-28 text-xs border border-green-400 bg-green-50/50 p-1 rounded font-bold text-green-700 text-right outline-none"
-                    />
-                  </div>
-                  <div className="flex justify-between font-bold text-red-600">
-                    <span>{txt('৩. বর্তমান বিলের বাকি:', '3. Current Bill Due:')}</span>
-                    <span className="font-mono">৳ {currentBillDue.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600 border-t pt-1">
-                    <span>{txt('৪. কাস্টমারের পূর্বের মোট বাকি:', '4. Customer Previous Due:')}</span>
-                    <span className="font-mono font-bold">৳ {customerPreviousDue.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between font-black text-sm text-red-700 bg-red-50 p-1.5 rounded border border-red-200">
-                    <span>{txt('৫. পূর্বের টাকাসহ মোট বাকি:', '5. Total Due with Previous:')}</span>
-                    <span className="font-mono">৳ {totalDueWithPrevious.toLocaleString()}</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleCheckout}
-                  className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold rounded-xl text-sm transition cursor-pointer shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2"
-                >
-                  <CheckCircle size={16} /> {txt('কনফার্ম ও ইনভয়েস প্রিন্ট', 'Confirm & Print Invoice')}
-                </button>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -2477,7 +3421,7 @@ function App() {
         {/* ২. বিক্রয় ফেরত (Sales Return) ট্যাব: বারকোড ও নন-বারকোড পণ্য */}
         {activeTab === 'returns' && (
           <div className="space-y-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <div className="bg-white text-gray-800 p-6 rounded-xl shadow-sm border border-gray-200">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 pb-3 border-b">
                 <div>
                   <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -2853,7 +3797,7 @@ function App() {
 
         {/* ৩. বারকোড লাইফসাইকেল ট্র্যাকার */}
         {activeTab === 'barcode_search' && (
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-purple-100 max-w-2xl mx-auto">
+          <div className="bg-white text-gray-800 p-6 rounded-2xl shadow-sm border border-purple-100 max-w-2xl mx-auto">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-purple-500/20 shrink-0">
                 <Search size={20} />
@@ -2946,7 +3890,7 @@ function App() {
         {activeTab === 'quotation' && (
           <div className="space-y-6 max-w-5xl mx-auto">
             {/* সাব-ট্যাব ন্যাভিগেশন */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-amber-100 flex flex-col md:flex-row justify-between items-center gap-3">
+            <div className="bg-white text-gray-800 p-4 rounded-2xl shadow-sm border border-amber-100 flex flex-col md:flex-row justify-between items-center gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-md shadow-amber-500/20 shrink-0">
                   <FileText size={20} />
@@ -2980,7 +3924,7 @@ function App() {
 
             {/* ১. নতুন কোটেশন তৈরির ফর্ম */}
             {quotationSubTab === 'create' && (
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-5">
+              <div className="bg-white text-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 space-y-5">
                 {/* কাস্টমার ও মেটা তথ্য */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
@@ -3326,7 +4270,7 @@ function App() {
 
         {/* ৫. কাস্টমার খাতা ট্যাব */}
         {activeTab === 'customers' && (
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-teal-100">
+          <div className="bg-white text-gray-800 p-6 rounded-2xl shadow-sm border border-teal-100">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-500 to-emerald-600 flex items-center justify-center text-white shadow-md shadow-teal-500/20 shrink-0">
@@ -3346,7 +4290,7 @@ function App() {
                     placeholder={txt("কাস্টমারের নাম বা মোবাইল...", "Customer name or mobile...")}
                     value={customerSearch}
                     onChange={e => setCustomerSearch(e.target.value)}
-                    className="w-full pl-9 pr-3 py-1.5 border border-teal-200 rounded-xl text-xs outline-none focus:border-teal-500"
+                    className="w-full pl-9 pr-3 py-1.5 border border-teal-200 rounded-xl text-xs text-gray-900 bg-white outline-none focus:border-teal-500"
                   />
                 </div>
 
@@ -3356,33 +4300,33 @@ function App() {
               </div>
             </div>
 
-            <table className="w-full text-left border-collapse text-sm">
+            <table className="w-full text-left border-collapse text-sm text-gray-800">
               <thead>
-                <tr className="bg-gray-50 text-xs border-b">
-                  <th className="p-3">{txt('নাম', 'Name')}</th>
-                  <th className="p-3">{txt('মোবাইল', 'Mobile')}</th>
-                  <th className="p-3">{txt('বকেয়া (Due)', 'Due Balance')}</th>
-                  <th className="p-3 text-center">{txt('অ্যাকশন', 'Action')}</th>
+                <tr className="bg-gray-100/90 text-xs border-b text-gray-700">
+                  <th className="p-3 text-gray-700 font-bold">{txt('নাম', 'Name')}</th>
+                  <th className="p-3 text-gray-700 font-bold">{txt('মোবাইল', 'Mobile')}</th>
+                  <th className="p-3 text-gray-700 font-bold">{txt('বকেয়া (Due)', 'Due Balance')}</th>
+                  <th className="p-3 text-center text-gray-700 font-bold">{txt('অ্যাকশন', 'Action')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y text-xs">
+              <tbody className="divide-y text-xs text-gray-800">
                 {filteredCustomers.map((c) => (
-                  <tr key={c.id}>
-                    <td className="p-3 font-bold">{c.name}</td>
-                    <td className="p-3">{c.mobile || '-'}</td>
+                  <tr key={c.id} className="hover:bg-slate-50 transition">
+                    <td className="p-3 font-bold text-gray-900">{c.name}</td>
+                    <td className="p-3 text-gray-700 font-medium">{c.mobile || '-'}</td>
                     <td className="p-3 font-bold text-red-600">৳ {Number(c.total_due).toLocaleString()}</td>
                     <td className="p-3 text-center flex justify-center gap-2">
                       <button
                         onClick={() => {
                           setLedgerCustomer(c);
-                          fetch(`http://127.0.0.1:5010/api/customers/${c.id}/transactions`).then(r => r.json()).then(d => setTransactions(d || []));
+                          fetch(`${API_BASE}/customers/${c.id}/transactions`).then(r => r.json()).then(d => setTransactions(d || []));
                         }}
-                        className="px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded font-bold cursor-pointer"
+                        className="px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded font-bold cursor-pointer transition shadow-2xs"
                       >
                         {txt('লেজার / প্রিন্ট', 'Ledger / Print')}
                       </button>
                       {Number(c.total_due) > 0 && (
-                        <button onClick={() => { setPayModal(c); setCollectAmount(''); setCollectNote(''); }} className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded font-bold cursor-pointer flex items-center gap-1 shadow-xs transition">
+                        <button onClick={() => { setPayModal(c); setCollectAmount(''); setCollectDiscount(''); setCollectNote(''); }} className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded font-bold cursor-pointer flex items-center gap-1 shadow-xs transition">
                           <Receipt size={13} /> {txt('বকেয়া আদায় ও রিসিপ্ট', 'Collect Due & Receipt')}
                         </button>
                       )}
@@ -3406,7 +4350,7 @@ function App() {
 
         {/* ৬. সাপ্লায়ার খাতা ট্যাব */}
         {activeTab === 'suppliers' && (
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-cyan-100">
+          <div className="bg-white text-gray-800 p-6 rounded-2xl shadow-sm border border-cyan-100">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-md shadow-cyan-500/20 shrink-0">
@@ -3426,7 +4370,7 @@ function App() {
                     placeholder={txt("সাপ্লায়ার, প্রতিষ্ঠান বা মোবাইল...", "Supplier, company or mobile...")}
                     value={supplierSearch}
                     onChange={e => setSupplierSearch(e.target.value)}
-                    className="w-full pl-9 pr-3 py-1.5 border border-cyan-200 rounded-xl text-xs outline-none focus:border-cyan-500"
+                    className="w-full pl-9 pr-3 py-1.5 border border-cyan-200 rounded-xl text-xs text-gray-900 bg-white outline-none focus:border-cyan-500"
                   />
                 </div>
 
@@ -3447,35 +4391,43 @@ function App() {
               </div>
             </div>
 
-            <table className="w-full text-left border-collapse text-sm">
+            <table className="w-full text-left border-collapse text-sm text-gray-800">
               <thead>
-                <tr className="bg-gray-50 text-xs border-b">
-                  <th className="p-3">{txt('সাপ্লায়ারের নাম', 'Supplier Name')}</th>
-                  <th className="p-3">{txt('প্রতিষ্ঠান', 'Company')}</th>
-                  <th className="p-3">{txt('মোবাইল', 'Mobile')}</th>
-                  <th className="p-3">{txt('পাওনা ব্যালেন্স', 'Payable Balance')}</th>
-                  <th className="p-3 text-center">{txt('অ্যাকশন', 'Action')}</th>
+                <tr className="bg-gray-100/90 text-xs border-b text-gray-700">
+                  <th className="p-3 text-gray-700 font-bold">{txt('সাপ্লায়ারের নাম', 'Supplier Name')}</th>
+                  <th className="p-3 text-gray-700 font-bold">{txt('প্রতিষ্ঠান', 'Company')}</th>
+                  <th className="p-3 text-gray-700 font-bold">{txt('মোবাইল', 'Mobile')}</th>
+                  <th className="p-3 text-gray-700 font-bold">{txt('পাওনা ব্যালেন্স', 'Payable Balance')}</th>
+                  <th className="p-3 text-center text-gray-700 font-bold">{txt('অ্যাকশন', 'Action')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y text-xs">
+              <tbody className="divide-y text-xs text-gray-800">
                 {filteredSuppliers.map(s => (
-                  <tr key={s.id}>
-                    <td className="p-3 font-bold">{s.name}</td>
-                    <td className="p-3">{s.company || '-'}</td>
-                    <td className="p-3">{s.mobile || '-'}</td>
+                  <tr key={s.id} className="hover:bg-slate-50 transition">
+                    <td className="p-3 font-bold text-gray-900">{s.name}</td>
+                    <td className="p-3 text-gray-700 font-medium">{s.company || '-'}</td>
+                    <td className="p-3 text-gray-700 font-medium">{s.mobile || '-'}</td>
                     <td className="p-3 font-bold text-red-600">৳ {Number(s.total_payable).toLocaleString()}</td>
                     <td className="p-3 text-center flex justify-center gap-2">
                       <button
                         onClick={() => {
                           setSupplierLedger(s);
-                          fetch(`http://127.0.0.1:5010/api/suppliers/${s.id}/ledger`).then(r => r.json()).then(d => setSupplierTransactions(d || []));
+                          setSupplierLedgerTab('statement');
+                          fetch(`${API_BASE}/suppliers/${s.id}/ledger`).then(r => r.json()).then(d => setSupplierTransactions(d || []));
+                          fetchDeletedPayments(s.id);
                         }}
-                        className="px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded font-bold cursor-pointer"
+                        className="px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded font-bold cursor-pointer transition shadow-2xs"
                       >
                         {txt('লেনদেন খতিয়ান', 'Transaction Ledger')}
                       </button>
                       {currentUser.role === 'admin' && Number(s.total_payable) > 0 && (
-                        <button onClick={() => { setSupplierPayModal(s); setSupplierPayAmount(''); }} className="px-3 py-1 bg-green-600 text-white rounded font-bold cursor-pointer">
+                        <button onClick={() => { 
+                          setSupplierPayModal(s); 
+                          setSupplierPayAmount(''); 
+                          setSupplierPayDate(new Date().toISOString().slice(0, 10));
+                          setSupplierPayMethod('Cash');
+                          setSupplierPayNote('');
+                        }} className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded font-bold cursor-pointer transition shadow-xs">
                           {txt('পেমেন্ট পরিশোধ', 'Make Payment')}
                         </button>
                       )}
@@ -3529,8 +4481,12 @@ function App() {
           <WarrantyServiceModule
             currentUser={currentUser}
             products={products}
-            onStockUpdated={() => { fetchProducts(); fetchReports(); }}
             onOpenSlip={(slip) => setActiveWarrantySlip(slip)}
+            onStockUpdated={() => { 
+              fetchProducts(); 
+              fetchReports(); 
+              if (typeof fetchDailySummary === 'function') fetchDailySummary(selectedDate); 
+            }}
             onShareSlip={(slip) => {
               setActiveWarrantySlip(slip);
               setShareData({
@@ -3572,7 +4528,7 @@ function App() {
 
         {/* ৭. ইনভেন্টরি ও স্টক তালিকা ট্যাব (পণ্য নামের নিচে স্টকে থাকা বারকোড তালিকা সহ) */}
         {(activeTab === 'inventory' || activeTab === 'dashboard_inventory') && (
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-indigo-100">
+          <div className="bg-white text-gray-800 p-6 rounded-2xl shadow-sm border border-indigo-100">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-blue-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 shrink-0">
@@ -3616,7 +4572,7 @@ function App() {
                       setEditingProductId(null);
                       setFormData({ 
                         name: '', brand: '', model: '', category: 'CC Camera', barcode: '', warranty: '', 
-                        purchase_price: '', selling_price: '', current_stock: '', alert_quantity: 5,
+                        purchase_price: '', selling_price: '', min_selling_price: '', current_stock: '', alert_quantity: 5,
                         supplier_id: '' 
                       });
                       setShowProductModal(true);
@@ -3679,7 +4635,14 @@ function App() {
                     <td className="p-3"><span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200">{p.category || 'General'}</span></td>
                     <td className="p-3 font-mono text-gray-500">{p.barcode || '-'}</td>
                     {currentUser.role === 'admin' && <td className="p-3">৳ {p.purchase_price}</td>}
-                    <td className="p-3 font-bold text-green-600">৳ {p.selling_price}</td>
+                    <td className="p-3">
+                      <span className="font-bold text-green-600 block">৳ {p.selling_price}</span>
+                      {Number(p.min_selling_price || 0) > 0 && (
+                        <span className="text-[10px] text-rose-600 font-semibold block" title={txt("সর্বনিম্ন বিক্রয় মূল্য", "Minimum Selling Price")}>
+                          {txt("সর্বনিম্ন: ৳", "Min: ৳")}{p.min_selling_price}
+                        </span>
+                      )}
+                    </td>
                     <td className="p-3"><span className={`px-2 py-0.5 rounded font-bold ${p.current_stock <= p.alert_quantity ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{p.current_stock} {txt("টি", "pcs")}</span></td>
                     <td className="p-3 text-center flex justify-center gap-1.5">
                       {currentUser.role === 'admin' ? (
@@ -3699,6 +4662,7 @@ function App() {
                               setEditingProductId(p.id); 
                               setFormData({
                                 ...p,
+                                min_selling_price: p.min_selling_price !== undefined && p.min_selling_price !== null ? p.min_selling_price : '',
                                 model: p.model || '',
                                 supplier_id: p.supplier_id || '',
                                 bill_image: p.bill_image || ''
@@ -3738,7 +4702,7 @@ function App() {
         {activeTab === 'expenses' && (
           <div className="space-y-6">
             {/* তারিখ সিলেক্টর ও ড্যাশবোর্ড ওভারভিউ */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-emerald-100 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="bg-white text-gray-800 p-5 rounded-2xl shadow-sm border border-emerald-100 flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-green-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 shrink-0">
                   <DollarSign size={20} />
@@ -3763,9 +4727,12 @@ function App() {
             {dailySummary && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-gradient-to-br from-blue-50 to-indigo-50/40 p-4 rounded-2xl border border-blue-200 shadow-sm">
-                  <p className="text-xs text-blue-700 font-bold">{txt("মোট বিক্রয় (Sales)", "Total Sales")}</p>
+                  <p className="text-xs text-blue-700 font-bold">{txt("মোট বিক্রয় ও সেবা আয় (Sales & Service)", "Total Sales & Services")}</p>
                   <h3 className="text-xl font-black text-blue-900 mt-1">৳ {dailySummary.total_sales.toLocaleString()}</h3>
-                  <p className="text-[10px] text-blue-600 mt-1">{txt("নগদ আদায়: ৳", "Cash Collected: ৳")}{dailySummary.total_collected.toLocaleString()}</p>
+                  <p className="text-[10px] text-blue-600 mt-1">
+                    {txt("নগদ আদায়: ৳", "Cash Collected: ৳")}{dailySummary.total_collected.toLocaleString()}
+                    {Number(dailySummary.service_total_billed || 0) > 0 && ` (${txt("সার্ভিসিং: ৳", "Service: ৳")}${Number(dailySummary.service_total_billed).toLocaleString()})`}
+                  </p>
                 </div>
 
                 <div className="bg-gradient-to-br from-amber-50 to-orange-50/40 p-4 rounded-2xl border border-amber-200 shadow-sm">
@@ -3793,7 +4760,7 @@ function App() {
             {/* ব্যয় এন্ট্রি ফর্ম ও ব্যয়ের তালিকা */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* ব্যয় সংযোজন ফর্ম */}
-              <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+              <div className="bg-white text-gray-800 p-5 rounded-xl shadow-sm border border-gray-200">
                 <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-3">{txt("নতুন দৈনিক ব্যয় সংযোজন", "Add New Daily Expense")}</h3>
                 <form onSubmit={handleExpenseSubmit} className="space-y-3 text-xs">
                   <div>
@@ -3880,7 +4847,7 @@ function App() {
               </div>
 
               {/* খরচের টেবিল */}
-              <div className="lg:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+              <div className="lg:col-span-2 bg-white text-gray-800 p-5 rounded-xl shadow-sm border border-gray-200">
                 <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-3">
                   {txt("নির্বাচিত তারিখের খরচের তালিকা", "Expenses List for Selected Date")} ({selectedDate})
                 </h3>
@@ -3958,6 +4925,7 @@ function App() {
                     <p className="text-lg font-black text-emerald-700 mt-0.5">৳ {Number(dailySummary.total_cash_in || 0).toLocaleString()}</p>
                     <p className="text-[10px] text-gray-500">
                       {txt("নগদ বিক্রি", "Cash Sales")} ৳{Number(dailySummary.cash_sales || 0).toLocaleString()} + {txt("বাকি আদায়", "Due Collected")} ৳{Number(dailySummary.cash_due_collected || 0).toLocaleString()}
+                      {Number(dailySummary.service_cash_collected || 0) > 0 && ` + ${txt("সার্ভিসিং ক্যাশ", "Service Cash")} ৳${Number(dailySummary.service_cash_collected).toLocaleString()}`}
                     </p>
                   </div>
 
@@ -4158,7 +5126,7 @@ function App() {
 
         {/* ৯. সেলস ও প্রফিট রিপোর্ট (ইনভয়েস দেখা ও প্রিন্ট করার সুবিধাসহ) */}
         {activeTab === 'reports' && currentUser.role === 'admin' && (
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-fuchsia-100">
+          <div className="bg-white text-gray-800 p-6 rounded-2xl shadow-sm border border-fuchsia-100">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-fuchsia-500 to-pink-600 flex items-center justify-center text-white shadow-md shadow-fuchsia-500/20 shrink-0">
@@ -4250,6 +5218,14 @@ function App() {
                           >
                             <Edit size={13} /> {txt("ইনভয়েস এডিট", "Edit Invoice")}
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteInvoice(r.id, r.invoice_no)}
+                            className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
+                            title={txt("ভুলবশত ডুপ্লিকেট হওয়া এই ইনভয়েসটি ডিলিট করুন (সেলস রিপোর্ট ও কাস্টমার লেজার থেকে মাইনাস হবে)", "Delete this duplicate invoice")}
+                          >
+                            <Trash2 size={13} /> {txt("ডিলিট", "Delete")}
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -4270,22 +5246,22 @@ function App() {
       {/* পণ্য এন্ট্রি ও এডিট মডাল */}
       {showProductModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto">
-            <button onClick={() => setShowProductModal(false)} className="absolute top-4 right-4 text-gray-400 cursor-pointer"><X size={20} /></button>
+          <div className="bg-white text-gray-800 rounded-xl shadow-xl w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto">
+            <button onClick={() => setShowProductModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer"><X size={20} /></button>
             <h2 className="text-lg font-bold text-gray-800 mb-4">{editingProductId ? txt('পণ্য সংশোধন', 'Edit Product') : txt('নতুন পণ্য যোগ', 'Add New Product')}</h2>
             
-            <form onSubmit={handleProductSubmit} className="space-y-3 text-xs">
+            <form onSubmit={handleProductSubmit} className="space-y-3 text-xs text-gray-800">
               <div>
-                <label className="font-bold">{txt("পণ্যের নাম *", "Product Name *")}</label>
-                <input type="text" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full border p-2 rounded mt-1" />
+                <label className="font-bold text-gray-700 block mb-1">{txt("পণ্যের নাম *", "Product Name *")}</label>
+                <input type="text" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="w-full border border-gray-300 p-2 rounded mt-1 bg-white text-gray-900 outline-none focus:border-blue-500" />
               </div>
 
               <div>
-                <label className="font-bold text-gray-700">{txt("সাপ্লায়ার / মহাজন (যার থেকে কেনা হয়েছে)", "Supplier (Purchased From)")}</label>
+                <label className="font-bold text-gray-700 block mb-1">{txt("সাপ্লায়ার / মহাজন (যার থেকে কেনা হয়েছে)", "Supplier (Purchased From)")}</label>
                 <select
                   value={formData.supplier_id || ''}
                   onChange={e => setFormData({ ...formData, supplier_id: e.target.value })}
-                  className="w-full border border-gray-300 rounded p-2 text-xs bg-white mt-1 outline-none focus:border-blue-500"
+                  className="w-full border border-gray-300 rounded p-2 text-xs bg-white text-gray-900 mt-1 outline-none focus:border-blue-500"
                 >
                   <option value="">{txt("-- কোনো সাপ্লায়ার নেই (Direct / Cash Purchase) --", "-- No Supplier (Direct / Cash Purchase) --")}</option>
                   {suppliers.map(sup => (
@@ -4298,18 +5274,18 @@ function App() {
 
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="font-bold">{txt("ক্যাটাগরি *", "Category *")}</label>
-                  <select value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} className="w-full border p-2 rounded mt-1 bg-white">
+                  <label className="font-bold text-gray-700 block mb-1">{txt("ক্যাটাগরি *", "Category *")}</label>
+                  <select value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} className="w-full border border-gray-300 p-2 rounded mt-1 bg-white text-gray-900 outline-none focus:border-blue-500">
                     {MASTER_CATEGORIES.map((c, i) => <option key={i} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold">{txt("ব্র্যান্ড", "Brand")}</label>
-                  <input type="text" placeholder={txt("যেমন: Dahua", "e.g. Dahua")} value={formData.brand} onChange={e => setFormData({ ...formData, brand: e.target.value })} className="w-full border p-2 rounded mt-1" />
+                  <label className="font-bold text-gray-700 block mb-1">{txt("ব্র্যান্ড", "Brand")}</label>
+                  <input type="text" placeholder={txt("যেমন: Dahua", "e.g. Dahua")} value={formData.brand} onChange={e => setFormData({ ...formData, brand: e.target.value })} className="w-full border border-gray-300 p-2 rounded mt-1 bg-white text-gray-900 outline-none focus:border-blue-500" />
                 </div>
                 <div>
-                  <label className="font-bold">{txt("মডেল", "Model")}</label>
-                  <input type="text" placeholder={txt("যেমন: B1A21P", "e.g. B1A21P")} value={formData.model} onChange={e => setFormData({ ...formData, model: e.target.value })} className="w-full border p-2 rounded mt-1" />
+                  <label className="font-bold text-gray-700 block mb-1">{txt("মডেল", "Model")}</label>
+                  <input type="text" placeholder={txt("যেমন: B1A21P", "e.g. B1A21P")} value={formData.model} onChange={e => setFormData({ ...formData, model: e.target.value })} className="w-full border border-gray-300 p-2 rounded mt-1 bg-white text-gray-900 outline-none focus:border-blue-500" />
                 </div>
               </div>
 
@@ -4327,12 +5303,12 @@ function App() {
                   placeholder={txt("একটি বারকোড স্ক্যান করুন অথবা একাধিক ইউনিক সিরিয়াল হলে কমা দিয়ে লিখুন (যেমন: SN01, SN02, SN03)", "Scan a barcode or enter multiple unique serials separated by comma (e.g. SN01, SN02, SN03)")}
                   value={formData.barcode}
                   onChange={handleSingleBarcodeChange}
-                  className="w-full border border-blue-300 rounded p-2 text-xs font-mono bg-white outline-none focus:border-blue-600 shadow-inner"
+                  className="w-full border border-blue-300 rounded p-2 text-xs font-mono bg-white text-gray-900 outline-none focus:border-blue-600 shadow-inner"
                 />
               </div>
 
               <div>
-                <label className="font-bold">{txt("ওয়ারেন্টি", "Warranty")}</label>
+                <label className="font-bold text-gray-700 block mb-1">{txt("ওয়ারেন্টি", "Warranty")}</label>
                 <div className="grid grid-cols-2 gap-2 mt-1">
                   <select
                     value={['1 month', '3 months', '6 months', '1 year', '2 years', '3 years', 'ওয়ারেন্টি নেই'].includes(formData.warranty) ? formData.warranty : (formData.warranty ? 'custom' : 'ওয়ারেন্টি নেই')}
@@ -4346,7 +5322,7 @@ function App() {
                         setFormData({ ...formData, warranty: val });
                       }
                     }}
-                    className="border p-2 rounded text-xs bg-white outline-none cursor-pointer"
+                    className="border border-gray-300 p-2 rounded text-xs bg-white text-gray-900 outline-none cursor-pointer"
                   >
                     <option value="ওয়ারেন্টি নেই">{txt("ওয়ারেন্টি নেই (নন-ওয়ারেন্টি)", "No Warranty (Non-warranty)")}</option>
                     <option value="1 month">1 month</option>
@@ -4362,28 +5338,42 @@ function App() {
                     placeholder={txt("কাস্টম ওয়ারেন্টি লিখুন...", "Enter custom warranty...")} 
                     value={formData.warranty} 
                     onChange={e => setFormData({ ...formData, warranty: e.target.value })} 
-                    className="border p-2 rounded text-xs outline-none focus:border-blue-500" 
+                    className="border border-gray-300 p-2 rounded text-xs bg-white text-gray-900 outline-none focus:border-blue-500" 
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
-                  <label className="font-bold">{txt("ক্রয় মূল্য", "Purchase Price")}</label>
-                  <input type="number" required value={formData.purchase_price} onChange={e => setFormData({ ...formData, purchase_price: e.target.value })} className="w-full border p-2 rounded mt-1" />
+                  <label className="font-bold text-gray-700 block mb-1">{txt("ক্রয় মূল্য (৳)", "Purchase Price (৳)")}</label>
+                  <input type="number" required min="0" value={formData.purchase_price} onChange={e => setFormData({ ...formData, purchase_price: e.target.value })} className="w-full border border-gray-300 p-2 rounded mt-1 bg-white text-gray-900 font-semibold outline-none focus:border-blue-500" />
                 </div>
                 <div>
-                  <label className="font-bold">{txt("বিক্রয় মূল্য", "Selling Price")}</label>
-                  <input type="number" required value={formData.selling_price} onChange={e => setFormData({ ...formData, selling_price: e.target.value })} className="w-full border p-2 rounded mt-1" />
+                  <label className="font-bold text-gray-700 block mb-1">{txt("বিক্রয় মূল্য (৳)", "Selling Price (৳)")}</label>
+                  <input type="number" required min="0" value={formData.selling_price} onChange={e => setFormData({ ...formData, selling_price: e.target.value })} className="w-full border border-gray-300 p-2 rounded mt-1 bg-white text-gray-900 font-semibold outline-none focus:border-blue-500" />
                 </div>
                 <div>
-                  <label className="font-bold">{txt("প্রাথমিক স্টক", "Initial Stock")}</label>
+                  <label className="font-bold text-rose-700 block mb-1" title={txt("বিক্রয়ের সময় এই প্রাইসের নিচে বিক্রি করা যাবে না", "Cannot be sold below this price")}>
+                    {txt("সর্বনিম্ন বিক্রয় দর (৳)", "Min Selling Price (৳)")}
+                  </label>
+                  <input 
+                    type="number" 
+                    min="0" 
+                    placeholder={txt("সর্বনিম্ন সীমা...", "Min limit...")} 
+                    value={formData.min_selling_price !== undefined ? formData.min_selling_price : ''} 
+                    onChange={e => setFormData({ ...formData, min_selling_price: e.target.value })} 
+                    className="w-full border border-rose-300 bg-rose-50/40 p-2 rounded mt-1 text-gray-900 font-bold outline-none focus:bg-white focus:border-rose-500" 
+                    title={txt("বিল/কার্টে বিক্রয় প্রাইস এর চেয়ে কম করা যাবে না", "Selling price in cart cannot be lower than this")}
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">{txt("প্রাথমিক স্টক", "Initial Stock")}</label>
                   <input 
                     type="number" 
                     required 
                     value={formData.current_stock} 
                     onChange={e => setFormData({ ...formData, current_stock: e.target.value })} 
-                    className="w-full border p-2 rounded mt-1 bg-gray-50 font-bold" 
+                    className="w-full border border-gray-300 p-2 rounded mt-1 bg-gray-50 text-gray-900 font-bold outline-none focus:border-blue-500" 
                   />
                 </div>
               </div>
@@ -4415,7 +5405,7 @@ function App() {
                         reader.readAsDataURL(file);
                       }
                     }} 
-                    className="text-xs border p-1.5 rounded-lg flex-1 bg-white cursor-pointer" 
+                    className="text-xs border border-gray-300 p-1.5 rounded-lg flex-1 bg-white text-gray-900 cursor-pointer" 
                   />
                   {formData.bill_image && (
                     <div className="shrink-0 text-center">
@@ -4444,25 +5434,25 @@ function App() {
       {/* নতুন সাপ্লায়ার যোগ মডাল */}
       {showSupplierModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
-            <button onClick={() => setShowSupplierModal(false)} className="absolute top-4 right-4 text-gray-400 cursor-pointer"><X size={20} /></button>
+          <div className="bg-white text-gray-800 rounded-xl shadow-xl w-full max-w-md p-6 relative">
+            <button onClick={() => setShowSupplierModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer"><X size={20} /></button>
             <h3 className="text-lg font-bold text-gray-800 mb-3">{txt("নতুন সাপ্লায়ার এন্ট্রি", "Add New Supplier")}</h3>
-            <form onSubmit={handleSupplierSubmit} className="space-y-3 text-xs">
+            <form onSubmit={handleSupplierSubmit} className="space-y-3 text-xs text-gray-800">
               <div>
-                <label className="font-bold">{txt("সাপ্লায়ারের নাম *", "Supplier Name *")}</label>
-                <input type="text" required placeholder={txt("নাম লিখুন", "Enter name")} value={supplierForm.name} onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })} className="w-full border p-2 rounded mt-1" />
+                <label className="font-bold text-gray-700 block mb-1">{txt("সাপ্লায়ারের নাম *", "Supplier Name *")}</label>
+                <input type="text" required placeholder={txt("নাম লিখুন", "Enter name")} value={supplierForm.name} onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })} className="w-full border border-gray-300 p-2 rounded mt-1 bg-white text-gray-900 outline-none focus:border-blue-500" />
               </div>
               <div>
-                <label className="font-bold">{txt("কোম্পানি / প্রতিষ্ঠান", "Company / Organization")}</label>
-                <input type="text" placeholder={txt("প্রতিষ্ঠানের নাম", "Company name")} value={supplierForm.company} onChange={e => setSupplierForm({ ...supplierForm, company: e.target.value })} className="w-full border p-2 rounded mt-1" />
+                <label className="font-bold text-gray-700 block mb-1">{txt("কোম্পানি / প্রতিষ্ঠান", "Company / Organization")}</label>
+                <input type="text" placeholder={txt("প্রতিষ্ঠানের নাম", "Company name")} value={supplierForm.company} onChange={e => setSupplierForm({ ...supplierForm, company: e.target.value })} className="w-full border border-gray-300 p-2 rounded mt-1 bg-white text-gray-900 outline-none focus:border-blue-500" />
               </div>
               <div>
-                <label className="font-bold">{txt("মোবাইল নম্বর", "Mobile Number")}</label>
-                <input type="text" placeholder="০১৭১১-xxxxxx" value={supplierForm.mobile} onChange={e => setSupplierForm({ ...supplierForm, mobile: e.target.value })} className="w-full border p-2 rounded mt-1" />
+                <label className="font-bold text-gray-700 block mb-1">{txt("মোবাইল নম্বর", "Mobile Number")}</label>
+                <input type="text" placeholder="০১৭১১-xxxxxx" value={supplierForm.mobile} onChange={e => setSupplierForm({ ...supplierForm, mobile: e.target.value })} className="w-full border border-gray-300 p-2 rounded mt-1 bg-white text-gray-900 outline-none focus:border-blue-500" />
               </div>
               <div>
-                <label className="font-bold">{txt("ঠিকানা", "Address")}</label>
-                <textarea placeholder={txt("ঠিকানা", "Address")} value={supplierForm.address} onChange={e => setSupplierForm({ ...supplierForm, address: e.target.value })} className="w-full border p-2 rounded mt-1" />
+                <label className="font-bold text-gray-700 block mb-1">{txt("ঠিকানা", "Address")}</label>
+                <textarea placeholder={txt("ঠিকানা", "Address")} value={supplierForm.address} onChange={e => setSupplierForm({ ...supplierForm, address: e.target.value })} className="w-full border border-gray-300 p-2 rounded mt-1 bg-white text-gray-900 outline-none focus:border-blue-500" />
               </div>
               <button type="submit" className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg cursor-pointer">
                 {txt("সংরক্ষণ করুন", "Save Supplier")}
@@ -4475,7 +5465,7 @@ function App() {
       {/* ইউজার ও স্টাফ ম্যানেজমেন্ট মডাল (এডমিন ও সেলস পাসওয়ার্ড/ইউজারনেম পরিবর্তন) */}
       {showUserModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto">
+          <div className="bg-white text-gray-800 rounded-xl shadow-2xl w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto">
             <button 
               onClick={() => { setShowUserModal(false); setEditingUserId(null); }} 
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer"
@@ -4513,6 +5503,15 @@ function App() {
                             </span>
                           </div>
                           <p className="text-gray-500 font-mono text-[11px] mt-0.5">ID: @{u.username}</p>
+                          {u.email ? (
+                            <p className="text-blue-700 font-sans text-[10px] mt-0.5 flex items-center gap-1 font-medium">
+                              📧 {u.email}
+                            </p>
+                          ) : (
+                            <p className="text-amber-600 font-sans text-[10px] mt-0.5 italic">
+                              ⚠️ {txt("ইমেইল যুক্ত নেই (2FA নিষ্ক্রিয়)", "No email (2FA disabled)")}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-1">
                           <button
@@ -4523,7 +5522,8 @@ function App() {
                                 username: u.username,
                                 password: '',
                                 fullname: u.fullname,
-                                role: u.role
+                                role: u.role,
+                                email: u.email || ''
                               });
                             }}
                             className="px-2 py-1 bg-white hover:bg-purple-100 text-purple-700 border border-purple-200 rounded font-bold text-[11px] cursor-pointer transition flex items-center gap-1"
@@ -4558,7 +5558,7 @@ function App() {
                       type="button"
                       onClick={() => {
                         setEditingUserId(null);
-                        setNewUserForm({ username: '', password: '', fullname: '', role: 'sales' });
+                        setNewUserForm({ username: '', password: '', fullname: '', role: 'sales', email: '' });
                       }}
                       className="text-[11px] text-purple-600 hover:underline font-semibold cursor-pointer"
                     >
@@ -4589,6 +5589,21 @@ function App() {
                       onChange={e => setNewUserForm({ ...newUserForm, username: e.target.value })} 
                       className="w-full border p-2 rounded mt-1 bg-white outline-none focus:border-purple-600 font-mono" 
                     />
+                  </div>
+                  <div>
+                    <label className="font-bold text-gray-700 flex items-center justify-between">
+                      <span>{txt("ইমেইল এড্রেস (২-স্টেপ ভেরিফিকেশন কোডের জন্য)", "Email Address (For 2-Step Verification)")}</span>
+                    </label>
+                    <input 
+                      type="email" 
+                      placeholder={txt("যেমন: fctechnology2018@gmail.com", "e.g. fctechnology2018@gmail.com")} 
+                      value={newUserForm.email || ''} 
+                      onChange={e => setNewUserForm({ ...newUserForm, email: e.target.value })} 
+                      className="w-full border p-2 rounded mt-1 bg-white outline-none focus:border-purple-600 font-sans" 
+                    />
+                    <p className="text-[10px] text-gray-500 mt-0.5">
+                      {txt("লগইন করার সময় এই ইমেইলে ওটিপি (OTP) কোড পাঠানো হবে।", "A verification code (OTP) will be sent to this email upon login.")}
+                    </p>
                   </div>
                   <div>
                     <label className="font-bold text-gray-700">
@@ -4630,7 +5645,7 @@ function App() {
       {/* ল্যাপটপ ও ডেস্কটপ সার্ভিসিং বিল মডাল */}
       {showServiceModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 relative">
+          <div className="bg-white text-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6 relative">
             <button onClick={() => setShowServiceModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer">
               <X size={20} />
             </button>
@@ -4639,7 +5654,7 @@ function App() {
                 <Wrench size={20} />
               </div>
               <div>
-                <h3 className="text-base font-bold text-gray-800">{txt("ল্যাপটপ / ডেস্কটপ সার্ভিসিং বিল যোগ", "Add Laptop / Desktop Service Bill")}</h3>
+                <h3 className="text-base font-bold text-gray-800">{txt("ডিভাইস / কম্পিউটার / ক্যামেরা / সার্ভিসিং বিল যোগ", "Add Device / Service Bill")}</h3>
                 <p className="text-xs text-gray-500">{txt("সার্ভিসিং এর বিবরণ ও চার্জ লিখে সরাসরি বিল-কার্টে যোগ করুন", "Enter service details and charge to add directly to sale cart")}</p>
               </div>
             </div>
@@ -4647,15 +5662,23 @@ function App() {
             <form onSubmit={handleAddServiceToCart} className="space-y-3 mt-4 text-xs">
               <div>
                 <label className="font-bold text-gray-700">{txt("ডিভাইস / সার্ভিসিং ক্যাটাগরি *", "Device / Service Category *")}</label>
-                <div className="grid grid-cols-3 gap-2 mt-1">
-                  {['ল্যাপটপ সার্ভিসিং', 'ডেস্কটপ সার্ভিসিং', 'সাধারণ সার্ভিসিং'].map(cat => (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-1">
+                  {[
+                    { id: 'ল্যাপটপ সার্ভিসিং', bn: 'ল্যাপটপ সার্ভিসিং', en: 'Laptop Service' },
+                    { id: 'ডেস্কটপ সার্ভিসিং', bn: 'ডেস্কটপ সার্ভিসিং', en: 'Desktop Service' },
+                    { id: 'প্রিন্টার সার্ভিস', bn: 'প্রিন্টার সার্ভিস', en: 'Printer Service' },
+                    { id: 'ক্যামেরা ইনস্টলেশন', bn: 'ক্যামেরা ইনস্টলেশন', en: 'Camera Installation' },
+                    { id: 'ক্যামেরা সার্ভিস', bn: 'ক্যামেরা সার্ভিস', en: 'Camera Service' },
+                    { id: 'ইউপিএস সার্ভিস', bn: 'ইউপিএস সার্ভিস', en: 'UPS Service' },
+                    { id: 'সাধারণ সার্ভিসিং', bn: 'সাধারণ সার্ভিসিং', en: 'General Service' }
+                  ].map(cat => (
                     <button
-                      key={cat}
+                      key={cat.id}
                       type="button"
-                      onClick={() => setServiceForm({ ...serviceForm, category: cat })}
-                      className={`py-1.5 px-2 rounded-lg font-bold border text-center transition cursor-pointer ${serviceForm.category === cat ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'}`}
+                      onClick={() => setServiceForm({ ...serviceForm, category: cat.id })}
+                      className={`py-1.5 px-2 rounded-lg font-bold border text-center transition cursor-pointer text-xs ${serviceForm.category === cat.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'}`}
                     >
-                      {cat === 'ল্যাপটপ সার্ভিসিং' ? txt('ল্যাপটপ সার্ভিসিং', 'Laptop Service') : cat === 'ডেস্কটপ সার্ভিসিং' ? txt('ডেস্কটপ সার্ভিসিং', 'Desktop Service') : txt('সাধারণ সার্ভিসিং', 'General Service')}
+                      {txt(cat.bn, cat.en)}
                     </button>
                   ))}
                 </div>
@@ -4741,7 +5764,7 @@ function App() {
       {/* মাল্টিপল সিরিয়াল স্টক ইন মডাল */}
       {showStockInModal && stockInProduct && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 relative">
+          <div className="bg-white text-gray-800 rounded-xl shadow-xl w-full max-w-lg p-6 relative">
             <button onClick={() => setShowStockInModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer"><X size={20} /></button>
             <h3 className="text-lg font-bold text-gray-800 mb-1">{txt("আলাদা সিরিয়াল বারকোড সহ স্টক ইন", "Stock-In with Unique Serial Barcodes")}</h3>
             <p className="text-xs text-gray-500 mb-4">{stockInProduct.name} ({txt("বর্তমান স্টক:", "Current Stock:")} {stockInProduct.current_stock})</p>
@@ -4823,7 +5846,7 @@ function App() {
       {/* সাপ্লায়ার সরাসরি ক্রয় বিল এন্ট্রি ও ইমেজ আপলোড মডাল */}
       {showSupplierPurchaseModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
+          <div className="bg-white text-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
             <button onClick={() => setShowSupplierPurchaseModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer">
               <X size={20} />
             </button>
@@ -4930,32 +5953,102 @@ function App() {
       {/* সাপ্লায়ার পেমেন্ট পরিশোধ মডাল */}
       {supplierPayModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 relative">
+          <div className="bg-white text-gray-800 rounded-xl shadow-xl w-full max-w-sm p-6 relative">
             <button onClick={() => setSupplierPayModal(null)} className="absolute top-4 right-4 text-gray-400 cursor-pointer"><X size={20} /></button>
             <h3 className="text-lg font-bold text-gray-800 mb-1">{txt("সাপ্লায়ারকে পরিশোধ", "Pay Supplier")}</h3>
-            <p className="text-xs text-gray-500 mb-4">{supplierPayModal.name} ({txt("বকেয়া পাওনা: ৳ ", "Payable Balance: ৳ ")}{supplierPayModal.total_payable})</p>
+            <p className="text-xs text-gray-500 mb-4">{supplierPayModal.name} {supplierPayModal.company ? `(${supplierPayModal.company})` : ''} - {txt("বকেয়া পাওনা: ৳ ", "Payable Balance: ৳ ")}{Number(supplierPayModal.total_payable).toLocaleString()}</p>
 
             <form onSubmit={(e) => {
               e.preventDefault();
-              fetch('http://127.0.0.1:5010/api/suppliers/pay', {
+              fetch(`${API_BASE}/suppliers/pay`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ supplier_id: supplierPayModal.id, amount: supplierPayAmount, payment_method: 'Cash', note: txt('সাপ্লায়ার দেনা পরিশোধ', 'Supplier Payment') })
-              }).then(() => {
+                body: JSON.stringify({ 
+                  supplier_id: supplierPayModal.id, 
+                  amount: supplierPayAmount, 
+                  payment_method: supplierPayMethod || 'Cash', 
+                  payment_date: supplierPayDate,
+                  note: supplierPayNote || txt('সাপ্লায়ার দেনা পরিশোধ', 'Supplier Payment') 
+                })
+              })
+              .then(r => r.json())
+              .then(data => {
+                if (data.error) {
+                  alert(data.error);
+                  return;
+                }
                 setSupplierPayModal(null);
                 setSupplierPayAmount('');
+                setSupplierPayNote('');
                 fetchSuppliers();
-              });
+                fetchExpenses(selectedDate);
+                fetchDailySummary(selectedDate);
+                alert(txt("পেমেন্ট সফলভাবে সংরক্ষিত হয়েছে এবং নির্বাচিত তারিখের খরচের তালিকায় যুক্ত হয়েছে!", "Payment recorded successfully and added to daily expenses list!"));
+              })
+              .catch(err => alert(err.message));
             }} className="space-y-3">
-              <input
-                type="number"
-                required
-                placeholder={txt("পরিশোধের পরিমাণ (৳)", "Payment Amount (৳)")}
-                value={supplierPayAmount}
-                onChange={e => setSupplierPayAmount(e.target.value)}
-                className="w-full border p-2 rounded text-sm outline-none"
-              />
-              <button type="submit" className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg text-sm cursor-pointer">
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">
+                  {txt("পরিশোধের পরিমাণ (৳) *", "Payment Amount (৳) *")}
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  step="0.01"
+                  placeholder={txt("পরিশোধের পরিমাণ (৳)", "Payment Amount (৳)")}
+                  value={supplierPayAmount}
+                  onChange={e => setSupplierPayAmount(e.target.value)}
+                  className="w-full border p-2 rounded-lg text-sm outline-none focus:border-green-600 font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">
+                  {txt("পরিশোধের তারিখ *", "Payment Date *")}
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={supplierPayDate}
+                  onChange={e => setSupplierPayDate(e.target.value)}
+                  className="w-full border p-2 rounded-lg text-xs outline-none focus:border-green-600 bg-white"
+                />
+                <span className="text-[10px] text-gray-500 mt-0.5 block">
+                  {txt("এই তারিখের খরচের তালিকায় টাকাটি যুক্ত হবে এবং প্রত্যাশিত ক্যাশ কমবে।", "Will appear in expenses list on this date and reduce expected cash.")}
+                </span>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">
+                  {txt("পেমেন্ট মাধ্যম", "Payment Method")}
+                </label>
+                <select
+                  value={supplierPayMethod}
+                  onChange={e => setSupplierPayMethod(e.target.value)}
+                  className="w-full border p-2 rounded-lg text-xs outline-none focus:border-green-600 bg-white font-medium"
+                >
+                  <option value="Cash">Cash (নগদ)</option>
+                  <option value="Bank">Bank (ব্যাংক ট্রান্সফার)</option>
+                  <option value="bKash">bKash (বিকাশ)</option>
+                  <option value="Cheque">Cheque (চেক)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">
+                  {txt("বিবরণ / নোট (ঐচ্ছিক)", "Note / Description (Optional)")}
+                </label>
+                <input
+                  type="text"
+                  placeholder={txt("যেমন: চেক নম্বর, ভাউচার বা বিশেষ তথ্য...", "e.g. cheque no, voucher or reference...")}
+                  value={supplierPayNote}
+                  onChange={e => setSupplierPayNote(e.target.value)}
+                  className="w-full border p-2 rounded-lg text-xs outline-none focus:border-green-600"
+                />
+              </div>
+
+              <button type="submit" className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg text-sm cursor-pointer shadow transition mt-2">
                 {txt("পরিশোধ নিশ্চিত করুন", "Confirm Payment")}
               </button>
             </form>
@@ -4966,11 +6059,12 @@ function App() {
       {/* কাস্টমার বকেয়া গ্রহণ মডাল (নগদ, বিকাশ, ব্যাংক ও চেক রিসিভ সহ এবং মানি রিসিপ্ট তৈরি) */}
       {payModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
+          <div className="bg-white text-gray-800 rounded-xl shadow-xl w-full max-w-md p-6 relative max-h-[92vh] overflow-y-auto">
             <button 
               onClick={() => {
                 setPayModal(null);
                 setCollectAmount('');
+                setCollectDiscount('');
                 setCollectNote('');
                 setChequeBank('');
                 setChequeNo('');
@@ -4991,14 +6085,21 @@ function App() {
               e.preventDefault();
               try {
                 const payingCustId = payModal.id;
-                const paidAmtNum = Number(collectAmount);
+                const paidAmtNum = Number(collectAmount) || 0;
+                const discountAmtNum = Math.max(0, Number(collectDiscount) || 0);
+                const totalAdjustNum = paidAmtNum + discountAmtNum;
 
-                const res = await fetch('http://127.0.0.1:5010/api/customers/pay', {
+                if (totalAdjustNum <= 0) {
+                  return alert(txt('সঠিক টাকার পরিমাণ অথবা ছাড়ের পরিমাণ প্রদান করুন!', 'Please enter a valid amount or discount!'));
+                }
+
+                const res = await fetch(`${API_BASE}/customers/pay`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ 
                     customer_id: payingCustId, 
-                    amount: collectAmount, 
+                    amount: paidAmtNum, 
+                    discount: discountAmtNum,
                     payment_method: collectMethod, 
                     note: collectNote || (collectMethod === 'Cheque' ? txt(`চেক নং: ${chequeNo} (${chequeBank})`, `Cheque No: ${chequeNo} (${chequeBank})`) : txt('বকেয়া সমন্বয় বাবদ নগদ জমা', 'Cash received for due adjustment')),
                     bank_name: collectMethod === 'Cheque' ? chequeBank : null,
@@ -5014,6 +6115,7 @@ function App() {
                 // স্টেট রিসেট
                 setPayModal(null);
                 setCollectAmount('');
+                setCollectDiscount('');
                 setCollectNote('');
                 setChequeBank('');
                 setChequeNo('');
@@ -5027,9 +6129,9 @@ function App() {
                 if (ledgerCustomer && ledgerCustomer.id === payingCustId) {
                   setLedgerCustomer(prev => ({
                     ...prev,
-                    total_due: Math.max(0, Number(prev.total_due || 0) - paidAmtNum)
+                    total_due: Math.max(0, Number(prev.total_due || 0) - totalAdjustNum)
                   }));
-                  fetch(`http://127.0.0.1:5010/api/customers/${payingCustId}/transactions?from_date=${custLedgerFromDate}&to_date=${custLedgerToDate}`)
+                  fetch(`${API_BASE}/customers/${payingCustId}/transactions?from_date=${custLedgerFromDate}&to_date=${custLedgerToDate}`)
                     .then(r => r.json())
                     .then(d => setTransactions(d || []));
                 }
@@ -5045,17 +6147,77 @@ function App() {
               }
             }} className="space-y-3 text-xs">
               <div>
-                <label className="font-bold text-gray-700 block mb-1">{txt("টাকার পরিমাণ (৳) *", "Amount (৳) *")}</label>
+                <label className="font-bold text-gray-700 block mb-1">{txt("জমা / পরিশোধিত টাকা (৳) *", "Amount Received / Paid (৳) *")}</label>
                 <input
                   type="number"
                   required
+                  min="0"
                   max={payModal.total_due}
                   value={collectAmount}
                   onChange={e => setCollectAmount(e.target.value)}
-                  className="w-full border p-2.5 rounded-lg text-sm font-bold outline-none focus:border-emerald-600"
+                  className="w-full border p-2.5 rounded-lg text-sm font-bold font-mono outline-none focus:border-emerald-600"
                   placeholder={txt("টাকার পরিমাণ লিখুন", "Enter amount")}
                 />
               </div>
+
+              {/* টাকা কম দিলে ছাড় হিসেবে দেখানোর অপশন */}
+              <div className="bg-amber-50/70 border border-amber-200 p-2.5 rounded-xl space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="font-bold text-amber-900 block">
+                    {txt("টাকা কম দিলে ছাড় / ডিসকাউন্ট (৳)", "Discount / Waiver if paid less (৳)")}
+                  </label>
+                  <span className="text-[10px] text-amber-700 font-semibold bg-amber-100/80 px-2 py-0.5 rounded border border-amber-300">
+                    {txt("ঐচ্ছিক (বাকি মাফ)", "Optional")}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  value={collectDiscount}
+                  onChange={e => setCollectDiscount(e.target.value)}
+                  className="w-full border border-amber-300 bg-white p-2 rounded-lg text-sm font-bold font-mono outline-none focus:border-amber-600 text-amber-900"
+                  placeholder={txt("ছাড়ের পরিমাণ (যেমন: ৫০ বা ১০০)", "Enter discount amount (e.g. 50 or 100)")}
+                />
+                {Number(payModal.total_due) > Number(collectAmount || 0) && Number(collectAmount || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setCollectDiscount(String(Math.max(0, Number(payModal.total_due || 0) - Number(collectAmount || 0))))}
+                    className="text-[11px] text-amber-800 hover:text-amber-900 font-bold underline flex items-center gap-1 cursor-pointer transition pt-0.5"
+                  >
+                    💡 {txt(`বাকি ৳ ${(Number(payModal.total_due || 0) - Number(collectAmount || 0)).toLocaleString()} পুরোটা ছাড় (মাফ) হিসেবে সমন্বয় করতে ক্লিক করুন`, `Click to set remaining ৳ ${(Number(payModal.total_due || 0) - Number(collectAmount || 0)).toLocaleString()} as discount`)}
+                  </button>
+                )}
+              </div>
+
+              {/* লাইভ হিসাব ও সমন্বয় প্রিভিউ */}
+              {(Number(collectAmount) > 0 || Number(collectDiscount) > 0) && (
+                <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1 text-[11px]">
+                  <div className="flex justify-between text-gray-600">
+                    <span>{txt("বর্তমান মোট বকেয়া:", "Current Total Due:")}</span>
+                    <span className="font-bold font-mono text-gray-800">৳ {Number(payModal.total_due || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-emerald-700">
+                    <span>{txt("নগদ / পরিশোধ গ্রহণ:", "Amount Received:")}</span>
+                    <span className="font-bold font-mono">৳ {Number(collectAmount || 0).toLocaleString()}</span>
+                  </div>
+                  {Number(collectDiscount) > 0 && (
+                    <div className="flex justify-between text-amber-800">
+                      <span>{txt("বিশেষ ছাড় (মাফ):", "Discount / Waiver:")}</span>
+                      <span className="font-bold font-mono">- ৳ {Number(collectDiscount).toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-slate-200 pt-1 flex justify-between font-bold text-gray-800">
+                    <span>{txt("সর্বমোট বকেয়া সমন্বয়:", "Total Due Adjusted:")}</span>
+                    <span className="text-emerald-700 font-mono">৳ {((Number(collectAmount) || 0) + (Number(collectDiscount) || 0)).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between font-bold">
+                    <span className="text-gray-700">{txt("অবশিষ্ট বকেয়া থাকবে:", "Remaining Balance Due:")}</span>
+                    <span className={`font-mono ${Math.max(0, Number(payModal.total_due || 0) - (Number(collectAmount || 0) + Number(collectDiscount || 0))) === 0 ? 'text-emerald-600 font-black' : 'text-rose-600'}`}>
+                      ৳ {Math.max(0, Number(payModal.total_due || 0) - (Number(collectAmount || 0) + Number(collectDiscount || 0))).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="font-bold text-gray-700 block mb-1">{txt("পরিশোধের মাধ্যম (Payment Method) *", "Payment Method *")}</label>
@@ -5148,10 +6310,233 @@ function App() {
         </div>
       )}
 
+      {/* কাস্টমার পেমেন্ট ও মানি রিসিপ্ট এডিট মডাল (শুধুমাত্র অ্যাডমিন দ্বারা সম্পাদনাযোগ্য) */}
+      {editingPayment && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+          <div className="bg-white text-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6 relative max-h-[92vh] overflow-y-auto">
+            <button 
+              onClick={() => setEditingPayment(null)} 
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+            
+            <div className="flex items-center gap-2.5 border-b pb-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-lg">
+                ✏️
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">
+                  {txt("টাকা গ্রহণ ও মানি রিসিপ্ট সংশোধন", "Edit Received Payment & Money Receipt")}
+                </h3>
+                <p className="text-[11px] text-gray-500">
+                  {txt("শুধুমাত্র অ্যাডমিন: টাকা কম বা বেশি গ্রহণ করা হলে সমন্বয়", "Admin Only: Adjust mistaken excess or under-payment")}
+                </p>
+              </div>
+            </div>
+
+            {/* গ্রাহক ও রিসিপ্ট সংক্ষিপ্ত তথ্য */}
+            <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3 mb-4 text-xs space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">{txt("গ্রাহকের নাম:", "Customer:")}</span>
+                <span className="font-bold text-gray-900">{editingPayment.customer_name || ledgerCustomer?.name || '-'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">{txt("রিসিপ্ট নং:", "Receipt No:")}</span>
+                <span className="font-mono font-bold text-emerald-800">{editingPayment.receipt_no || `MR-${editingPayment.id}`}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">{txt("মূল পূর্বের বকেয়া:", "Original Previous Due:")}</span>
+                <span className="font-mono font-bold text-gray-800">৳ {Number(editingPayment.previous_due || 0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center border-t border-amber-200/60 pt-1">
+                <span className="text-gray-500">{txt("পূর্বে জমার পরিমাণ:", "Previous Recorded Amount:")}</span>
+                <span className="font-mono font-bold text-emerald-700">৳ {Number(editingPayment.amount || 0).toLocaleString()}</span>
+              </div>
+              {Number(editingPayment.discount || 0) > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">{txt("পূর্বে বিশেষ ছাড়:", "Previous Recorded Discount:")}</span>
+                  <span className="font-mono font-bold text-amber-700">৳ {Number(editingPayment.discount || 0).toLocaleString()}</span>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleUpdatePayment} className="space-y-3.5 text-xs">
+              <div>
+                <label className="font-bold text-gray-700 block mb-1">
+                  {txt("সংশোধিত সঠিক জমার পরিমাণ (৳) *", "Corrected Received Amount (৳) *")}
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  required
+                  value={editPaymentForm.amount}
+                  onChange={e => setEditPaymentForm(prev => ({ ...prev, amount: e.target.value }))}
+                  className="w-full border border-gray-300 p-2.5 rounded-lg text-base font-bold font-mono outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-500"
+                  placeholder={txt("সঠিক টাকার পরিমাণ লিখুন", "Enter corrected amount")}
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-gray-700 block mb-1">
+                  {txt("সংশোধিত বিশেষ ছাড় / ডিসকাউন্ট (৳)", "Corrected Special Discount (৳)")}
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={editPaymentForm.discount}
+                  onChange={e => setEditPaymentForm(prev => ({ ...prev, discount: e.target.value }))}
+                  className="w-full border border-amber-300 bg-amber-50/40 p-2.5 rounded-lg text-base font-bold font-mono outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-500 text-amber-900"
+                  placeholder={txt("ছাড়ের পরিমাণ (প্রযোজ্য না হলে খালি রাখুন বা ০)", "Enter discount amount (or 0)")}
+                />
+              </div>
+
+              {/* লাইভ সমন্বয় ও লেজার প্রভাব প্রিভিউ */}
+              {editPaymentForm.amount !== '' && !isNaN(Number(editPaymentForm.amount)) && (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-[11px] space-y-1 font-medium">
+                  {(() => {
+                    const curNewAmt = Number(editPaymentForm.amount) || 0;
+                    const curNewDisc = Number(editPaymentForm.discount) || 0;
+                    const curNewTotal = curNewAmt + curNewDisc;
+                    const curOldTotal = Number(editingPayment.amount || 0) + Number(editingPayment.discount || 0);
+                    const curDiff = curNewTotal - curOldTotal;
+                    const curRemaining = Math.max(0, Number(editingPayment.previous_due || 0) - curNewTotal);
+                    return (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">{txt("মোট সমন্বয় (জমা + ছাড়):", "Total Adjustment (Paid + Discount):")}</span>
+                          <span className="font-mono font-bold text-emerald-800">৳ {curNewTotal.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">{txt("সমন্বিত অবশিষ্ট বকেয়া (রিসিপ্টে):", "Adjusted Remaining Due (Receipt):")}</span>
+                          <span className="font-mono font-bold text-emerald-700">৳ {curRemaining.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between border-t border-slate-200/80 pt-1">
+                          <span className="text-gray-600">{txt("কাস্টমার লেজারে প্রভাব:", "Customer Ledger Impact:")}</span>
+                          <span className={`font-mono font-bold ${curDiff > 0 ? 'text-emerald-700' : curDiff < 0 ? 'text-rose-700' : 'text-gray-600'}`}>
+                            {curDiff > 0
+                              ? `${txt("বকেয়া আরও কমবে: -৳ ", "Due will decrease: -৳ ")}${curDiff.toLocaleString()}`
+                              : curDiff < 0
+                              ? `${txt("বকেয়া বাড়বে: +৳ ", "Due will increase: +৳ ")}${Math.abs(curDiff).toLocaleString()}`
+                              : txt("কোনো পরিবর্তন নেই", "No change")}
+                          </span>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
+              <div>
+                <label className="font-bold text-gray-700 block mb-1">{txt("পরিশোধের মাধ্যম *", "Payment Method *")}</label>
+                <select
+                  value={editPaymentForm.payment_method}
+                  onChange={e => setEditPaymentForm(prev => ({ ...prev, payment_method: e.target.value }))}
+                  className="w-full border border-gray-300 p-2.5 rounded-lg font-bold outline-none focus:border-amber-600"
+                >
+                  <option value="Cash">💵 {txt("নগদ অর্থ (Cash)", "Cash")}</option>
+                  <option value="bKash">📱 {txt("বিকাশ (bKash)", "bKash")}</option>
+                  <option value="Bank">🏛️ {txt("ব্যাংক ট্রান্সফার (Bank Transfer)", "Bank Transfer")}</option>
+                  <option value="Cheque">🏦 {txt("ব্যাংক চেক (Cheque)", "Bank Cheque")}</option>
+                </select>
+              </div>
+
+              {editPaymentForm.payment_method === 'Cheque' && (
+                <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-300 space-y-2.5">
+                  <h4 className="font-bold text-amber-900 text-xs">{txt("ব্যাংক চেকের বিবরণ", "Cheque Details")}</h4>
+                  <div>
+                    <label className="text-[10px] text-gray-600 block mb-0.5">{txt("ব্যাংকের নাম", "Bank Name")}</label>
+                    <input
+                      type="text"
+                      value={editPaymentForm.bank_name}
+                      onChange={e => setEditPaymentForm(prev => ({ ...prev, bank_name: e.target.value }))}
+                      className="w-full border p-2 rounded text-xs outline-none focus:border-amber-500"
+                      placeholder="e.g. Islami Bank, DBBL"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-600 block mb-0.5">{txt("চেক নম্বর", "Cheque No")}</label>
+                    <input
+                      type="text"
+                      value={editPaymentForm.cheque_no}
+                      onChange={e => setEditPaymentForm(prev => ({ ...prev, cheque_no: e.target.value }))}
+                      className="w-full border p-2 rounded text-xs outline-none focus:border-amber-500"
+                      placeholder="e.g. CQ-991204"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-gray-600 block mb-0.5">{txt("চেকের তারিখ", "Cheque Date")}</label>
+                      <input
+                        type="date"
+                        value={editPaymentForm.cheque_date}
+                        onChange={e => setEditPaymentForm(prev => ({ ...prev, cheque_date: e.target.value }))}
+                        className="w-full border p-1.5 rounded text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-600 block mb-0.5">{txt("জমার তারিখ", "Deposit Date")}</label>
+                      <input
+                        type="date"
+                        value={editPaymentForm.deposit_date}
+                        onChange={e => setEditPaymentForm(prev => ({ ...prev, deposit_date: e.target.value }))}
+                        className="w-full border p-1.5 rounded text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-600 block mb-0.5">{txt("চেকের স্ট্যাটাস", "Cheque Status")}</label>
+                    <select
+                      value={editPaymentForm.cheque_status}
+                      onChange={e => setEditPaymentForm(prev => ({ ...prev, cheque_status: e.target.value }))}
+                      className="w-full border p-2 rounded text-xs"
+                    >
+                      <option value="Pending">{txt("বিচারাধীন / জমাপ্রক্রিয়াধীন", "Pending")}</option>
+                      <option value="Deposited">{txt("জমা সম্পন্ন (Deposited)", "Deposited")}</option>
+                      <option value="Bounced">{txt("বাউন্সড (Bounced)", "Bounced")}</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="font-bold text-gray-700 block mb-1">
+                  {txt("সংশোধনের কারণ / নোট", "Note / Reason for Adjustment")}
+                </label>
+                <input
+                  type="text"
+                  value={editPaymentForm.note}
+                  onChange={e => setEditPaymentForm(prev => ({ ...prev, note: e.target.value }))}
+                  className="w-full border border-gray-300 p-2.5 rounded-lg outline-none focus:border-amber-600"
+                  placeholder={txt("উদা: ভুলবশত বেশি/কম টাকা এন্ট্রি হয়েছিল", "e.g. Entered incorrect amount by mistake")}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingPayment(null)}
+                  className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg cursor-pointer transition"
+                >
+                  {txt("বাতিল", "Cancel")}
+                </button>
+                <button
+                  type="submit"
+                  className="flex-2 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg cursor-pointer shadow transition flex items-center justify-center gap-1.5"
+                >
+                  <Receipt size={15} /> {txt("সংশোধন ও সমন্বয় সম্পন্ন করুন", "Save Adjustment & Sync Ledger")}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* গ্রাহকদের চেক রসিদ ও ব্যাংকে জমা ট্র্যাকিং মডাল */}
       {showChequeModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl p-6 relative max-h-[90vh] overflow-y-auto">
+          <div className="bg-white text-gray-800 rounded-xl shadow-2xl w-full max-w-4xl p-6 relative max-h-[90vh] overflow-y-auto">
             <button 
               onClick={() => setShowChequeModal(false)} 
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer"
@@ -5324,45 +6709,87 @@ function App() {
         <div className="fixed inset-0 bg-black/60 flex items-start justify-center p-4 py-6 md:py-8 z-50 overflow-y-auto print:static print:bg-white print:p-0">
           <div className="print-card-wrapper bg-white rounded-xl shadow-2xl w-full max-w-3xl my-2 relative flex flex-col print:shadow-none print:w-full print:m-0 print:border-none">
             <div className="sticky top-0 z-30 flex justify-between items-center p-4 border-b bg-gray-50 rounded-t-xl shadow-xs print:hidden">
-              <span className="font-bold text-gray-700">{txt("A4 ইনভয়েস প্রিন্ট প্রিভিউ", "A4 Invoice Print Preview")}</span>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => {
-                    setShareData({
-                      type: 'invoice',
-                      title: invoiceDocTitle || txt('বিক্রয় বিল / ক্যাশ মেমো', 'Sales Invoice / Cash Memo'),
-                      number: completedInvoice.invoice_no,
-                      date: formatDateDMY(completedInvoice.date || completedInvoice.created_at),
-                      customerName: completedInvoice.customer_name,
-                      customerMobile: completedInvoice.customer_mobile,
-                      amount: completedInvoice.total_amount,
-                      filename: `FC_Technology_Invoice_${completedInvoice.invoice_no}`,
-                      elementId: 'printable-content',
-                      raw: completedInvoice,
-                      details: lang === 'en' 
-                        ? `Paid: ৳${Number(completedInvoice.paid_amount || 0).toLocaleString()} | Due: ৳${Number(completedInvoice.due_amount || 0).toLocaleString()}`
-                        : `পরিশোধিত: ৳${Number(completedInvoice.paid_amount || 0).toLocaleString()} | বকেয়া: ৳${Number(completedInvoice.due_amount || 0).toLocaleString()}`
-                    });
-                  }} 
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition"
-                >
-                  <Share2 size={15} /> {lang === 'en' ? 'Share' : 'শেয়ার করুন'}
-                </button>
-                <button onClick={() => window.print()} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer"><Printer size={15} /> {txt("প্রিন্ট / সেভ PDF", "Print / Save PDF")}</button>
-                {currentUser?.role === 'admin' && (
-                  <button 
-                    onClick={() => {
-                      const id = completedInvoice.id;
-                      setCompletedInvoice(null);
-                      handleOpenEditInvoice(id);
-                    }}
-                    className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition"
-                    title={txt("এই ইনভয়েস এডিট করে নতুন পণ্য যুক্ত করুন", "Edit this invoice and add products")}
-                  >
-                    <Edit size={15} /> {txt("ইনভয়েস এডিট", "Edit Invoice")}
-                  </button>
+              {completedInvoice.is_preview ? (
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 bg-amber-500 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1">
+                    <Eye size={15} /> {txt("বিল প্রিভিউ (অসংরক্ষিত ড্রাফট)", "Bill Preview (Unsaved Draft)")}
+                  </span>
+                  <span className="text-xs text-gray-500 hidden md:inline">
+                    {txt("কনফার্ম করার পূর্বে বিলটি যাচাই করুন", "Verify bill details before confirming")}
+                  </span>
+                </div>
+              ) : (
+                <span className="font-bold text-gray-700">{txt("A4 ইনভয়েস প্রিন্ট প্রিভিউ", "A4 Invoice Print Preview")}</span>
+              )}
+
+              <div className="flex items-center gap-2">
+                {completedInvoice.is_preview ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleCheckout()}
+                      className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md transition"
+                    >
+                      <CheckCircle size={15} /> {txt("বিল কনফার্ম ও সংরক্ষণ করুন", "Confirm & Save Bill")}
+                    </button>
+                    <button 
+                      onClick={() => window.print()} 
+                      className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer border transition"
+                    >
+                      <Printer size={15} /> {txt("প্রিভিউ প্রিন্ট", "Print Preview")}
+                    </button>
+                    <button 
+                      onClick={() => { setCompletedInvoice(null); setShowInvoiceTitlePresets(false); }} 
+                      className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer border border-rose-200 transition"
+                    >
+                      <X size={15} /> {txt("প্রিভিউ বন্ধ", "Close Preview")}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button 
+                      onClick={() => {
+                        setShareData({
+                          type: 'invoice',
+                          title: invoiceDocTitle || txt('বিক্রয় বিল / ক্যাশ মেমো', 'Sales Invoice / Cash Memo'),
+                          number: completedInvoice.invoice_no,
+                          date: formatDateDMY(completedInvoice.date || completedInvoice.created_at),
+                          customerName: completedInvoice.customer_name,
+                          customerMobile: completedInvoice.customer_mobile,
+                          amount: completedInvoice.total_amount,
+                          filename: `FC_Technology_Invoice_${completedInvoice.invoice_no}`,
+                          elementId: 'printable-content',
+                          raw: completedInvoice,
+                          details: lang === 'en' 
+                            ? `Paid: ৳${Number(completedInvoice.paid_amount || 0).toLocaleString()} | Due: ৳${Number(completedInvoice.due_amount || 0).toLocaleString()}`
+                            : `পরিশোধিত: ৳${Number(completedInvoice.paid_amount || 0).toLocaleString()} | বকেয়া: ৳${Number(completedInvoice.due_amount || 0).toLocaleString()}`
+                        });
+                      }} 
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition"
+                    >
+                      <Share2 size={15} /> {lang === 'en' ? 'Share' : 'শেয়ার করুন'}
+                    </button>
+                    <button onClick={() => window.print()} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition">
+                      <Printer size={15} /> {txt("প্রিন্ট / সেভ PDF", "Print / Save PDF")}
+                    </button>
+                    {currentUser?.role === 'admin' && (
+                      <button 
+                        onClick={() => {
+                          const id = completedInvoice.id;
+                          setCompletedInvoice(null);
+                          handleOpenEditInvoice(id);
+                        }}
+                        className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition"
+                        title={txt("এই ইনভয়েস এডিট করে নতুন পণ্য যুক্ত করুন", "Edit this invoice and add products")}
+                      >
+                        <Edit size={15} /> {txt("ইনভয়েস এডিট", "Edit Invoice")}
+                      </button>
+                    )}
+                    <button onClick={() => { setCompletedInvoice(null); setShowInvoiceTitlePresets(false); }} className="p-2 text-gray-400 hover:text-gray-600 cursor-pointer">
+                      <X size={20} />
+                    </button>
+                  </>
                 )}
-                <button onClick={() => { setCompletedInvoice(null); setShowInvoiceTitlePresets(false); }} className="p-2 text-gray-400 cursor-pointer"><X size={20} /></button>
               </div>
             </div>
 
@@ -5374,7 +6801,7 @@ function App() {
                 <img 
                   src="/fc_logo_watermark.png" 
                   alt="Watermark" 
-                  className="w-96 md:w-[460px] max-w-[85%] opacity-[0.22] md:opacity-[0.24] select-none object-contain print:opacity-[0.22]" 
+                  className="w-96 md:w-[460px] max-w-[85%] opacity-[0.09] md:opacity-[0.11] select-none object-contain print:opacity-[0.09]" 
                   onError={(e) => { e.target.src = '/fc_brand_watermark.png'; }}
                 />
               </div>
@@ -5478,7 +6905,19 @@ function App() {
                           </div>
                         )}
                       </div>
-                      <p className="text-xs font-bold">{txt("ইনভয়েস নং:", "Invoice No:")} <span className="font-mono text-blue-600">{completedInvoice.invoice_no}</span></p>
+                      <p className="text-xs font-bold">
+                        {txt("ইনভয়েস নং:", "Invoice No:")} <span className="font-mono text-blue-600">{completedInvoice.invoice_no}</span>
+                        {completedInvoice.is_preview && (
+                          <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300">
+                            ⚠️ {txt("ড্রাফট প্রিভিউ", "Draft Preview")}
+                          </span>
+                        )}
+                        {completedInvoice.returns && completedInvoice.returns.length > 0 && (
+                          <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-300">
+                            🔄 {txt("পণ্য ফেরত সমন্বয়কৃত", "Return Adjusted")}
+                          </span>
+                        )}
+                      </p>
                       <p className="text-[11px] text-gray-600">{txt("তারিখ:", "Date:")} {formatDateDMY(completedInvoice.date || completedInvoice.created_at)}</p>
                       <p className="text-[11px] font-bold text-gray-700 mt-0.5">
                         {txt("সেলসম্যান:", "Salesman:")} {completedInvoice.salesman_name || 'Admin'} {completedInvoice.user_id ? `(ID: #${completedInvoice.user_id})` : ''}
@@ -5513,7 +6952,14 @@ function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 border-b">
-                    {completedInvoice.items.map((it, idx) => (
+                    {(!completedInvoice.items || completedInvoice.items.length === 0) ? (
+                      <tr>
+                        <td colSpan={5} className="py-3 px-2 text-center text-rose-600 font-bold bg-rose-50/50 text-[11px]">
+                          {txt("অত্র ইনভয়েসের বিক্রয়কৃত পণ্য ফেরত নেওয়া হয়েছে (নিচে রিটার্ন হিস্টরি দ্রষ্টব্য)", "All items from this invoice have been returned (see return history below)")}
+                        </td>
+                      </tr>
+                    ) : (
+                      completedInvoice.items.map((it, idx) => (
                       <tr key={idx} className="align-middle">
                         <td className="py-1.5 px-2 text-center align-middle">
                           <div className="flex items-center justify-center min-h-[24px] text-[11px] font-medium leading-none">
@@ -5532,7 +6978,7 @@ function App() {
                               )}
                               {Number(it.discount || 0) > 0 && (
                                 <span className="ml-1.5 text-[10px] font-bold text-orange-600 bg-orange-50 px-1 py-0.2 rounded border border-orange-200">
-                                  {txt("ছাড়:", "Disc:")} -৳{Number(it.discount).toLocaleString()}
+                                  {txt("ছাড়:", "Disc:")} -{Number(it.discount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                               )}
                             </div>
@@ -5553,18 +6999,72 @@ function App() {
                         </td>
                         <td className="py-1.5 px-2 text-right align-middle">
                           <div className="flex items-center justify-end min-h-[24px] font-mono text-[11px] leading-none">
-                            ৳ {Number(it.selling_price || it.unit_price).toLocaleString()}
+                            {Number(it.selling_price || it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
                         </td>
                         <td className="py-1.5 px-2 text-right align-middle">
                           <div className="flex items-center justify-end min-h-[24px] font-mono font-bold text-[11px] leading-none">
-                            ৳ {((it.selling_price || it.unit_price) * (it.qty || it.quantity)).toLocaleString()}
+                            {((it.selling_price || it.unit_price) * (it.qty || it.quantity)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )))}
                   </tbody>
                 </table>
+
+                {/* পণ্য ফেরত ও রিটার্ন হিস্টরি সেকশন (যদি উক্ত বিলে কোনো পণ্য ফেরত থাকে) */}
+                {completedInvoice.returns && completedInvoice.returns.length > 0 && (
+                  <div className="mb-2.5 rounded-lg border border-rose-300 bg-rose-50/40 p-2.5 print:bg-transparent print:border-rose-400">
+                    <div className="flex justify-between items-center mb-1.5 pb-1 border-b border-rose-200">
+                      <span className="font-bold text-rose-900 text-[11px] flex items-center gap-1.5">
+                        🔄 {txt("অত্র বিলে পণ্য ফেরতের হিস্টরি (Sales Return History)", "Sales Return History for this Bill")}
+                      </span>
+                      <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded border border-rose-200">
+                        {txt("মোট ফেরত আইটেম: ", "Total Returned: ")}{completedInvoice.returns.length}{txt(" টি", "")} | -{Number(completedInvoice.total_returned_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <table className="w-full text-left border-collapse text-[11px]">
+                      <thead>
+                        <tr className="bg-rose-800 text-white uppercase text-[10px] print:bg-rose-900 print:text-white">
+                          <th className="py-1 px-1.5 text-center w-8">{txt("নং", "SL")}</th>
+                          <th className="py-1 px-1.5">{txt("ফেরতকৃত পণ্য ও মডেল", "Returned Product & Model")}</th>
+                          <th className="py-1 px-1.5">{txt("সিরিয়াল / বারকোড", "Serial / Barcode")}</th>
+                          <th className="py-1 px-1.5 text-center w-12">{txt("পরিমাণ", "Qty")}</th>
+                          <th className="py-1 px-1.5 text-right w-24">{txt("ফেরত মূল্য (৳)", "Refund (৳)")}</th>
+                          <th className="py-1 px-1.5">{txt("সমন্বয়ের ধরন", "Refund Type")}</th>
+                          <th className="py-1 px-1.5">{txt("কারণ ও তারিখ", "Reason & Date")}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-rose-200/80 bg-white/70 print:bg-transparent">
+                        {completedInvoice.returns.map((ret, rIdx) => (
+                          <tr key={rIdx} className="hover:bg-rose-50/50">
+                            <td className="py-1 px-1.5 text-center font-bold text-gray-700">{rIdx + 1}</td>
+                            <td className="py-1 px-1.5 font-bold text-gray-900">
+                              {ret.product_name}
+                              {ret.product_model && <span className="ml-1 text-[10px] text-gray-500 font-mono font-normal">[{ret.product_model}]</span>}
+                            </td>
+                            <td className="py-1 px-1.5 font-mono text-[10px] text-gray-700">
+                              {ret.serial_number && ret.serial_number !== 'নন-বারকোড পণ্য' ? ret.serial_number : <span className="text-gray-400 italic">{txt("নন-বারকোড", "Non-barcode")}</span>}
+                            </td>
+                            <td className="py-1 px-1.5 text-center font-bold text-gray-800">{ret.quantity}</td>
+                            <td className="py-1 px-1.5 text-right font-mono font-bold text-rose-700">-{Number(ret.refund_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="py-1 px-1.5 text-[10px] text-gray-700">
+                              {ret.refund_type === 'Deduce_Due' ? (
+                                <span className="text-blue-800 bg-blue-50 px-1 py-0.2 rounded border border-blue-200 font-medium">{txt("বকেয়া থেকে সমন্বয়", "Deduce Due")}</span>
+                              ) : (
+                                <span className="text-emerald-800 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 font-medium">{txt("নগদ রিফান্ড", "Cash Refund")}</span>
+                              )}
+                            </td>
+                            <td className="py-1 px-1.5 text-[10px] text-gray-600">
+                              <span>{ret.return_reason || txt("পণ্য ফেরত", "Returned")}</span>
+                              <span className="block text-[9px] text-gray-500">{formatDateDMY(ret.return_date)}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
                 {/* শর্তাবলী (বামে) এবং ৫-পয়েন্ট পূর্ণাঙ্গ হিসাব সামারি (ডানে) */}
                 <div className="flex flex-row justify-between items-start gap-3 mb-2">
@@ -5602,33 +7102,39 @@ function App() {
                   <div className="w-72 shrink-0 space-y-1 text-xs border border-gray-300 rounded-lg p-2.5 bg-gray-50/40 print:bg-transparent invoice-subtotal-box invoice-transparent-box">
                     <div className="flex justify-between items-center py-0.5 text-gray-600">
                       <span className="leading-snug">{txt("আইটেম মোট মূল্য:", "Item Subtotal:")}</span>
-                      <span className="font-mono font-medium leading-snug">৳ {Number(completedInvoice.sub_total || (completedInvoice.total_amount + Number(completedInvoice.discount_amount || 0))).toLocaleString()}</span>
+                      <span className="font-mono font-medium leading-snug">{Number(completedInvoice.sub_total || (completedInvoice.total_amount + Number(completedInvoice.discount_amount || 0) + Number(completedInvoice.total_returned_amount || 0))).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     {Number(completedInvoice.discount_amount || 0) > 0 && (
                       <div className="flex justify-between items-center py-0.5 text-orange-600 font-semibold border-b pb-0.5">
                         <span className="leading-snug">{txt("বিশেষ ছাড় / ডিসকাউন্ট:", "Special Discount:")}</span>
-                        <span className="font-mono leading-snug">- ৳ {Number(completedInvoice.discount_amount).toLocaleString()}</span>
+                        <span className="font-mono leading-snug">- {Number(completedInvoice.discount_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    )}
+                    {Number(completedInvoice.total_returned_amount || 0) > 0 && (
+                      <div className="flex justify-between items-center py-0.5 text-rose-600 font-semibold border-b pb-0.5">
+                        <span className="leading-snug">{txt("ফেরত পণ্যের সমন্বয়:", "Returns Deduction:")}</span>
+                        <span className="font-mono leading-snug">- {Number(completedInvoice.total_returned_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                     )}
                     <div className="flex justify-between items-center py-0.5 font-bold text-gray-900 border-b">
                       <span className="leading-snug">{txt("১. বর্তমান মোট বিল:", "1. Current Net Bill:")}</span>
-                      <span className="font-mono leading-snug">৳ {Number(completedInvoice.total_amount).toLocaleString()}</span>
+                      <span className="font-mono leading-snug">{Number(completedInvoice.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between items-center py-0.5 text-green-700 font-medium">
                       <span className="leading-snug">{txt("২. বর্তমান প্রদানকৃত টাকা:", "2. Current Paid Amount:")}</span>
-                      <span className="font-mono font-bold leading-snug">৳ {Number(completedInvoice.paid_amount || 0).toLocaleString()}</span>
+                      <span className="font-mono font-bold leading-snug">{Number(completedInvoice.paid_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between items-center py-0.5 text-red-600 font-bold border-b pb-0.5">
                       <span className="leading-snug">{txt("৩. বর্তমান বিলের বাকি:", "3. Current Bill Due:")}</span>
-                      <span className="font-mono leading-snug">৳ {Number(completedInvoice.due_amount || 0).toLocaleString()}</span>
+                      <span className="font-mono leading-snug">{Number(completedInvoice.due_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between items-center py-0.5 text-gray-700">
                       <span className="leading-snug">{txt("৪. কাস্টমারের পূর্বের মোট বাকি:", "4. Customer Previous Due:")}</span>
-                      <span className="font-mono font-bold leading-snug">৳ {Number(completedInvoice.previous_due || 0).toLocaleString()}</span>
+                      <span className="font-mono font-bold leading-snug">{Number(completedInvoice.previous_due || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between items-center py-1 bg-red-50/70 border border-red-200 px-2 rounded font-black text-xs text-red-700 mt-0.5 print:bg-transparent">
                       <span className="leading-snug">{txt("৫. পূর্বের টাকাসহ মোট বাকি:", "5. Grand Total Due:")}</span>
-                      <span className="font-mono leading-snug">৳ {Number(completedInvoice.total_due_after ?? (Number(completedInvoice.previous_due || 0) + Number(completedInvoice.due_amount || 0))).toLocaleString()}</span>
+                      <span className="font-mono leading-snug">{Number(completedInvoice.total_due_after ?? (Number(completedInvoice.previous_due || 0) + Number(completedInvoice.due_amount || 0))).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   </div>
                 </div>
@@ -5655,9 +7161,8 @@ function App() {
         const editDiscountNum = Math.max(0, Number(editDiscount || 0));
         const editNetTotal = Math.max(0, editSubTotal - editDiscountNum);
         const editOldPaid = Number(editingInvoice.paid_amount || 0);
-        const editAddPaidNum = Number(editAdditionalPaid || 0);
-        const editCalculatedPaid = editOldPaid + editAddPaidNum;
-        const editNewDue = Math.max(0, editNetTotal - editCalculatedPaid);
+        const currentPaidNum = Math.max(0, Number(editPaidAmount === '' ? 0 : editPaidAmount));
+        const editNewDue = Math.max(0, editNetTotal - currentPaidNum);
         const editDueDiff = editNewDue - Number(editingInvoice.due_amount || 0);
 
         // ফিল্টারকৃত পণ্যসমূহ (সার্চ অনুযায়ী)
@@ -5680,7 +7185,7 @@ function App() {
 
         return (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl my-4 flex flex-col max-h-[92vh] border border-gray-200 overflow-hidden">
+            <div className="bg-white text-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl my-4 flex flex-col max-h-[92vh] border border-gray-200 overflow-hidden">
               
               {/* মডাল হেডার */}
               <div className="flex justify-between items-center p-4 md:p-5 border-b bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100/50">
@@ -5726,17 +7231,73 @@ function App() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-bold text-gray-700 mb-1">
-                        {txt("কাস্টমারের নাম *", "Customer Name *")}
+                    <div className="relative">
+                      <label className="block text-[11px] font-bold text-gray-700 mb-1 flex items-center justify-between">
+                        <span>{txt("কাস্টমারের নাম *", "Customer Name *")}</span>
+                        {editCustomerId && (
+                          <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-300 px-1.5 py-0.2 rounded font-bold">
+                            ✓ {txt("সংরক্ষিত কাস্টমার", "Saved Customer")}
+                          </span>
+                        )}
                       </label>
                       <input
                         type="text"
                         value={editCustomerName}
-                        onChange={(e) => setEditCustomerName(e.target.value)}
-                        placeholder={txt("কাস্টমারের নাম লিখুন...", "Enter customer name...")}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditCustomerName(val);
+                          setEditCustomerId(null);
+                          if (val.trim()) {
+                            const q = val.toLowerCase();
+                            const matches = customers.filter(c => 
+                              (c.name && c.name.toLowerCase().includes(q)) || 
+                              (c.mobile && c.mobile.includes(q))
+                            ).slice(0, 8);
+                            setEditCustomerSuggestions(matches);
+                            setShowEditCustSuggestions(matches.length > 0);
+                          } else {
+                            setEditCustomerSuggestions([]);
+                            setShowEditCustSuggestions(false);
+                          }
+                        }}
+                        onFocus={() => {
+                          if (editCustomerName.trim()) {
+                            const q = editCustomerName.toLowerCase();
+                            const matches = customers.filter(c => 
+                              (c.name && c.name.toLowerCase().includes(q)) || 
+                              (c.mobile && c.mobile.includes(q))
+                            ).slice(0, 8);
+                            setEditCustomerSuggestions(matches);
+                            setShowEditCustSuggestions(matches.length > 0);
+                          }
+                        }}
+                        placeholder={txt("কাস্টমারের নাম লিখুন (বা তালিকায় খুঁজুন)...", "Enter customer name (or search list)...")}
                         className="w-full px-3 py-2 border border-amber-300 rounded-xl bg-white text-xs font-bold text-gray-900 outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-500 shadow-2xs"
                       />
+                      {showEditCustSuggestions && editCustomerSuggestions.length > 0 && (
+                        <div className="absolute left-0 right-0 top-14 bg-white border border-amber-300 shadow-xl rounded-xl max-h-48 overflow-y-auto z-50 divide-y">
+                          {editCustomerSuggestions.map(c => (
+                            <div
+                              key={c.id}
+                              onClick={() => {
+                                setEditCustomerId(c.id);
+                                setEditCustomerName(c.name);
+                                setEditCustomerMobile(c.mobile || '');
+                                setShowEditCustSuggestions(false);
+                              }}
+                              className="p-2 hover:bg-amber-50 cursor-pointer flex justify-between items-center text-xs"
+                            >
+                              <div>
+                                <p className="font-bold text-gray-800">{c.name}</p>
+                                <p className="text-[10px] text-gray-500">{txt("মোবাইল: ", "Mobile: ")}{c.mobile || txt("নেই", "None")}</p>
+                              </div>
+                              <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
+                                {txt("বর্তমান বকেয়া: ৳", "Due: ৳")}{c.total_due}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -6231,135 +7792,259 @@ function App() {
                 </div>
 
                 {/* ৩. হিসাব, পেমেন্ট ও লেজার সমন্বয় সামারি */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                <div className="space-y-3">
                   
-                  {/* বাম সাইড: নোট, পেমেন্ট টাইপ ও লেজার রিকনসিলিয়েশন নোটিশ */}
-                  <div className="md:col-span-6 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="font-bold text-gray-700 block mb-1">{txt("পেমেন্ট মেথড", "Payment Method")}</label>
-                        <select
-                          value={editPaymentType}
-                          onChange={(e) => setEditPaymentType(e.target.value)}
-                          className="w-full border border-gray-300 rounded-xl p-2 bg-white text-xs outline-none focus:border-blue-500 font-bold"
-                        >
-                          <option value="Cash">{txt("নগদ (Cash)", "Cash")}</option>
-                          <option value="Due">{txt("বাকি বিক্রয় (Due)", "Due Sale")}</option>
-                          <option value="bKash">{txt("বিকাশ (bKash)", "bKash")}</option>
-                          <option value="Nagad">{txt("নগদ মোবাইল ব্যাংকিং (Nagad)", "Nagad")}</option>
-                          <option value="Bank">{txt("ব্যাংক ট্রান্সফার (Bank)", "Bank Transfer")}</option>
-                          <option value="Cheque">{txt("চেক (Cheque)", "Cheque")}</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="font-bold text-gray-700 block mb-1">{txt("বিশেষ ছাড় / ডিসকাউন্ট (৳)", "Special Discount (৳)")}</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={editDiscount}
-                          onChange={(e) => setEditDiscount(e.target.value)}
-                          className="w-full border border-gray-300 rounded-xl p-2 bg-white text-xs outline-none focus:border-blue-500 font-mono font-bold text-right"
-                        />
-                      </div>
-                    </div>
-
+                  {/* দ্রুত পেমেন্ট স্ট্যাটাস পরিবর্তন বার (Quick Payment Action Buttons) */}
+                  <div className="bg-gradient-to-r from-amber-100/90 via-orange-100/70 to-amber-50 border border-amber-300 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-2.5 shadow-2xs">
                     <div>
-                      <label className="font-bold text-gray-700 block mb-1">{txt("ইনভয়েস বিশেষ নোট", "Invoice Special Note")}</label>
-                      <textarea
-                        rows="2"
-                        value={editNote}
-                        onChange={(e) => setEditNote(e.target.value)}
-                        placeholder={txt("ইনভয়েস নোট বা সংশোধনের কারণ লিখুন...", "Enter invoice note or reason for edit...")}
-                        className="w-full border border-gray-300 rounded-xl p-2 bg-white text-xs outline-none focus:border-blue-500"
-                      />
+                      <span className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                        <AlertTriangle size={15} className="text-amber-700" />
+                        {txt("পেমেন্ট স্ট্যাটাস পরিবর্তন শর্টকাট:", "Payment Status Shortcuts:")}
+                      </span>
+                      <p className="text-[11px] text-gray-600 mt-0.5">
+                        {txt("ক্যাশ সেল করার পর কাস্টমার টাকা না দিলে এক ক্লিকে পুরো বিল বাকি (Due) করুন:", "If customer did not pay cash, convert to Due in one click:")}
+                      </p>
                     </div>
 
-                    {/* লেজার সমন্বয় অ্যালার্ট কার্ড */}
-                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3 text-blue-950 space-y-1.5 shadow-xs">
-                      <div className="font-bold flex items-center gap-1.5 text-xs text-blue-900">
-                        <RotateCcw size={14} className="text-blue-600 shrink-0" />
-                        {txt("কাস্টমার লেজার স্বয়ংক্রিয় সমন্বয় নীতি:", "Customer Ledger Automatic Reconciliation Policy:")}
-                      </div>
-                      <p className="text-[11px] leading-relaxed text-blue-900/90">
-                        {txt(
-                          `এই ইনভয়েসটি সংরক্ষণ করলে নতুন পণ্যের জন্য ইনভেন্টরি স্টক কমে যাবে এবং ক্রেতা "${editingInvoice.customer_name}"-এর লেজারের বকেয়া এবং লেনদেন খতিয়ান স্বয়ংক্রিয়ভাবে সমন্বয় হয়ে যাবে।`,
-                          `Saving this invoice will deduct inventory stock for new items and automatically adjust customer "${editingInvoice.customer_name}"'s ledger balance and transaction records.`
-                        )}
-                      </p>
-                      <div className="text-[11px] pt-1.5 border-t border-blue-200/80 flex justify-between font-bold">
-                        <span>{txt("লেজারে বকেয়া পরিবর্তন:", "Ledger Due Change:")}</span>
-                        <span className={`font-mono text-xs ${editDueDiff > 0 ? "text-red-700" : editDueDiff < 0 ? "text-green-700" : "text-gray-700"}`}>
-                          {editDueDiff > 0 
-                            ? `+ ৳ ${editDueDiff.toLocaleString()} ${txt('(বকেয়া বৃদ্ধি পাবে)', '(Due will increase)')}` 
-                            : editDueDiff < 0 
-                            ? `- ৳ ${Math.abs(editDueDiff).toLocaleString()} ${txt('(বকেয়া হ্রাস পাবে)', '(Due will decrease)')}` 
-                            : `৳ ০ ${txt('(বকেয়া অপরিবর্তিত)', '(Due unchanged)')}`}
-                        </span>
-                      </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditPaidAmount(0);
+                          setEditPaymentType('Due');
+                          setEditAdditionalPaid('');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                          currentPaidNum === 0
+                            ? 'bg-red-600 text-white ring-2 ring-red-400'
+                            : 'bg-white text-red-700 hover:bg-red-50 border border-red-300'
+                        }`}
+                        title={txt("কাস্টমার টাকা দেয়নি - সম্পূর্ণ বাকি / ডিউ করুন", "Customer didn't pay - mark full bill as due")}
+                      >
+                        <AlertTriangle size={13} />
+                        {txt("❌ কাস্টমার টাকা দেয়নি (সম্পূর্ণ বাকি / ডিউ করুন)", "❌ Customer Didn't Pay (Full Due)")}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditPaidAmount(editNetTotal);
+                          setEditPaymentType('Cash');
+                          setEditAdditionalPaid('');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                          currentPaidNum === editNetTotal && editNetTotal > 0
+                            ? 'bg-emerald-600 text-white ring-2 ring-emerald-400'
+                            : 'bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-300'
+                        }`}
+                        title={txt("সম্পূর্ণ নগদ পরিশোধ হিসেবে চিহ্নিত করুন", "Mark as full paid in cash")}
+                      >
+                        <CheckCircle2 size={13} />
+                        {txt("💰 সম্পূর্ণ নগদ পরিশোধ (Full Paid)", "💰 Full Cash Paid")}
+                      </button>
+
+                      {editOldPaid !== currentPaidNum && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditPaidAmount(editOldPaid);
+                            setEditPaymentType(editingInvoice.payment_type || 'Cash');
+                            setEditAdditionalPaid('');
+                          }}
+                          className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 rounded-xl text-xs font-semibold cursor-pointer transition flex items-center gap-1"
+                        >
+                          <RotateCcw size={12} />
+                          {txt(`পূর্বের পরিশোধে ফেরত (৳ ${editOldPaid})`, `Reset to Original (৳ ${editOldPaid})`)}
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  {/* ডান সাইড: ফিন্যান্সিয়াল হিসাব ক্যালকুলেশন */}
-                  <div className="md:col-span-6 bg-slate-50 border border-slate-300 rounded-2xl p-4 space-y-2 text-xs">
-                    <div className="flex justify-between py-1 text-gray-600">
-                      <span>{txt("আইটেম মোট মূল্য (Sub Total):", "Items Sub Total:")}</span>
-                      <span className="font-mono font-bold">৳ {editSubTotal.toLocaleString()}</span>
-                    </div>
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                    {/* বাম সাইড: নোট, পেমেন্ট টাইপ ও লেজার রিকনসিলিয়েশন নোটিশ */}
+                    <div className="md:col-span-6 space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-bold text-gray-700 block mb-1">{txt("পেমেন্ট মেথড", "Payment Method")}</label>
+                          <select
+                            value={editPaymentType}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditPaymentType(val);
+                              if (val === 'Due') {
+                                if (currentPaidNum >= editNetTotal) {
+                                  setEditPaidAmount(0);
+                                }
+                              } else if (val === 'Cash') {
+                                if (currentPaidNum === 0 && editNetTotal > 0) {
+                                  setEditPaidAmount(editNetTotal);
+                                }
+                              }
+                            }}
+                            className="w-full border border-gray-300 rounded-xl p-2 bg-white text-xs outline-none focus:border-blue-500 font-bold"
+                          >
+                            <option value="Cash">{txt("নগদ (Cash)", "Cash")}</option>
+                            <option value="Due">{txt("বাকি বিক্রয় (Due)", "Due Sale")}</option>
+                            <option value="bKash">{txt("বিকাশ (bKash)", "bKash")}</option>
+                            <option value="Nagad">{txt("নগদ মোবাইল ব্যাংকিং (Nagad)", "Nagad")}</option>
+                            <option value="Bank">{txt("ব্যাংক ট্রান্সফার (Bank)", "Bank Transfer")}</option>
+                            <option value="Cheque">{txt("চেক (Cheque)", "Cheque")}</option>
+                          </select>
+                        </div>
 
-                    {editDiscountNum > 0 && (
-                      <div className="flex justify-between py-1 text-orange-600 font-semibold border-b pb-1">
-                        <span>{txt("বিশেষ ছাড় / ডিসকাউন্ট:", "Special Discount:")}</span>
-                        <span className="font-mono">- ৳ {editDiscountNum.toLocaleString()}</span>
-                      </div>
-                    )}
-
-                    <div className="flex justify-between py-1.5 font-bold text-gray-900 border-b text-sm">
-                      <span>{txt("১. সংশোধিত মোট বিল:", "1. Revised Net Total:")}</span>
-                      <span className="font-mono text-blue-700">৳ {editNetTotal.toLocaleString()}</span>
-                    </div>
-
-                    <div className="flex justify-between py-1 text-gray-700">
-                      <span>{txt("২. পূর্বে পরিশোধিত টাকা:", "2. Previously Paid Amount:")}</span>
-                      <span className="font-mono font-bold">৳ {editOldPaid.toLocaleString()}</span>
-                    </div>
-
-                    {/* অতিরিক্ত নগদ প্রদান ইনপুট */}
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 space-y-1">
-                      <div className="flex justify-between items-center">
-                        <label className="font-bold text-emerald-900 text-xs">
-                          {txt("৩. নতুন পণ্যের জন্য অতিরিক্ত নগদ জমা:", "3. Additional Cash for New Items:")}
-                        </label>
-                        <div className="flex items-center gap-1">
-                          <span className="font-bold text-emerald-700">+ ৳</span>
+                        <div>
+                          <label className="font-bold text-gray-700 block mb-1">{txt("বিশেষ ছাড় / ডিসকাউন্ট (৳)", "Special Discount (৳)")}</label>
                           <input
                             type="number"
                             min="0"
-                            placeholder="০"
-                            value={editAdditionalPaid}
-                            onChange={(e) => setEditAdditionalPaid(e.target.value)}
-                            className="w-24 px-2 py-1 bg-white border border-emerald-300 rounded-lg text-right font-mono font-bold text-xs outline-none focus:border-emerald-600"
+                            value={editDiscount}
+                            onChange={(e) => setEditDiscount(e.target.value)}
+                            className="w-full border border-gray-300 rounded-xl p-2 bg-white text-xs outline-none focus:border-blue-500 font-mono font-bold text-right"
                           />
                         </div>
                       </div>
-                      <p className="text-[10px] text-emerald-700 leading-tight">
-                        {txt("* ক্রেতা যদি নতুন পণ্যের বাবদ এখনই নগদ টাকা প্রদান করে, তবে সেই টাকার পরিমাণ এখানে লিখুন", "* If customer is paying additional cash right now for the added items, enter the amount here")}
-                      </p>
+
+                      <div>
+                        <label className="font-bold text-gray-700 block mb-1">{txt("ইনভয়েস বিশেষ নোট", "Invoice Special Note")}</label>
+                        <textarea
+                          rows="2"
+                          value={editNote}
+                          onChange={(e) => setEditNote(e.target.value)}
+                          placeholder={txt("ইনভয়েস নোট বা সংশোধনের কারণ লিখুন...", "Enter invoice note or reason for edit...")}
+                          className="w-full border border-gray-300 rounded-xl p-2 bg-white text-xs outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      {/* লেজার সমন্বয় অ্যালার্ট কার্ড */}
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-3 text-blue-950 space-y-1.5 shadow-xs">
+                        <div className="font-bold flex items-center gap-1.5 text-xs text-blue-900">
+                          <RotateCcw size={14} className="text-blue-600 shrink-0" />
+                          {txt("কাস্টমার লেজার স্বয়ংক্রিয় সমন্বয় নীতি:", "Customer Ledger Automatic Reconciliation Policy:")}
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-blue-900/90">
+                          {txt(
+                            `এই ইনভয়েসটি সংরক্ষণ করলে নতুন পণ্যের জন্য ইনভেন্টরি স্টক সমন্বয় হবে এবং ক্রেতা "${editCustomerName || editingInvoice.customer_name}"-এর লেজারের বকেয়া এবং লেনদেন খতিয়ান স্বয়ংক্রিয়ভাবে হালনাগাদ হবে।`,
+                            `Saving this invoice will adjust inventory stock and automatically update customer "${editCustomerName || editingInvoice.customer_name}"'s ledger balance and transactions.`
+                          )}
+                        </p>
+                        <div className="text-[11px] pt-1.5 border-t border-blue-200/80 flex justify-between font-bold">
+                          <span>{txt("লেজারে বকেয়া পরিবর্তন:", "Ledger Due Change:")}</span>
+                          <span className={`font-mono text-xs ${editDueDiff > 0 ? "text-red-700" : editDueDiff < 0 ? "text-green-700" : "text-gray-700"}`}>
+                            {editDueDiff > 0 
+                              ? `+ ৳ ${editDueDiff.toLocaleString()} ${txt('(বকেয়া বৃদ্ধি পাবে)', '(Due will increase)')}` 
+                              : editDueDiff < 0 
+                              ? `- ৳ ${Math.abs(editDueDiff).toLocaleString()} ${txt('(বকেয়া হ্রাস পাবে)', '(Due will decrease)')}` 
+                              : `৳ ০ ${txt('(বকেয়া অপরিবর্তিত)', '(Due unchanged)')}`}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="flex justify-between py-1 text-green-700 font-bold border-b pb-1">
-                      <span>{txt("৪. সর্বমোট পরিশোধিত টাকা:", "4. Total Paid Amount:")}</span>
-                      <span className="font-mono">৳ {editCalculatedPaid.toLocaleString()}</span>
+                    {/* ডান সাইড: ফিন্যান্সিয়াল হিসাব ক্যালকুলেশন */}
+                    <div className="md:col-span-6 bg-slate-50 border border-slate-300 rounded-2xl p-4 space-y-2.5 text-xs">
+                      <div className="flex justify-between py-1 text-gray-600">
+                        <span>{txt("আইটেম মোট মূল্য (Sub Total):", "Items Sub Total:")}</span>
+                        <span className="font-mono font-bold">৳ {editSubTotal.toLocaleString()}</span>
+                      </div>
+
+                      {editDiscountNum > 0 && (
+                        <div className="flex justify-between py-1 text-orange-600 font-semibold border-b pb-1">
+                          <span>{txt("বিশেষ ছাড় / ডিসকাউন্ট:", "Special Discount:")}</span>
+                          <span className="font-mono">- ৳ {editDiscountNum.toLocaleString()}</span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between py-1.5 font-bold text-gray-900 border-b text-sm">
+                        <span>{txt("১. সংশোধিত মোট বিল:", "1. Revised Net Total:")}</span>
+                        <span className="font-mono text-blue-700">৳ {editNetTotal.toLocaleString()}</span>
+                      </div>
+
+                      <div className="flex justify-between py-1 text-gray-600 text-[11px]">
+                        <span>{txt("২. পূর্বে বিলে পরিশোধ রেকর্ড ছিল:", "2. Previously Recorded Paid:")}</span>
+                        <span className="font-mono font-bold">৳ {editOldPaid.toLocaleString()}</span>
+                      </div>
+
+                      {/* পরিশোধিত টাকা এডিট ইনপুট */}
+                      <div className="bg-amber-50/90 border-2 border-amber-300 rounded-xl p-2.5 space-y-1.5 shadow-2xs">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <label className="font-bold text-gray-900 text-xs block">
+                              {txt("৩. সংশোধিত পরিশোধিত টাকা (Paid Amount) *:", "3. Revised Paid Amount *:")}
+                            </label>
+                            <span className="text-[10px] text-gray-600">
+                              {txt("টাকা না দিলে ০ লিখুন অথবা আংশিক টাকা লিখুন", "Enter 0 if unpaid or enter partial amount")}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold text-gray-700 text-xs">৳</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={editPaidAmount}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setEditPaidAmount(val);
+                                const num = Number(val || 0);
+                                if (num <= 0) {
+                                  setEditPaymentType('Due');
+                                } else if (num >= editNetTotal && editNetTotal > 0) {
+                                  if (editPaymentType === 'Due') setEditPaymentType('Cash');
+                                }
+                              }}
+                              className="w-28 px-2 py-1 bg-white border-2 border-amber-500 rounded-lg text-right font-mono font-black text-sm text-gray-900 outline-none focus:ring-2 focus:ring-amber-500 shadow-inner"
+                            />
+                          </div>
+                        </div>
+
+                        {/* অতিরিক্ত ক্যাশ যোগ করার কুইক ফিল্ড */}
+                        <div className="flex items-center justify-between pt-1 border-t border-amber-200 text-[10px]">
+                          <span className="text-gray-600 font-medium">{txt("নতুন পণ্যের জন্য অতিরিক্ত ক্যাশ যোগ:", "Extra cash for new items:")}</span>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="+ ০"
+                              value={editAdditionalPaid}
+                              onChange={(e) => setEditAdditionalPaid(e.target.value)}
+                              className="w-20 px-1.5 py-0.5 bg-white border border-gray-300 rounded text-right font-mono text-[11px]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const add = Number(editAdditionalPaid || 0);
+                                if (add > 0) {
+                                  setEditPaidAmount(prev => Math.min(editNetTotal, Number(prev || 0) + add));
+                                  setEditAdditionalPaid('');
+                                }
+                              }}
+                              className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold text-[10px] cursor-pointer"
+                            >
+                              + {txt("যোগ", "Add")}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={`flex justify-between items-center py-2 px-3 rounded-xl font-black text-sm shadow-2xs ${
+                        editNewDue > 0 ? 'bg-red-100 text-red-800 border-2 border-red-300' : 'bg-green-100 text-green-800 border-2 border-green-300'
+                      }`}>
+                        <div className="flex items-center gap-1.5">
+                          <span>{txt("৪. সংশোধিত অবশিষ্ট বাকি:", "4. Revised Remaining Due:")}</span>
+                          {editNewDue > 0 ? (
+                            <span className="bg-red-200 text-red-900 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                              {txt("বাকি / ডিউ বিল", "Due Bill")}
+                            </span>
+                          ) : (
+                            <span className="bg-green-200 text-green-900 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                              {txt("পরিশোধিত", "Paid")}
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-mono text-base">৳ {editNewDue.toLocaleString()}</span>
+                      </div>
                     </div>
 
-                    <div className={`flex justify-between py-1.5 px-2.5 rounded-xl font-black text-sm ${
-                      editNewDue > 0 ? 'bg-red-100 text-red-800 border border-red-300' : 'bg-green-100 text-green-800 border border-green-300'
-                    }`}>
-                      <span>{txt("৫. সংশোধিত অবশিষ্ট বাকি:", "5. Revised Remaining Due:")}</span>
-                      <span className="font-mono">৳ {editNewDue.toLocaleString()}</span>
-                    </div>
                   </div>
-
                 </div>
 
               </div>
@@ -6437,6 +8122,15 @@ function App() {
                 >
                   <Printer size={15} /> {txt("প্রিন্ট মানি রিসিপ্ট / Save PDF", "Print Money Receipt / Save PDF")}
                 </button>
+                {currentUser?.role === 'admin' && (
+                  <button 
+                    onClick={() => handleOpenEditPayment(activeMoneyReceipt)} 
+                    className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition"
+                    title={txt("টাকা কম বা বেশি গ্রহণ করা হলে সংশোধন করুন", "Edit received amount")}
+                  >
+                    ✏️ {txt("টাকা সংশোধন", "Edit Amount")}
+                  </button>
+                )}
                 <button 
                   onClick={() => setActiveMoneyReceipt(null)} 
                   className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 cursor-pointer"
@@ -6453,7 +8147,7 @@ function App() {
                 <img 
                   src="/fc_logo_watermark.png" 
                   alt="Watermark" 
-                  className="w-80 md:w-[420px] max-w-[85%] opacity-[0.22] md:opacity-[0.24] select-none object-contain print:opacity-[0.22]" 
+                  className="w-80 md:w-[420px] max-w-[85%] opacity-[0.09] md:opacity-[0.11] select-none object-contain print:opacity-[0.09]" 
                   onError={(e) => { e.target.src = '/fc_brand_watermark.png'; }}
                 />
               </div>
@@ -6564,15 +8258,15 @@ function App() {
                             <p className="text-[11px] text-gray-500">{txt("সরাসরি গ্রাহকের মূল খতিয়ান / খাতা থেকে সমন্বয়কৃত", "Adjusted directly from customer general ledger")}</p>
                           </td>
                           <td className="p-2.5 text-right font-mono font-black text-sm text-emerald-700">
-                            ৳ {Number(activeMoneyReceipt.amount).toLocaleString()}
+                            {Number(activeMoneyReceipt.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
 
-                  {/* ৫. পূর্বের বকেয়া, জমাকৃত টাকা ও বর্তমান অবশিষ্ট বকেয়া বিশ্লেষণ */}
-                  <div className="mt-3 grid grid-cols-3 gap-2.5 text-center">
+                  {/* ৫. পূর্বের বকেয়া, জমাকৃত টাকা, বিশেষ ছাড় ও বর্তমান অবশিষ্ট বকেয়া বিশ্লেষণ */}
+                  <div className={`mt-3 grid ${Number(activeMoneyReceipt.discount || 0) > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-2.5 text-center`}>
                     <div className="invoice-transparent-box p-2.5 rounded-xl border border-gray-200 bg-gray-50/60 print:bg-transparent">
                       <span className="text-[10px] text-gray-500 font-semibold block uppercase">{txt("১. পূর্বের মোট বকেয়া", "1. Previous Total Due")}</span>
                       <span className="text-sm md:text-base font-black font-mono text-gray-800">
@@ -6580,13 +8274,23 @@ function App() {
                       </span>
                     </div>
                     <div className="invoice-transparent-box p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-50/60 print:bg-transparent shadow-xs">
-                      <span className="text-[10px] text-emerald-800 font-bold block uppercase">{txt("২. অত্র রসিদে জমাকৃত", "2. Amount Received")}</span>
+                      <span className="text-[10px] text-emerald-800 font-bold block uppercase">{txt("২. অত্র রসিদে জমাকৃত নগদ", "2. Amount Received")}</span>
                       <span className="text-base md:text-lg font-black font-mono text-emerald-700">
                         ৳ {Number(activeMoneyReceipt.amount).toLocaleString()}
                       </span>
                     </div>
+                    {Number(activeMoneyReceipt.discount || 0) > 0 && (
+                      <div className="invoice-transparent-box p-2.5 rounded-xl border-2 border-amber-500 bg-amber-50/60 print:bg-transparent shadow-xs">
+                        <span className="text-[10px] text-amber-900 font-bold block uppercase">{txt("৩. বিশেষ ছাড় (মাফ)", "3. Special Discount")}</span>
+                        <span className="text-base md:text-lg font-black font-mono text-amber-800">
+                          - ৳ {Number(activeMoneyReceipt.discount).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                     <div className="invoice-transparent-box p-2.5 rounded-xl border border-rose-300 bg-rose-50/60 print:bg-transparent">
-                      <span className="text-[10px] text-rose-800 font-bold block uppercase">{txt("৩. বর্তমান অবশিষ্ট বকেয়া", "3. Current Remaining Due")}</span>
+                      <span className="text-[10px] text-rose-800 font-bold block uppercase">
+                        {Number(activeMoneyReceipt.discount || 0) > 0 ? txt("৪. বর্তমান অবশিষ্ট বকেয়া", "4. Remaining Due") : txt("৩. বর্তমান অবশিষ্ট বকেয়া", "3. Current Remaining Due")}
+                      </span>
                       <span className="text-sm md:text-base font-black font-mono text-rose-700">
                         ৳ {Number(activeMoneyReceipt.remaining_due || 0).toLocaleString()}
                       </span>
@@ -6615,7 +8319,7 @@ function App() {
                 </div>
 
                 {/* ৬. স্বাক্ষর সেকশন (একদম নিচে) */}
-                <div className="money-receipt-signatures flex justify-between items-end pt-8 mt-auto text-xs pb-3 border-t border-gray-200 print:border-gray-400">
+                <div className="money-receipt-signatures flex justify-between items-end pt-8 mt-auto text-xs pb-3">
                   <div className="text-center w-40">
                     <div className="border-t border-gray-400 pt-1 font-semibold text-gray-800">
                       {txt("গ্রাহকের স্বাক্ষর", "Customer's Signature")}
@@ -6786,10 +8490,10 @@ function App() {
                           <div className="flex items-center justify-center min-h-[24px] font-bold font-mono text-[11px] leading-none">{it.qty}</div>
                         </td>
                         <td className="py-1.5 px-3 text-right align-middle border-r border-gray-200">
-                          <div className="flex items-center justify-end min-h-[24px] font-mono text-[11px] leading-none">৳ {Number(it.unit_price).toLocaleString()}</div>
+                          <div className="flex items-center justify-end min-h-[24px] font-mono text-[11px] leading-none">{Number(it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         </td>
                         <td className="py-1.5 px-3 text-right align-middle border-r border-gray-200">
-                          <div className="flex items-center justify-end min-h-[24px] font-mono font-bold text-gray-950 text-[11px] leading-none">৳ {Number(it.total_price || (it.unit_price * it.qty)).toLocaleString()}</div>
+                          <div className="flex items-center justify-end min-h-[24px] font-mono font-bold text-gray-950 text-[11px] leading-none">{Number(it.total_price || (it.unit_price * it.qty)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         </td>
                       </tr>
                     ))}
@@ -6995,7 +8699,7 @@ function App() {
               <div className="flex items-center gap-2">
                 {Number(ledgerCustomer.total_due) > 0 && (
                   <button 
-                    onClick={() => { setPayModal(ledgerCustomer); setCollectAmount(''); setCollectNote(''); }} 
+                    onClick={() => { setPayModal(ledgerCustomer); setCollectAmount(''); setCollectDiscount(''); setCollectNote(''); }} 
                     className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow transition"
                   >
                     <Receipt size={15} /> {txt("বকেয়া গ্রহণ ও মানি রিসিপ্ট", "Collect Due & Money Receipt")}
@@ -7135,6 +8839,14 @@ function App() {
                                     ✏️ {txt("এডিট", "Edit")}
                                   </button>
                                 )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteInvoice(t.id, t.invoice_no)}
+                                  className="px-2 py-0.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1 shadow-xs transition"
+                                  title={txt("ভুলবশত এক বিল দুইবার হলে ডিলিট করুন (কাস্টমার লেজার ও সেলস রিপোর্ট থেকে মাইনাস হবে)", "Delete duplicate invoice (deducted from customer ledger & sales report)")}
+                                >
+                                  <Trash2 size={11} /> {txt("ডিলিট", "Delete")}
+                                </button>
                               </div>
                             ) : (
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
@@ -7143,6 +8855,11 @@ function App() {
                                     <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                                       {t.receipt_no || `MR-${t.id}`}
                                     </span>
+                                    {Number(t.discount || 0) > 0 && (
+                                      <span className="text-[11px] font-bold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">
+                                        {txt("ছাড়: ৳", "Discount: ৳")}{Number(t.discount).toLocaleString()}
+                                      </span>
+                                    )}
                                     <span className="text-[11px] font-semibold text-gray-700">
                                       {t.payment_method === 'Cheque' ? (
                                         <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
@@ -7159,14 +8876,26 @@ function App() {
                                   </div>
                                   {t.note && <p className="text-[11px] text-gray-500 mt-0.5">{t.note}</p>}
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleViewMoneyReceipt(t)}
-                                  className="px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1 shrink-0 self-start sm:self-center"
-                                  title={txt("এই জমার মানি রিসিপ্ট দেখুন ও প্রিন্ট করুন", "View & print money receipt")}
-                                >
-                                  <Receipt size={12} /> {txt("মানি রিসিপ্ট", "Receipt")}
-                                </button>
+                                <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleViewMoneyReceipt(t)}
+                                    className="px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1 shrink-0"
+                                    title={txt("এই জমার মানি রিসিপ্ট দেখুন ও প্রিন্ট করুন", "View & print money receipt")}
+                                  >
+                                    <Receipt size={12} /> {txt("মানি রিসিপ্ট", "Receipt")}
+                                  </button>
+                                  {currentUser?.role === 'admin' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditPayment(t)}
+                                      className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1 shrink-0"
+                                      title={txt("টাকা কম বা বেশি গ্রহণ করা হলে সংশোধন করুন", "Edit received payment")}
+                                    >
+                                      ✏️ {txt("এডিট", "Edit")}
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </td>
@@ -7257,169 +8986,305 @@ function App() {
               </div>
             </div>
 
-            {/* তারিখ রেঞ্জ ফিল্টার কন্ট্রোল (স্ক্রিনে দৃশ্যমান, প্রিন্টে লুকানো) */}
-            <div className="p-3.5 bg-blue-50/60 border-b flex flex-wrap items-center justify-between gap-2.5 text-xs print:hidden">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-gray-800 flex items-center gap-1">
-                  <Filter size={15} className="text-blue-600" /> {txt("কত তারিখ থেকে কত তারিখের লেজার দেখবেন:", "Filter statement by date range:")}
-                </span>
-                <input
-                  type="date"
-                  value={suppLedgerFromDate}
-                  onChange={e => setSuppLedgerFromDate(e.target.value)}
-                  className="border border-blue-300 rounded px-2.5 py-1.5 bg-white outline-none focus:border-blue-600 font-semibold"
-                  title={txt("শুরুর তারিখ", "Start Date")}
-                />
-                <span className="text-gray-500 font-bold">{txt("হতে", "to")}</span>
-                <input
-                  type="date"
-                  value={suppLedgerToDate}
-                  onChange={e => setSuppLedgerToDate(e.target.value)}
-                  className="border border-blue-300 rounded px-2.5 py-1.5 bg-white outline-none focus:border-blue-600 font-semibold"
-                  title={txt("শেষের তারিখ", "End Date")}
-                />
-                <button
-                  type="button"
-                  onClick={() => handleFilterSupplierLedger(supplierLedger.id)}
-                  className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded cursor-pointer transition shadow-xs"
-                >
-                  {txt("ফিল্টার করুন", "Filter")}
-                </button>
-                {(suppLedgerFromDate || suppLedgerToDate) && (
-                  <button
-                    type="button"
-                    onClick={() => handleResetSupplierLedger(supplierLedger.id)}
-                    className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded cursor-pointer transition"
-                  >
-                    {txt("সব দেখুন (রিসেট)", "Reset (View All)")}
-                  </button>
+            {/* ট্যাব নেভিগেশন (লেজার বিবরণী বনাম মুছে ফেলা পেমেন্ট হিস্ট্রি) */}
+            <div className="flex border-b bg-gray-100 text-xs font-bold px-4 pt-2 gap-2 print:hidden">
+              <button
+                type="button"
+                onClick={() => setSupplierLedgerTab('statement')}
+                className={`px-3.5 py-2 rounded-t-lg transition flex items-center gap-1.5 cursor-pointer ${
+                  supplierLedgerTab === 'statement'
+                    ? 'bg-white text-blue-700 border-t-2 border-blue-600 shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <FileText size={14} /> {txt("📋 লেনদেন বিবরণী", "📋 Statement")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSupplierLedgerTab('deleted_history');
+                  fetchDeletedPayments(supplierLedger.id);
+                }}
+                className={`px-3.5 py-2 rounded-t-lg transition flex items-center gap-1.5 cursor-pointer ${
+                  supplierLedgerTab === 'deleted_history'
+                    ? 'bg-white text-rose-700 border-t-2 border-rose-600 shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <History size={14} /> {txt("🕒 মুছে ফেলা পেমেন্ট হিস্ট্রি", "🕒 Deleted Payments History")}
+                {supplierDeletedPayments.length > 0 && (
+                  <span className="bg-rose-100 text-rose-800 text-[10px] px-1.5 py-0.2 rounded-full font-bold ml-1">
+                    {supplierDeletedPayments.length}
+                  </span>
                 )}
-              </div>
-              <div className="text-gray-600 text-[11px] font-medium">
-                {txt("ফিল্টারকৃত লেনদেন:", "Filtered Transactions:")} <span className="font-bold text-blue-700">{supplierTransactions.length}</span> {txt("টি", "")}
-              </div>
+              </button>
             </div>
 
-            <div id="printable-content" className="statement-printable p-8 bg-white text-gray-900 text-sm font-sans flex flex-col justify-between min-h-[950px] print:p-0">
-              <div className="flex-1 flex flex-col justify-between">
-                <div>
-                  <div className="border-b-2 border-gray-900 pb-3 mb-4 flex justify-between items-start">
-                    <div>
-                      <h2 className="text-2xl font-black">FC Technology</h2>
-                      <p className="text-xs text-gray-500">{txt("মহাজন / সাপ্লায়ার হিসাব বিবরণী / Supplier Statement", "Supplier Account Statement / Ledger")}</p>
-                      <p className="text-[11px] text-gray-500">{txt("দোকান নং #১৮, আর এফ জোহরা টাওয়ার, আগ্রাবাদ, চট্টগ্রাম।", "Shop #18, RF Zohura Tower, Agrabad, Chattogram.")}</p>
-                    </div>
-                    <div className="text-right text-xs">
-                      <p className="font-bold text-sm text-gray-900">{txt("সাপ্লায়ার:", "Supplier:")} {supplierLedger.name} ({supplierLedger.company})</p>
-                      <p className="text-gray-600">{txt("মোবাইল:", "Mobile:")} {supplierLedger.mobile || '-'}</p>
-                      <p className="font-bold text-red-600">{txt("বর্তমান মোট পাওনা:", "Current Total Payable:")} ৳ {Number(supplierLedger.total_payable).toLocaleString()}</p>
-                      {(suppLedgerFromDate || suppLedgerToDate) && (
-                        <p className="text-[11px] font-bold text-blue-700 mt-1 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 inline-block">
-                          {txt("সময়কাল:", "Period:")} {suppLedgerFromDate || txt('শুরু', 'Start')} {txt("হতে", "to")} {suppLedgerToDate || txt('আজ পর্যন্ত', 'Today')}
-                        </p>
-                      )}
-                    </div>
+            {supplierLedgerTab === 'deleted_history' ? (
+              <div className="p-6 overflow-y-auto max-h-[75vh]">
+                <div className="flex justify-between items-center mb-4 pb-2 border-b">
+                  <div>
+                    <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+                      <History size={16} className="text-rose-600" />
+                      {supplierLedger.name} {supplierLedger.company ? `(${supplierLedger.company})` : ''} - {txt("মুছে ফেলা পেমেন্ট হিস্ট্রি (Audit Log)", "Deleted Payments History (Audit Log)")}
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {txt("সাপ্লায়ারকে পরিশোধের পর যেসব পেমেন্ট লেজার থেকে বাতিল/মুছে ফেলা হয়েছে তার বিবরণ।", "Audit trail of payments that were cancelled/deleted from this supplier's ledger.")}
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => fetchDeletedPayments(supplierLedger.id)}
+                    className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg flex items-center gap-1 cursor-pointer transition shadow-2xs"
+                  >
+                    <RefreshCw size={12} /> {txt("রিফ্রেশ", "Refresh")}
+                  </button>
+                </div>
 
-                  <table className="w-full text-left border-collapse text-xs mb-4">
+                <div className="overflow-x-auto border border-gray-200 rounded-xl shadow-xs">
+                  <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="bg-gray-900 text-white uppercase print:bg-gray-900 print:text-white">
-                        <th className="p-2.5">{txt("তারিখ", "Date")}</th>
-                        <th className="p-2.5">{txt("লেনদেনের ধরন", "Type")}</th>
-                        <th className="p-2.5">{txt("বিবরণ / নোট", "Description / Note")}</th>
+                      <tr className="bg-rose-50 text-rose-900 border-b border-rose-200 font-bold uppercase">
+                        <th className="p-2.5">{txt("মুছে ফেলার সময়", "Deleted At")}</th>
+                        <th className="p-2.5">{txt("মূল পেমেন্টের তারিখ", "Payment Date")}</th>
+                        <th className="p-2.5">{txt("পেমেন্ট মাধ্যম", "Method")}</th>
+                        <th className="p-2.5">{txt("মূল বিবরণ / নোট", "Original Note")}</th>
+                        <th className="p-2.5">{txt("কে মুছেছেন", "Deleted By")}</th>
                         <th className="p-2.5 text-right">{txt("টাকার পরিমাণ (৳)", "Amount (৳)")}</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
-                      {supplierTransactions.map((st, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="p-2.5">{formatDateDMY(st.created_at)}</td>
-                          <td className="p-2.5 font-bold">
-                            {st.type === 'নতুন পণ্য ওয়ারেন্টি পেন্ডিং' ? (
-                              <span className="inline-flex items-center gap-1 text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-300 font-bold text-[11px]">
-                                ⚠️ {txt("নতুন পণ্য ওয়ারেন্টি পেন্ডিং", "Defective Stock Warranty Pending")}
-                              </span>
-                            ) : st.type === 'সাপ্লায়ার পণ্য পরিবর্তন' ? (
-                              <span className="inline-flex items-center gap-1 text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-300 font-bold text-[11px]">
-                                🔄 {txt("সাপ্লায়ার পণ্য পরিবর্তন", "Supplier Warranty Replaced")}
-                              </span>
-                            ) : st.type === 'Purchase' ? (
-                              <span className="text-rose-700">{txt("পণ্য ক্রয় (+)", "Purchase (+)")}</span>
-                            ) : (
-                              <span className="text-emerald-700">{txt("পেমেন্ট পরিশোধ (-)", "Payment (-)")}</span>
-                            )}
-                          </td>
-                          <td className="p-2.5 text-gray-700">
-                            <div className="flex items-center justify-between gap-2">
-                              <span>{st.note || '-'}</span>
-                              {st.bill_image && (
-                                <button 
-                                  type="button" 
-                                  onClick={() => setActiveImageView({ src: st.bill_image, title: `${supplierLedger.name} (${formatDateDMY(st.created_at)})` })}
-                                  className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer print:hidden shrink-0 transition"
-                                  title={txt("বিল বা মেমোর ছবি দেখুন", "View bill or memo image")}
-                                >
-                                  <Camera size={11} /> {txt("বিল দেখুন", "View Bill")}
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                          <td className={`p-2.5 text-right font-mono font-bold ${
-                            st.type === 'Purchase' ? 'text-red-600' :
-                            st.type === 'নতুন পণ্য ওয়ারেন্টি পেন্ডিং' ? 'text-amber-700' :
-                            st.type === 'সাপ্লায়ার পণ্য পরিবর্তন' ? 'text-blue-700' :
-                            'text-green-600'
-                          }`}>
-                            ৳ {Number(st.amount).toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                      {supplierTransactions.length === 0 && (
+                    <tbody className="divide-y divide-gray-100">
+                      {supplierDeletedPayments.length === 0 ? (
                         <tr>
-                          <td colSpan="4" className="text-center py-6 text-gray-400">
-                            {txt("নির্বাচিত তারিখের মধ্যে কোনো লেনদেন পাওয়া যায়নি", "No transactions found within selected date range")}
+                          <td colSpan="6" className="text-center py-10 text-gray-400">
+                            <History size={28} className="mx-auto mb-2 opacity-30 text-gray-400" />
+                            <p className="font-semibold text-gray-500">{txt("কোনো মুছে ফেলা পেমেন্টের রেকর্ড নেই", "No deleted payment records found")}</p>
+                            <p className="text-[11px] text-gray-400 mt-0.5">{txt("লেজার থেকে কোনো পেমেন্ট মুছে ফেললে তা এখানে স্থায়ীভাবে সংরক্ষিত থাকবে।", "Any payment deleted from ledger will be archived here permanently.")}</p>
                           </td>
                         </tr>
+                      ) : (
+                        supplierDeletedPayments.map((dp, dIdx) => (
+                          <tr key={dp.id || dIdx} className="hover:bg-rose-50/30">
+                            <td className="p-2.5 text-gray-600 font-medium whitespace-nowrap">
+                              {formatDateDMY(dp.deleted_at)}
+                            </td>
+                            <td className="p-2.5 font-bold text-gray-900 whitespace-nowrap">
+                              {dp.payment_date ? formatDateDMY(dp.payment_date) : (dp.original_created_at ? formatDateDMY(dp.original_created_at) : '-')}
+                            </td>
+                            <td className="p-2.5">
+                              <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-[10px] font-bold">
+                                {dp.payment_method || 'Cash'}
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-gray-700">
+                              {dp.note || '-'}
+                            </td>
+                            <td className="p-2.5 text-gray-600 whitespace-nowrap">
+                              <span className="font-semibold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 text-[10px]">
+                                {dp.deleted_by || 'Admin'}
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-right font-mono font-black text-rose-600 whitespace-nowrap">
+                              ৳ {Number(dp.amount).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))
                       )}
                     </tbody>
-                    {supplierTransactions.length > 0 && (
-                      <tfoot className="border-t-2 border-gray-900 bg-gray-50 font-bold text-xs print:bg-white">
+                    {supplierDeletedPayments.length > 0 && (
+                      <tfoot className="bg-rose-50/50 border-t font-bold text-xs">
                         <tr>
-                          <td colSpan={3} className="p-2.5 text-right font-black">
-                            {(suppLedgerFromDate || suppLedgerToDate) ? txt('নির্বাচিত সময়ের মোট ক্রয় / প্রাপ্তি:', 'Total Purchase in Period:') : txt('মোট ক্রয়:', 'Total Purchase:')}
+                          <td colSpan="5" className="p-2.5 text-right text-rose-900 font-black">
+                            {txt("সর্বমোট মুছে ফেলা টাকার পরিমাণ:", "Total Deleted Amount:")}
                           </td>
                           <td className="p-2.5 text-right font-mono font-black text-rose-700">
-                            ৳ {supplierTransactions.reduce((acc, st) => acc + (st.type === 'Purchase' ? Number(st.amount || 0) : 0), 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr>
-                          <td colSpan={3} className="p-2.5 text-right font-black">
-                            {(suppLedgerFromDate || suppLedgerToDate) ? txt('নির্বাচিত সময়ের মোট পরিশোধ:', 'Total Payment in Period:') : txt('মোট পরিশোধ:', 'Total Payment:')}
-                          </td>
-                          <td className="p-2.5 text-right font-mono font-black text-green-700">
-                            ৳ {supplierTransactions.reduce((acc, st) => acc + (st.type === 'Payment' ? Number(st.amount || 0) : 0), 0).toLocaleString()}
+                            ৳ {supplierDeletedPayments.reduce((sum, dp) => sum + Number(dp.amount || 0), 0).toLocaleString()}
                           </td>
                         </tr>
                       </tfoot>
                     )}
                   </table>
                 </div>
-
-                {/* সাপ্লায়ার লেজার সিগনেচার সেকশন - একদম নিচে */}
-                <div className="statement-signatures flex justify-between items-end pt-8 mt-auto text-xs pb-3 border-t border-gray-200 print:border-gray-400">
-                  <div className="text-center w-40">
-                    <div className="border-t border-gray-400 pt-1 font-semibold text-gray-800">
-                      {txt("সাপ্লায়ারের স্বাক্ষর", "Supplier's Signature")}
-                    </div>
+              </div>
+            ) : (
+              <>
+                {/* তারিখ রেঞ্জ ফিল্টার কন্ট্রোল (স্ক্রিনে দৃশ্যমান, প্রিন্টে লুকানো) */}
+                <div className="p-3.5 bg-blue-50/60 border-b flex flex-wrap items-center justify-between gap-2.5 text-xs print:hidden">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-gray-800 flex items-center gap-1">
+                      <Filter size={15} className="text-blue-600" /> {txt("কত তারিখ থেকে কত তারিখের লেজার দেখবেন:", "Filter statement by date range:")}
+                    </span>
+                    <input
+                      type="date"
+                      value={suppLedgerFromDate}
+                      onChange={e => setSuppLedgerFromDate(e.target.value)}
+                      className="border border-blue-300 rounded px-2.5 py-1.5 bg-white outline-none focus:border-blue-600 font-semibold"
+                      title={txt("শুরুর তারিখ", "Start Date")}
+                    />
+                    <span className="text-gray-500 font-bold">{txt("হতে", "to")}</span>
+                    <input
+                      type="date"
+                      value={suppLedgerToDate}
+                      onChange={e => setSuppLedgerToDate(e.target.value)}
+                      className="border border-blue-300 rounded px-2.5 py-1.5 bg-white outline-none focus:border-blue-600 font-semibold"
+                      title={txt("শেষের তারিখ", "End Date")}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleFilterSupplierLedger(supplierLedger.id)}
+                      className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded cursor-pointer transition shadow-xs"
+                    >
+                      {txt("ফিল্টার করুন", "Filter")}
+                    </button>
+                    {(suppLedgerFromDate || suppLedgerToDate) && (
+                      <button
+                        type="button"
+                        onClick={() => handleResetSupplierLedger(supplierLedger.id)}
+                        className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded cursor-pointer transition"
+                      >
+                        {txt("সব দেখুন (রিসেট)", "Reset (View All)")}
+                      </button>
+                    )}
                   </div>
-                  <div className="text-center w-48">
-                    <div className="border-t border-gray-400 pt-1 font-semibold text-gray-800">
-                      {txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}
+                  <div className="text-gray-600 text-[11px] font-medium">
+                    {txt("ফিল্টারকৃত লেনদেন:", "Filtered Transactions:")} <span className="font-bold text-blue-700">{supplierTransactions.length}</span> {txt("টি", "")}
+                  </div>
+                </div>
+
+                <div id="printable-content" className="statement-printable p-8 bg-white text-gray-900 text-sm font-sans flex flex-col justify-between min-h-[950px] print:p-0">
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="border-b-2 border-gray-900 pb-3 mb-4 flex justify-between items-start">
+                        <div>
+                          <h2 className="text-2xl font-black">FC Technology</h2>
+                          <p className="text-xs text-gray-500">{txt("মহাজন / সাপ্লায়ার হিসাব বিবরণী / Supplier Statement", "Supplier Account Statement / Ledger")}</p>
+                          <p className="text-[11px] text-gray-500">{txt("দোকান নং #১৮, আর এফ জোহরা টাওয়ার, আগ্রাবাদ, চট্টগ্রাম।", "Shop #18, RF Zohura Tower, Agrabad, Chattogram.")}</p>
+                        </div>
+                        <div className="text-right text-xs">
+                          <p className="font-bold text-sm text-gray-900">{txt("সাপ্লায়ার:", "Supplier:")} {supplierLedger.name} ({supplierLedger.company})</p>
+                          <p className="text-gray-600">{txt("মোবাইল:", "Mobile:")} {supplierLedger.mobile || '-'}</p>
+                          <p className="font-bold text-red-600">{txt("বর্তমান মোট পাওনা:", "Current Total Payable:")} ৳ {Number(supplierLedger.total_payable).toLocaleString()}</p>
+                          {(suppLedgerFromDate || suppLedgerToDate) && (
+                            <p className="text-[11px] font-bold text-blue-700 mt-1 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 inline-block">
+                              {txt("সময়কাল:", "Period:")} {suppLedgerFromDate || txt('শুরু', 'Start')} {txt("হতে", "to")} {suppLedgerToDate || txt('আজ পর্যন্ত', 'Today')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <table className="w-full text-left border-collapse text-xs mb-4">
+                        <thead>
+                          <tr className="bg-gray-900 text-white uppercase print:bg-gray-900 print:text-white">
+                            <th className="p-2.5">{txt("তারিখ", "Date")}</th>
+                            <th className="p-2.5">{txt("লেনদেনের ধরন", "Type")}</th>
+                            <th className="p-2.5">{txt("বিবরণ / নোট", "Description / Note")}</th>
+                            <th className="p-2.5 text-right">{txt("টাকার পরিমাণ (৳)", "Amount (৳)")}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {supplierTransactions.map((st, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="p-2.5">{formatDateDMY(st.created_at)}</td>
+                              <td className="p-2.5 font-bold">
+                                {st.type === 'নতুন পণ্য ওয়ারেন্টি পেন্ডিং' ? (
+                                  <span className="inline-flex items-center gap-1 text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-300 font-bold text-[11px]">
+                                    ⚠️ {txt("নতুন পণ্য ওয়ারেন্টি পেন্ডিং", "Defective Stock Warranty Pending")}
+                                  </span>
+                                ) : st.type === 'সাপ্লায়ার পণ্য পরিবর্তন' ? (
+                                  <span className="inline-flex items-center gap-1 text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-300 font-bold text-[11px]">
+                                    🔄 {txt("সাপ্লায়ার পণ্য পরিবর্তন", "Supplier Warranty Replaced")}
+                                  </span>
+                                ) : st.type === 'Purchase' ? (
+                                  <span className="text-rose-700">{txt("পণ্য ক্রয় (+)", "Purchase (+)")}</span>
+                                ) : (
+                                  <span className="text-emerald-700">{txt("পেমেন্ট পরিশোধ (-)", "Payment (-)")}</span>
+                                )}
+                              </td>
+                              <td className="p-2.5 text-gray-700">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span>{st.note || '-'}</span>
+                                  {st.bill_image && (
+                                    <button 
+                                      type="button" 
+                                      onClick={() => setActiveImageView({ src: st.bill_image, title: `${supplierLedger.name} (${formatDateDMY(st.created_at)})` })}
+                                      className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer print:hidden shrink-0 transition"
+                                      title={txt("বিল বা মেমোর ছবি দেখুন", "View bill or memo image")}
+                                    >
+                                      <Camera size={11} /> {txt("বিল দেখুন", "View Bill")}
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                              <td className={`p-2.5 text-right font-mono font-bold ${
+                                st.type === 'Purchase' ? 'text-red-600' :
+                                st.type === 'নতুন পণ্য ওয়ারেন্টি পেন্ডিং' ? 'text-amber-700' :
+                                st.type === 'সাপ্লায়ার পণ্য পরিবর্তন' ? 'text-blue-700' :
+                                'text-green-600'
+                              }`}>
+                                <div className="flex items-center justify-end gap-2">
+                                  <span>৳ {Number(st.amount).toLocaleString()}</span>
+                                  {st.type === 'Payment' && currentUser.role === 'admin' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteSupplierPayment(st)}
+                                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer print:hidden transition"
+                                      title={txt("পেমেন্টটি ডিলিট করুন (সাপ্লায়ার ব্যালেন্স ও খরচের হিসাব সমন্বয় হবে)", "Delete payment (reverts balance & expenses)")}
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                          {supplierTransactions.length === 0 && (
+                            <tr>
+                              <td colSpan="4" className="text-center py-6 text-gray-400">
+                                {txt("নির্বাচিত তারিখের মধ্যে কোনো লেনদেন পাওয়া যায়নি", "No transactions found within selected date range")}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                        {supplierTransactions.length > 0 && (
+                          <tfoot className="border-t-2 border-gray-900 bg-gray-50 font-bold text-xs print:bg-white">
+                            <tr>
+                              <td colSpan={3} className="p-2.5 text-right font-black">
+                                {(suppLedgerFromDate || suppLedgerToDate) ? txt('নির্বাচিত সময়ের মোট ক্রয় / প্রাপ্তি:', 'Total Purchase in Period:') : txt('মোট ক্রয়:', 'Total Purchase:')}
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-black text-rose-700">
+                                ৳ {supplierTransactions.reduce((acc, st) => acc + (st.type === 'Purchase' ? Number(st.amount || 0) : 0), 0).toLocaleString()}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td colSpan={3} className="p-2.5 text-right font-black">
+                                {(suppLedgerFromDate || suppLedgerToDate) ? txt('নির্বাচিত সময়ের মোট পরিশোধ:', 'Total Payment in Period:') : txt('মোট পরিশোধ:', 'Total Payment:')}
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-black text-green-700">
+                                ৳ {supplierTransactions.reduce((acc, st) => acc + (st.type === 'Payment' ? Number(st.amount || 0) : 0), 0).toLocaleString()}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+
+                    {/* সাপ্লায়ার লেজার সিগনেচার সেকশন - একদম নিচে */}
+                    <div className="statement-signatures flex justify-between items-end pt-8 mt-auto text-xs pb-3 border-t border-gray-200 print:border-gray-400">
+                      <div className="text-center w-40">
+                        <div className="border-t border-gray-400 pt-1 font-semibold text-gray-800">
+                          {txt("সাপ্লায়ারের স্বাক্ষর", "Supplier's Signature")}
+                        </div>
+                      </div>
+                      <div className="text-center w-48">
+                        <div className="border-t border-gray-400 pt-1 font-semibold text-gray-800">
+                          {txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -7427,41 +9292,96 @@ function App() {
       {/* লগইন / ইউজার সুইচ মডাল */}
       {showLoginModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 relative">
-            <button onClick={() => setShowLoginModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer"><X size={20} /></button>
-            <h3 className="text-lg font-bold text-gray-800 mb-1">{txt("ইউজার পরিবর্তন / লগইন", "Switch User / Login")}</h3>
-            <p className="text-xs text-gray-500 mb-4">{txt("অ্যাডমিনিস্ট্রেটর অথবা বিক্রয় প্রতিনিধি একাউন্টে সুইচ করুন", "Switch to Administrator or Sales Executive account")}</p>
+          <div className="bg-white text-gray-800 rounded-xl shadow-xl w-full max-w-sm p-6 relative">
+            <button 
+              onClick={() => {
+                setShowLoginModal(false);
+                setSwitchTwoFaData(null);
+                setSwitchOtp('');
+              }} 
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+            <h3 className="text-lg font-bold text-gray-800 mb-1">
+              {switchTwoFaData ? txt("দ্বি-স্তরীয় নিরাপত্তা কোড (2FA)", "Two-Step Verification (2FA)") : txt("ইউজার পরিবর্তন / লগইন", "Switch User / Login")}
+            </h3>
+            <p className="text-xs text-gray-500 mb-4">
+              {switchTwoFaData 
+                ? txt(`ইমেইল (${switchTwoFaData.email_masked})-এ প্রেরিত ওটিপি কোডটি লিখুন`, `Enter the OTP sent to email (${switchTwoFaData.email_masked})`) 
+                : txt("অ্যাডমিনিস্ট্রেটর অথবা বিক্রয় প্রতিনিধি একাউন্টে সুইচ করুন", "Switch to Administrator or Sales Executive account")}
+            </p>
             
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              <button
-                type="button"
-                onClick={() => setLoginForm({ username: 'admin', password: 'admin123' })}
-                className="py-1.5 px-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-xs font-bold cursor-pointer transition text-center"
-              >
-                {txt("👑 অ্যাডমিন", "👑 Admin")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setLoginForm({ username: 'sales', password: 'sales123' })}
-                className="py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-xs font-bold cursor-pointer transition text-center"
-              >
-                {txt("👤 বিক্রয় প্রতিনিধি", "👤 Sales Rep")}
-              </button>
-            </div>
+            {switchTwoFaData ? (
+              <form onSubmit={handleVerifySwitch2fa} className="space-y-3 text-xs">
+                <div>
+                  <label className="font-bold block mb-1 text-center">{txt("৬-সংখ্যার ওটিপি কোড লিখুন", "Enter 6-Digit OTP")}</label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    autoFocus
+                    placeholder="• • • • • •"
+                    value={switchOtp}
+                    onChange={e => setSwitchOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                    className="w-full text-center text-xl font-mono font-bold tracking-[6px] border-2 border-blue-400 p-2 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={switch2faLoading}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={switch2faLoading || switchOtp.length < 6}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-sm transition cursor-pointer disabled:opacity-50"
+                >
+                  {switch2faLoading ? txt("যাচাই হচ্ছে...", "Verifying...") : txt("যাচাই ও লগইন করুন", "Verify & Login")}
+                </button>
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSwitchTwoFaData(null);
+                      setSwitchOtp('');
+                    }}
+                    className="text-xs text-gray-500 hover:underline cursor-pointer"
+                  >
+                    {txt("← পাসওয়ার্ড স্ক্রিনে ফিরে যান", "← Back to Password")}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setLoginForm({ username: 'admin', password: 'admin123' })}
+                    className="py-1.5 px-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-xs font-bold cursor-pointer transition text-center"
+                  >
+                    {txt("👑 অ্যাডমিন", "👑 Admin")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoginForm({ username: 'sales', password: 'sales123' })}
+                    className="py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-xs font-bold cursor-pointer transition text-center"
+                  >
+                    {txt("👤 বিক্রয় প্রতিনিধি", "👤 Sales Rep")}
+                  </button>
+                </div>
 
-            <form onSubmit={handleLogin} className="space-y-3 text-xs">
-              <div>
-                <label className="font-bold">{txt("ইউজারনেম", "Username")}</label>
-                <input type="text" required placeholder={txt("admin অথবা sales", "admin or sales")} value={loginForm.username} onChange={e => setLoginForm({ ...loginForm, username: e.target.value })} className="w-full border p-2 rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="font-bold">{txt("পাসওয়ার্ড", "Password")}</label>
-                <input type="password" required placeholder={txt("পাসওয়ার্ড দিন", "Enter password")} value={loginForm.password} onChange={e => setLoginForm({ ...loginForm, password: e.target.value })} className="w-full border p-2 rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <button type="submit" className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-sm transition cursor-pointer">
-                {txt("সুইচ / লগইন করুন", "Switch / Login")}
-              </button>
-            </form>
+                <form onSubmit={handleLogin} className="space-y-3 text-xs">
+                  <div>
+                    <label className="font-bold">{txt("ইউজারনেম", "Username")}</label>
+                    <input type="text" required placeholder={txt("admin অথবা sales", "admin or sales")} value={loginForm.username} onChange={e => setLoginForm({ ...loginForm, username: e.target.value })} className="w-full border p-2 rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="font-bold">{txt("পাসওয়ার্ড", "Password")}</label>
+                    <input type="password" required placeholder={txt("পাসওয়ার্ড দিন", "Enter password")} value={loginForm.password} onChange={e => setLoginForm({ ...loginForm, password: e.target.value })} className="w-full border p-2 rounded mt-1 outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <button type="submit" className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-sm transition cursor-pointer">
+                    {txt("সুইচ / লগইন করুন", "Switch / Login")}
+                  </button>
+                </form>
+              </>
+            )}
           </div>
         </div>
       )}

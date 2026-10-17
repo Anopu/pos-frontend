@@ -221,14 +221,81 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
     }
   };
 
-  // হোয়াটসঅ্যাপে সরাসরি মেসেজ ও বিল পাঠানো
-  const handleSendWhatsApp = () => {
+  // হোয়াটসঅ্যাপে সরাসরি পিডিএফ সহ মানি রিসিপ্ট পাঠানো
+  const handleSendWhatsApp = async () => {
     if (!cleanMobile) {
       alert(txt('গ্রাহকের মোবাইল নম্বর দেওয়া নেই!', 'Customer mobile number is missing!'));
       return;
     }
-    const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(formattedSummary)}`;
-    window.open(url, '_blank');
+
+    if (!printableRef.current) {
+      const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(formattedSummary)}`;
+      window.open(url, '_blank');
+      return;
+    }
+
+    setIsPdfLoading(true);
+    setAlertNotice(null);
+    try {
+      const filename = `FC_Technology_ISP_${docMode === 'receipt' ? 'Receipt' : 'Bill'}_${receipt_no}.pdf`;
+      const result = await generatePdfFromElement(printableRef.current, filename, {
+        singlePage: true,
+        forceSinglePage: true
+      });
+
+      const pdfCaption = `*FC TECHNOLOGY - ISP INTERNET ${docMode === 'receipt' ? 'PAYMENT RECEIPT' : 'BILL'}*\n` +
+        `------------------------------------\n` +
+        `📄 আপনার ইন্টারনেট বিলের অফিসিয়াল PDF মানি রিসিপ্ট প্রস্তুত হয়েছে।\n` +
+        `👤 গ্রাহক: ${customer_name}\n` +
+        `📡 প্যাকেজ: ${speed || 'Standard'}\n` +
+        `📅 বিলিং মাস: ${displayBillingMonth}\n` +
+        `💰 টাকার পরিমাণ: ৳ ${Number(amount).toLocaleString()} (${numberToWordsBn(amount)})\n` +
+        `🧾 মানি রিসিট নং: ${receipt_no}\n` +
+        `------------------------------------\n` +
+        `দোকান নং #১৮, আর এফ জোহরা টাওয়ার, আগ্রাবাদ, চট্টগ্রাম।\n` +
+        `হটলাইন: 09613-181920, 01812-091939\n` +
+        `ধন্যবাদ, FC Technology এর সাথেই থাকুন!`;
+
+      // ১. যদি ব্রাউজার ফাইল শেয়ার সাপোর্ট করে (মোবাইল / সাপোর্টেড ব্রাউজার) - সরাসরি পিডিএফ ফাইল হোয়াটসঅ্যাপে সেন্ড
+      if (navigator.canShare && navigator.canShare({ files: [result.file] })) {
+        try {
+          await navigator.share({
+            files: [result.file],
+            title: `FC Technology - ISP ${docMode === 'receipt' ? 'Receipt' : 'Bill'} #${receipt_no}`,
+            text: pdfCaption
+          });
+          setAlertNotice({
+            type: 'success',
+            text: txt('পিডিএফ মানি রিসিপ্ট সরাসরি WhatsApp এ পাঠানো হয়েছে!', 'PDF receipt sent to WhatsApp successfully!')
+          });
+          return;
+        } catch (shareErr) {
+          if (shareErr.name === 'AbortError') return;
+        }
+      }
+
+      // ২. ডেস্কটপ বা ব্রাউজারের ক্ষেত্রে: সরাসরি পিডিএফ ডাউনলোড হবে এবং গ্রাহকের WhatsApp চ্যাট ওপেন হবে
+      downloadPdfFile(result.blob, filename);
+      const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(
+        `${pdfCaption}\n\n(সংযুক্ত "${filename}" পিডিএফ ফাইলটি ডাউনলোড হয়েছে, অনুগ্রহ করে চ্যাটে অ্যাটাচ করুন)`
+      )}`;
+      window.open(url, '_blank');
+
+      setAlertNotice({
+        type: 'success',
+        text: txt(
+          `পিডিএফ ফাইল "${filename}" ডাউনলোড হয়েছে এবং গ্রাহকের WhatsApp ওপেন হয়েছে! চ্যাটে ডাউনলোডকৃত ফাইলটি ড্রপ/অ্যাটাচ করুন।`,
+          `PDF downloaded and customer WhatsApp opened! Please attach the downloaded PDF in chat.`
+        )
+      });
+    } catch (err) {
+      console.error('WhatsApp PDF send error:', err);
+      // ফলব্যাক টেক্সট মেসেজ
+      const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(formattedSummary)}`;
+      window.open(url, '_blank');
+    } finally {
+      setIsPdfLoading(false);
+    }
   };
 
   // মোবাইলে SMS পাঠানো
@@ -366,9 +433,12 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
             </button>
             <button
               onClick={handleSendWhatsApp}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl font-medium transition cursor-pointer shadow-sm"
+              disabled={isPdfLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl font-medium transition cursor-pointer shadow-sm disabled:opacity-50"
+              title={txt('সরাসরি PDF ফাইল সহ WhatsApp এ পাঠান', 'Send PDF via WhatsApp')}
             >
-              <MessageCircle size={14} /> {txt('WhatsApp পাঠান', 'Send WhatsApp')}
+              {isPdfLoading ? <Loader2 size={14} className="animate-spin" /> : <MessageCircle size={14} />}
+              {txt('WhatsApp এ PDF পাঠান', 'Send PDF on WhatsApp')}
             </button>
             <button
               onClick={handleSendSms}
@@ -430,7 +500,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
               <img 
                 src="/fc_logo_watermark.png" 
                 alt="FC Watermark" 
-                className="w-80 md:w-[440px] max-w-[85%] opacity-[0.24] md:opacity-[0.26] select-none object-contain print:opacity-[0.25]"
+                className="w-80 md:w-[440px] max-w-[85%] opacity-[0.09] md:opacity-[0.11] select-none object-contain print:opacity-[0.09]"
                 onError={(e) => {
                   e.target.src = '/fc_brand_watermark.png';
                 }}
@@ -580,7 +650,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                           {displayBillingMonth}
                         </td>
                         <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
-                          ৳ {Number(amount).toLocaleString()}
+                          {Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                       </tr>
 
@@ -596,7 +666,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                             {txt('এককালীন', 'One-time')}
                           </td>
                           <td className="py-2 px-4 text-right font-mono font-bold text-slate-900">
-                            ৳ {Number(line_charge).toLocaleString()}
+                            {Number(line_charge).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                         </tr>
                       )}
@@ -675,7 +745,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
               </div>
 
               {/* ২. ফুটার অংশ (গ্রাহকের স্বাক্ষর এবং কর্তৃপক্ষের অনুমোদিত স্বাক্ষর পেইজের একদম নিচে) */}
-              <div className="pt-6 border-t border-slate-200/90 mt-auto w-full pb-2">
+              <div className="pt-6 mt-auto w-full pb-2">
                 <div className="flex items-end justify-between px-4 md:px-6">
                   {/* গ্রাহকের স্বাক্ষর */}
                   <div className="text-center w-52">

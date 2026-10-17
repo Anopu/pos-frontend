@@ -5,9 +5,18 @@ import {
   Calendar, User, Phone, Package, Camera, ExternalLink, Image as ImageIcon,
   RefreshCw, PackageMinus, CheckCircle2, RotateCcw, X
 } from 'lucide-react';
+import { API_BASE } from '../utils/apiConfig';
 
-const API_HOST = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : '127.0.0.1';
-const API_BASE = `http://${API_HOST}:5010/api`;
+export const DEVICE_CATEGORIES = [
+  'প্রিন্টার সার্ভিস',
+  'ক্যামেরা ইনস্টলেশন',
+  'ক্যামেরা সার্ভিস',
+  'ইউপিএস সার্ভিস',
+  'ল্যাপটপ সার্ভিসিং',
+  'ডেস্কটপ সার্ভিসিং',
+  'সাধারণ সার্ভিসিং',
+  'অন্যান্য'
+];
 
 export default function WarrantyServiceModule({
   currentUser,
@@ -59,6 +68,7 @@ export default function WarrantyServiceModule({
     product_name: '',
     model_no: '',
     serial_no: '',
+    device_category: 'সাধারণ সার্ভিসিং',
     problem_description: '',
     has_accessories: 'না',
     accessories_received: '',
@@ -72,6 +82,11 @@ export default function WarrantyServiceModule({
     service_type: 'ওয়ারেন্টি',
     estimated_cost: '',
     advance_paid: '',
+    final_cost: '',
+    paid_amount: '',
+    due_amount: '',
+    payment_status: 'নগদ',
+    payment_method: 'Cash',
     status: 'গ্রহণকৃত',
     delivery_date: '',
     delivery_note: ''
@@ -82,7 +97,21 @@ export default function WarrantyServiceModule({
   const [statusUpdateForm, setStatusUpdateForm] = useState({
     status: 'প্রক্রিয়াধীন',
     delivery_note: '',
-    delivery_date: new Date().toISOString().slice(0, 10)
+    delivery_date: new Date().toISOString().slice(0, 10),
+    final_cost: '',
+    payment_status: 'নগদ',
+    payment_method: 'Cash',
+    paid_amount: '',
+    due_amount: 0
+  });
+
+  // সার্ভিসিং বকেয়া আদায় মডাল স্টেট
+  const [collectDueItem, setCollectDueItem] = useState(null);
+  const [collectDueForm, setCollectDueForm] = useState({
+    amount: '',
+    payment_method: 'Cash',
+    collection_date: new Date().toISOString().slice(0, 10),
+    note: ''
   });
 
   // সাপ্লায়ার ওয়ারেন্টি স্টেট
@@ -200,6 +229,7 @@ export default function WarrantyServiceModule({
       product_name: '',
       model_no: '',
       serial_no: '',
+      device_category: 'সাধারণ সার্ভিসিং',
       problem_description: '',
       has_accessories: 'না',
       accessories_received: '',
@@ -213,6 +243,11 @@ export default function WarrantyServiceModule({
       service_type: 'ওয়ারেন্টি',
       estimated_cost: '',
       advance_paid: '',
+      final_cost: '',
+      paid_amount: '',
+      due_amount: '',
+      payment_status: 'নগদ',
+      payment_method: 'Cash',
       status: 'গ্রহণকৃত',
       delivery_date: '',
       delivery_note: ''
@@ -221,6 +256,9 @@ export default function WarrantyServiceModule({
 
   const handleOpenEditSlip = (slip) => {
     setEditingSlip(slip);
+    const cost = slip.final_cost !== null && slip.final_cost !== undefined ? slip.final_cost : (slip.estimated_cost || '');
+    const paid = slip.paid_amount !== null && slip.paid_amount !== undefined ? slip.paid_amount : (slip.advance_paid || '');
+    const due = slip.due_amount !== null && slip.due_amount !== undefined ? slip.due_amount : '';
     setCustomerForm({
       customer_name: slip.customer_name || '',
       customer_mobile: slip.customer_mobile || '',
@@ -228,6 +266,7 @@ export default function WarrantyServiceModule({
       product_name: slip.product_name || '',
       model_no: slip.model_no || '',
       serial_no: slip.serial_no || '',
+      device_category: slip.device_category || 'সাধারণ সার্ভিসিং',
       problem_description: slip.problem_description || '',
       has_accessories: slip.has_accessories || 'না',
       accessories_received: slip.accessories_received || '',
@@ -237,6 +276,11 @@ export default function WarrantyServiceModule({
       service_type: slip.service_type || 'ওয়ারেন্টি',
       estimated_cost: slip.estimated_cost !== null && slip.estimated_cost !== undefined ? slip.estimated_cost : '',
       advance_paid: slip.advance_paid !== null && slip.advance_paid !== undefined ? slip.advance_paid : '',
+      final_cost: cost,
+      paid_amount: paid,
+      due_amount: due,
+      payment_status: slip.payment_status || (Number(due) > 0 ? 'বাকি' : 'নগদ'),
+      payment_method: slip.payment_method || 'Cash',
       status: slip.status || 'গ্রহণকৃত',
       delivery_date: slip.delivery_date ? slip.delivery_date.slice(0, 10) : '',
       delivery_note: slip.delivery_note || ''
@@ -276,6 +320,7 @@ export default function WarrantyServiceModule({
           setShowCustomerModal(false);
           resetCustomerForm();
           fetchCustomerWarranties();
+          if (typeof onStockUpdated === 'function') onStockUpdated();
         } else {
           alert(data.error || (lang === 'en' ? 'Failed to update warranty slip!' : 'স্লিপ তথ্য আপডেটে ব্যর্থ হয়েছে!'));
         }
@@ -291,6 +336,7 @@ export default function WarrantyServiceModule({
           alert(lang === 'en' ? `Successfully saved! Token No: ${data.token_no}` : `সফলভাবে সংরক্ষিত হয়েছে! স্লিপ/টোকেন নং: ${data.token_no}`);
           setShowCustomerModal(false);
           fetchCustomerWarranties();
+          if (typeof onStockUpdated === 'function') onStockUpdated();
 
           // অবিলম্বে স্লিপ ওপেন করে দেখানো
           const createdSlip = {
@@ -311,28 +357,110 @@ export default function WarrantyServiceModule({
     }
   };
 
+  // স্ট্যাটাস আপডেট মডাল ওপেন
+  const handleOpenStatusUpdateModal = (item) => {
+    setStatusUpdateItem(item);
+    const cost = item.final_cost !== null && item.final_cost !== undefined && item.final_cost !== ''
+      ? item.final_cost
+      : (item.estimated_cost || '');
+    const paid = item.paid_amount !== null && item.paid_amount !== undefined && item.paid_amount !== ''
+      ? item.paid_amount
+      : (item.advance_paid || '');
+    const due = item.due_amount !== null && item.due_amount !== undefined && item.due_amount !== ''
+      ? item.due_amount
+      : Math.max(0, Number(cost || 0) - Number(paid || 0));
+
+    setStatusUpdateForm({
+      status: item.status || 'প্রক্রিয়াধীন',
+      delivery_note: item.delivery_note || '',
+      delivery_date: item.delivery_date ? item.delivery_date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      final_cost: cost,
+      payment_status: item.payment_status || (Number(due) > 0 ? 'বাকি' : 'নগদ'),
+      payment_method: item.payment_method || 'Cash',
+      paid_amount: paid,
+      due_amount: due
+    });
+  };
+
   // স্ট্যাটাস আপডেট সাবমিট
   const handleStatusUpdate = async (e) => {
     e.preventDefault();
     if (!statusUpdateItem) return;
 
     try {
+      const isDelivered = statusUpdateForm.status === 'ডেলিভারি সম্পন্ন' || statusUpdateForm.status === 'সম্পন্ন';
+      const cost = Number(statusUpdateForm.final_cost || 0);
+      const paid = statusUpdateForm.payment_status === 'নগদ' ? cost : Number(statusUpdateForm.paid_amount || 0);
+      const due = Math.max(0, cost - paid);
+
+      const payload = {
+        status: statusUpdateForm.status,
+        delivery_note: statusUpdateForm.delivery_note,
+        delivery_date: isDelivered ? statusUpdateForm.delivery_date : null,
+        final_cost: isDelivered ? cost : (statusUpdateItem.final_cost !== undefined ? statusUpdateItem.final_cost : undefined),
+        paid_amount: isDelivered ? paid : (statusUpdateItem.paid_amount !== undefined ? statusUpdateItem.paid_amount : undefined),
+        due_amount: isDelivered ? due : (statusUpdateItem.due_amount !== undefined ? statusUpdateItem.due_amount : undefined),
+        payment_status: isDelivered ? (due > 0 ? 'বাকি' : 'নগদ') : (statusUpdateItem.payment_status || undefined),
+        payment_method: isDelivered ? statusUpdateForm.payment_method : (statusUpdateItem.payment_method || undefined)
+      };
+
       const res = await fetch(`${API_BASE}/warranty-services/${statusUpdateItem.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: statusUpdateForm.status,
-          delivery_note: statusUpdateForm.delivery_note,
-          delivery_date: statusUpdateForm.status === 'ডেলিভারি সম্পন্ন' ? statusUpdateForm.delivery_date : null
-        })
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
-        alert('স্ট্যাটাস সফলভাবে আপডেট হয়েছে!');
+        alert(lang === 'en' ? 'Status and delivery info updated successfully!' : 'স্ট্যাটাস ও ডেলিভারি তথ্য সফলভাবে আপডেট হয়েছে!');
         setStatusUpdateItem(null);
         fetchCustomerWarranties();
+        if (typeof onStockUpdated === 'function') onStockUpdated();
+      } else {
+        const errData = await res.json();
+        alert(errData.error || (lang === 'en' ? 'Failed to update!' : 'আপডেট করতে ব্যর্থ হয়েছে'));
       }
     } catch {
-      alert('আপডেট হতে সমস্যা হয়েছে');
+      alert(lang === 'en' ? 'Server communication error!' : 'আপডেট হতে সমস্যা হয়েছে');
+    }
+  };
+
+  // বকেয়া কালেকশন মডাল ওপেন
+  const handleOpenCollectDueModal = (item) => {
+    setCollectDueItem(item);
+    setCollectDueForm({
+      amount: item.due_amount || '',
+      payment_method: item.payment_method || 'Cash',
+      collection_date: new Date().toISOString().slice(0, 10),
+      note: ''
+    });
+  };
+
+  // বকেয়া কালেকশন সাবমিট
+  const handleCollectDueSubmit = async (e) => {
+    e.preventDefault();
+    if (!collectDueItem) return;
+    const payAmt = Number(collectDueForm.amount);
+    if (!payAmt || payAmt <= 0) {
+      alert(lang === 'en' ? 'Please enter a valid amount' : 'সঠিক টাকার পরিমাণ দিন!');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/warranty-services/${collectDueItem.id}/collect-due`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(collectDueForm)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || (lang === 'en' ? 'Due collected successfully!' : 'বকেয়া টাকা সফলভাবে আদায় হয়েছে!'));
+        setCollectDueItem(null);
+        fetchCustomerWarranties();
+        if (typeof onStockUpdated === 'function') onStockUpdated();
+      } else {
+        alert(data.error || (lang === 'en' ? 'Failed to collect due' : 'বকেয়া আদায়ে সমস্যা হয়েছে'));
+      }
+    } catch {
+      alert(lang === 'en' ? 'Server communication error!' : 'সার্ভার যোগাযোগে সমস্যা হয়েছে');
     }
   };
 
@@ -537,6 +665,7 @@ export default function WarrantyServiceModule({
       (item.customer_mobile && item.customer_mobile.includes(customerSearch)) ||
       (item.token_no && item.token_no.toLowerCase().includes(customerSearch.toLowerCase())) ||
       (item.product_name && item.product_name.toLowerCase().includes(customerSearch.toLowerCase())) ||
+      (item.device_category && item.device_category.toLowerCase().includes(customerSearch.toLowerCase())) ||
       (item.serial_no && item.serial_no.toLowerCase().includes(customerSearch.toLowerCase()));
 
     const matchesStatus = statusFilter === 'All' || item.status === statusFilter;
@@ -731,9 +860,16 @@ export default function WarrantyServiceModule({
                         {item.model_no && `Model: ${item.model_no} `}
                         {item.serial_no && `| S/N: ${item.serial_no}`}
                       </p>
-                      <span className="text-[10px] font-bold text-blue-600 uppercase">
-                        [{item.service_type === 'ওয়ারেন্টি' || item.service_type === 'Warranty' ? (lang === 'en' ? 'Warranty' : 'ওয়ারেন্টি') : (lang === 'en' ? 'Paid Service' : (item.service_type || 'সার্ভিসিং'))}]
-                      </span>
+                      <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                        {item.device_category && (
+                          <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.2 rounded">
+                            {item.device_category}
+                          </span>
+                        )}
+                        <span className="text-[10px] font-bold text-blue-600 uppercase">
+                          [{item.service_type === 'ওয়ারেন্টি' || item.service_type === 'Warranty' ? (lang === 'en' ? 'Warranty' : 'ওয়ারেন্টি') : (lang === 'en' ? 'Paid Service' : (item.service_type || 'সার্ভিসিং'))}]
+                        </span>
+                      </div>
                     </td>
 
                     <td className="p-3 max-w-xs">
@@ -755,14 +891,30 @@ export default function WarrantyServiceModule({
                     <td className="p-3 text-[11px]">
                       <p className="text-slate-600">{lang === 'en' ? 'Received: ' : 'গ্রহণ: '}<strong>{item.received_date}</strong></p>
                       <p className="text-rose-700 font-bold">{lang === 'en' ? 'Promised: ' : 'সম্ভাব্য: '}<strong>{item.estimated_delivery_date || '-'}</strong></p>
+                      {item.delivery_date && (
+                        <p className="text-emerald-700 font-bold mt-0.5">
+                          {lang === 'en' ? 'Delivered: ' : 'ডেলিভারি: '}<strong>{item.delivery_date.slice(0, 10)}</strong>
+                        </p>
+                      )}
                     </td>
 
                     <td className="p-3 text-center">
                       <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black border ${getStatusBadge(item.status)}`}>
-                        {lang === 'en' 
-                          ? (item.status === 'গ্রহণকৃত' ? 'Received' : item.status === 'প্রক্রিয়াধীন' ? 'In Progress' : item.status === 'সার্ভিসিং সম্পন্ন' ? 'Ready for Delivery' : item.status === 'ডেলিভারি সম্পন্ন' ? 'Delivered' : item.status || 'Received')
-                          : (item.status || 'গ্রহণকৃত')}
+                        {formatStatus(item.status)}
                       </span>
+                      {(item.status === 'ডেলিভারি সম্পন্ন' || item.status === 'সম্পন্ন') && (
+                        <div className="mt-1">
+                          {Number(item.due_amount || 0) > 0 || item.payment_status === 'বাকি' ? (
+                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200" title={`পরিশোধিত: ৳${item.paid_amount || 0}`}>
+                              বাকি: ৳{Number(item.due_amount || 0).toLocaleString()}
+                            </span>
+                          ) : (
+                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              নগদ: ৳{Number(item.paid_amount || item.final_cost || item.estimated_cost || 0).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
 
                     <td className="p-3 text-center">
@@ -796,19 +948,23 @@ export default function WarrantyServiceModule({
 
                         {/* স্ট্যাটাস আপডেট */}
                         <button
-                          onClick={() => {
-                            setStatusUpdateItem(item);
-                            setStatusUpdateForm({
-                              status: item.status || 'প্রক্রিয়াধীন',
-                              delivery_note: item.delivery_note || '',
-                              delivery_date: item.delivery_date || new Date().toISOString().slice(0, 10)
-                            });
-                          }}
+                          onClick={() => handleOpenStatusUpdateModal(item)}
                           className="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 rounded-lg cursor-pointer transition"
                           title={lang === 'en' ? 'Change Status' : 'স্ট্যাটাস পরিবর্তন'}
                         >
                           <Clock size={13} />
                         </button>
+
+                        {/* বকেয়া টাকা আদায় বাটন */}
+                        {(item.status === 'ডেলিভারি সম্পন্ন' || item.status === 'সম্পন্ন') && (Number(item.due_amount || 0) > 0 || item.payment_status === 'বাকি') && (
+                          <button
+                            onClick={() => handleOpenCollectDueModal(item)}
+                            className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg cursor-pointer transition flex items-center gap-1 font-bold text-[10px] shadow-xs"
+                            title={lang === 'en' ? 'Collect Servicing Due' : 'বকেয়া টাকা আদায় করুন'}
+                          >
+                            💰 আদায়
+                          </button>
+                        )}
 
                         {/* ডিলিট (Admin) */}
                         {currentUser?.role === 'admin' && (
@@ -1052,6 +1208,39 @@ export default function WarrantyServiceModule({
                 />
               </div>
 
+              {/* ডিভাইস / সার্ভিস ক্যাটাগরি */}
+              <div className="bg-amber-50/70 p-3 rounded-xl border border-amber-200">
+                <label className="font-bold text-amber-950 block mb-1.5 flex items-center justify-between">
+                  <span>{txt('ডিভাইস / সার্ভিস ক্যাটাগরি *', 'Device / Service Category *')}</span>
+                  <span className="text-[10px] text-amber-800 font-semibold">{txt('ক্যাটাগরি নির্বাচন করুন', 'Select Category')}</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {DEVICE_CATEGORIES.map(cat => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setCustomerForm(prev => ({ ...prev, device_category: cat }))}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        customerForm.device_category === cat
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : 'bg-white hover:bg-amber-100 text-slate-700 border border-amber-200'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+                <select
+                  value={customerForm.device_category || 'সাধারণ সার্ভিসিং'}
+                  onChange={e => setCustomerForm({ ...customerForm, device_category: e.target.value })}
+                  className="w-full border p-2 rounded-xl bg-white outline-none focus:border-amber-500 font-bold text-slate-800"
+                >
+                  {DEVICE_CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {/* পণ্যের নাম */}
                 <div className="md:col-span-1">
@@ -1218,13 +1407,25 @@ export default function WarrantyServiceModule({
 
               {/* এডিট মোডে স্ট্যাটাস ও ডেলিভারি বিবরণ */}
               {editingSlip && (
-                <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2">
+                <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl space-y-3">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="font-bold text-amber-900 block mb-1">{txt('বর্তমান স্ট্যাটাস', 'Current Status')}</label>
                       <select
                         value={customerForm.status}
-                        onChange={e => setCustomerForm({ ...customerForm, status: e.target.value })}
+                        onChange={e => {
+                          const newStatus = e.target.value;
+                          setCustomerForm(prev => ({
+                            ...prev,
+                            status: newStatus,
+                            delivery_date: newStatus === 'ডেলিভারি সম্পন্ন' && !prev.delivery_date
+                              ? new Date().toISOString().slice(0, 10)
+                              : prev.delivery_date,
+                            final_cost: newStatus === 'ডেলিভারি সম্পন্ন' && !prev.final_cost
+                              ? prev.estimated_cost || ''
+                              : prev.final_cost
+                          }));
+                        }}
                         className="w-full border p-2 rounded-xl bg-white outline-none focus:border-amber-500 font-bold"
                       >
                         <option value="গ্রহণকৃত">{txt('গ্রহণকৃত', 'Received')}</option>
@@ -1241,10 +1442,137 @@ export default function WarrantyServiceModule({
                         type="date"
                         value={customerForm.delivery_date || ''}
                         onChange={e => setCustomerForm({ ...customerForm, delivery_date: e.target.value })}
-                        className="w-full border p-2 rounded-xl bg-white outline-none focus:border-amber-500"
+                        className="w-full border p-2 rounded-xl bg-white outline-none focus:border-amber-500 font-bold"
                       />
                     </div>
                   </div>
+
+                  {/* ডেলিভারি সম্পন্ন হলে বিল ও পেমেন্ট বিবরণ */}
+                  {(customerForm.status === 'ডেলিভারি সম্পন্ন' || customerForm.status === 'সম্পন্ন') && (
+                    <div className="p-3 bg-white border border-amber-300 rounded-xl space-y-2.5">
+                      <span className="font-bold text-amber-900 text-xs block border-b border-amber-100 pb-1">
+                        {txt('ডেলিভারি বিল ও পেমেন্ট তথ্য', 'Delivery Bill & Payment Information')}
+                      </span>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">{txt('চূড়ান্ত বিল / সার্ভিস চার্জ (৳)', 'Final Bill / Service Cost (৳)')}</label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0.00"
+                            value={customerForm.final_cost}
+                            onChange={e => {
+                              const val = e.target.value;
+                              const cost = Number(val || 0);
+                              if (customerForm.payment_status === 'নগদ') {
+                                setCustomerForm({ ...customerForm, final_cost: val, paid_amount: cost, due_amount: 0 });
+                              } else {
+                                const paid = Number(customerForm.paid_amount || 0);
+                                setCustomerForm({ ...customerForm, final_cost: val, due_amount: Math.max(0, cost - paid) });
+                              }
+                            }}
+                            className="w-full border p-2 rounded-xl bg-white outline-none focus:border-amber-500 font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">{txt('টাকা বাকি না নগদ?', 'Payment Status (Cash or Due)?')}</label>
+                          <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const cost = Number(customerForm.final_cost || customerForm.estimated_cost || 0);
+                                setCustomerForm({
+                                  ...customerForm,
+                                  payment_status: 'নগদ',
+                                  paid_amount: cost,
+                                  due_amount: 0
+                                });
+                              }}
+                              className={`py-1.5 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                                customerForm.payment_status === 'নগদ'
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
+                            >
+                              {txt('🟢 নগদ', 'Cash')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const cost = Number(customerForm.final_cost || customerForm.estimated_cost || 0);
+                                const currentPaid = Number(customerForm.advance_paid || 0);
+                                setCustomerForm({
+                                  ...customerForm,
+                                  payment_status: 'বাকি',
+                                  paid_amount: currentPaid,
+                                  due_amount: Math.max(0, cost - currentPaid)
+                                });
+                              }}
+                              className={`py-1.5 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                                customerForm.payment_status === 'বাকি'
+                                  ? 'bg-rose-600 text-white shadow-xs'
+                                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
+                            >
+                              {txt('🔴 বাকি', 'Due')}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">{txt('পরিশোধিত টাকা (৳)', 'Paid Amount (৳)')}</label>
+                          <input
+                            type="number"
+                            min="0"
+                            disabled={customerForm.payment_status === 'নগদ'}
+                            value={customerForm.paid_amount}
+                            onChange={e => {
+                              const paid = Number(e.target.value || 0);
+                              const cost = Number(customerForm.final_cost || 0);
+                              setCustomerForm({
+                                ...customerForm,
+                                paid_amount: e.target.value,
+                                due_amount: Math.max(0, cost - paid)
+                              });
+                            }}
+                            className={`w-full border p-2 rounded-xl outline-none font-bold ${
+                              customerForm.payment_status === 'নগদ' ? 'bg-slate-100' : 'bg-white focus:border-amber-500 text-emerald-800'
+                            }`}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-rose-700 block mb-1">{txt('বকেয়া টাকা (৳)', 'Due Amount (৳)')}</label>
+                          <input
+                            type="number"
+                            readOnly
+                            value={customerForm.due_amount}
+                            className="w-full border border-rose-200 bg-rose-50/60 p-2 rounded-xl text-rose-700 font-bold outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">{txt('পেমেন্ট মাধ্যম', 'Payment Method')}</label>
+                          <select
+                            value={customerForm.payment_method || 'Cash'}
+                            onChange={e => setCustomerForm({ ...customerForm, payment_method: e.target.value })}
+                            className="w-full border p-2 rounded-xl bg-white outline-none focus:border-amber-500 font-semibold"
+                          >
+                            <option value="Cash">{txt('নগদ ক্যাশ (Cash)', 'Cash')}</option>
+                            <option value="bKash">{txt('বিকাশ (bKash)', 'bKash')}</option>
+                            <option value="Nagad">{txt('নগদ (Nagad)', 'Nagad')}</option>
+                            <option value="Rocket">{txt('রকেট (Rocket)', 'Rocket')}</option>
+                            <option value="Bank">{txt('ব্যাংক ট্রান্সফার (Bank Transfer)', 'Bank')}</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="font-bold text-slate-700 block mb-1">{txt('ডেলিভারি / সার্ভিস নোট', 'Delivery / Service Note')}</label>
                     <input
@@ -1312,14 +1640,168 @@ export default function WarrantyServiceModule({
               </div>
 
               {statusUpdateForm.status === 'ডেলিভারি সম্পন্ন' && (
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">{txt('ডেলিভারির তারিখ', 'Delivery Date')}</label>
-                  <input
-                    type="date"
-                    value={statusUpdateForm.delivery_date}
-                    onChange={e => setStatusUpdateForm({ ...statusUpdateForm, delivery_date: e.target.value })}
-                    className="w-full border p-2 rounded-xl outline-none focus:border-amber-500 font-bold"
-                  />
+                <div className="p-3 bg-amber-50/90 border border-amber-300 rounded-xl space-y-3">
+                  <div className="flex items-center gap-1.5 text-amber-950 font-bold border-b border-amber-200 pb-1.5">
+                    <CheckCircle2 size={15} className="text-emerald-600" />
+                    <span>{txt('পণ্য ডেলিভারি ও বিল/পেমেন্ট হিসাব', 'Product Delivery & Payment Settlement')}</span>
+                  </div>
+
+                  {/* ডেলিভারির তারিখ */}
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      {txt('ডেলিভারির তারিখ *', 'Delivery Date *')}
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={statusUpdateForm.delivery_date}
+                      onChange={e => setStatusUpdateForm({ ...statusUpdateForm, delivery_date: e.target.value })}
+                      className="w-full border border-amber-300 p-2 rounded-xl bg-white outline-none focus:border-amber-500 font-bold"
+                    />
+                  </div>
+
+                  {/* মোট চার্জ / সার্ভিসিং বিল */}
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      {txt('মোট সার্ভিস চার্জ / বিল (৳) *', 'Total Service Charge / Bill (৳) *')}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="0.00"
+                      value={statusUpdateForm.final_cost}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const costNum = Number(val || 0);
+                        if (statusUpdateForm.payment_status === 'নগদ') {
+                          setStatusUpdateForm({
+                            ...statusUpdateForm,
+                            final_cost: val,
+                            paid_amount: costNum,
+                            due_amount: 0
+                          });
+                        } else {
+                          const paid = Number(statusUpdateForm.paid_amount || 0);
+                          setStatusUpdateForm({
+                            ...statusUpdateForm,
+                            final_cost: val,
+                            due_amount: Math.max(0, costNum - paid)
+                          });
+                        }
+                      }}
+                      className="w-full border border-amber-300 p-2 rounded-xl bg-white outline-none focus:border-amber-500 font-black text-amber-900"
+                    />
+                  </div>
+
+                  {/* পেমেন্টের ধরন: নগদ না বাকি */}
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1.5">
+                      {txt('টাকা বাকি না নগদ? *', 'Payment Status (Cash or Due)? *')}
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cost = Number(statusUpdateForm.final_cost || 0);
+                          setStatusUpdateForm({
+                            ...statusUpdateForm,
+                            payment_status: 'নগদ',
+                            paid_amount: cost,
+                            due_amount: 0
+                          });
+                        }}
+                        className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition ${
+                          statusUpdateForm.payment_status === 'নগদ'
+                            ? 'bg-emerald-600 text-white shadow-md'
+                            : 'bg-white border border-slate-300 text-slate-700 hover:bg-emerald-50'
+                        }`}
+                      >
+                        <CheckCircle size={14} /> {txt('🟢 নগদ পরিশোধ (Cash)', 'Cash Paid')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cost = Number(statusUpdateForm.final_cost || 0);
+                          const currentPaid = Number(statusUpdateItem.advance_paid || 0);
+                          setStatusUpdateForm({
+                            ...statusUpdateForm,
+                            payment_status: 'বাকি',
+                            paid_amount: currentPaid,
+                            due_amount: Math.max(0, cost - currentPaid)
+                          });
+                        }}
+                        className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition ${
+                          statusUpdateForm.payment_status === 'বাকি'
+                            ? 'bg-rose-600 text-white shadow-md'
+                            : 'bg-white border border-slate-300 text-slate-700 hover:bg-rose-50'
+                        }`}
+                      >
+                        <AlertCircle size={14} /> {txt('🔴 টাকা বাকি (Due)', 'Due Payment')}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* পেইড ও বকেয়া হিসাব */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">
+                        {txt('আদায়কৃত টাকা (৳)', 'Paid Amount (৳)')}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={statusUpdateForm.paid_amount}
+                        disabled={statusUpdateForm.payment_status === 'নগদ'}
+                        onChange={e => {
+                          const paid = Number(e.target.value || 0);
+                          const cost = Number(statusUpdateForm.final_cost || 0);
+                          setStatusUpdateForm({
+                            ...statusUpdateForm,
+                            paid_amount: e.target.value,
+                            due_amount: Math.max(0, cost - paid)
+                          });
+                        }}
+                        className={`w-full border p-2 rounded-xl outline-none font-bold ${
+                          statusUpdateForm.payment_status === 'নগদ' ? 'bg-slate-100 text-slate-700' : 'bg-white border-amber-300 focus:border-amber-500 text-emerald-800'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-rose-700 block mb-1">
+                        {txt('বকেয়া টাকা (৳)', 'Due Amount (৳)')}
+                      </label>
+                      <input
+                        type="number"
+                        readOnly
+                        value={statusUpdateForm.due_amount}
+                        className="w-full border border-rose-200 bg-rose-50/60 p-2 rounded-xl text-rose-700 font-black outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* পেমেন্ট মাধ্যম */}
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      {txt('টাকা আদায়ের মাধ্যম', 'Payment Method')}
+                    </label>
+                    <select
+                      value={statusUpdateForm.payment_method}
+                      onChange={e => setStatusUpdateForm({ ...statusUpdateForm, payment_method: e.target.value })}
+                      className="w-full border p-2 rounded-xl bg-white outline-none focus:border-amber-500 font-semibold"
+                    >
+                      <option value="Cash">{txt('নগদ ক্যাশ (Cash)', 'Cash')}</option>
+                      <option value="bKash">{txt('বিকাশ (bKash)', 'bKash')}</option>
+                      <option value="Nagad">{txt('নগদ (Nagad)', 'Nagad')}</option>
+                      <option value="Rocket">{txt('রকেট (Rocket)', 'Rocket')}</option>
+                      <option value="Bank">{txt('ব্যাংক ট্রান্সফার (Bank Transfer)', 'Bank')}</option>
+                    </select>
+                  </div>
+
+                  <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-200 text-[11px] text-emerald-800 font-semibold flex items-center gap-1.5">
+                    <CheckCircle size={13} className="text-emerald-600 shrink-0" />
+                    <span>💡 নগদ আদায়কৃত অর্থ ডেলিভারির তারিখে ক্যাশ ড্রয়ার ও দৈনিক লাভ-ক্ষতিতে সমন্বয় হয়ে যাবে।</span>
+                  </div>
                 </div>
               )}
 
@@ -1347,6 +1829,134 @@ export default function WarrantyServiceModule({
                   className="px-4 py-1.5 bg-amber-600 text-white rounded-lg font-bold cursor-pointer"
                 >
                   {txt('আপডেট করুন', 'Update')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= ৪.১. সার্ভিসিং বকেয়া টাকা আদায় মডাল ================= */}
+      {collectDueItem && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-emerald-600 p-4 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Wrench size={18} />
+                <h3 className="font-bold text-sm">
+                  {txt('সার্ভিসিং বকেয়া টাকা আদায়', 'Collect Servicing Due')} - #{collectDueItem.token_no}
+                </h3>
+              </div>
+              <button onClick={() => setCollectDueItem(null)} className="p-1 hover:bg-white/20 rounded cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCollectDueSubmit} className="p-4 space-y-3.5 text-xs">
+              {/* কাস্টমার ও পণ্য সংক্ষিপ্ত তথ্য */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                <p className="font-bold text-slate-800">
+                  {txt('গ্রাহক:', 'Customer:')} <span className="text-slate-900 font-black">{collectDueItem.customer_name}</span> ({collectDueItem.customer_mobile})
+                </p>
+                <p className="text-slate-600">
+                  {txt('পণ্য:', 'Product:')} <strong>{collectDueItem.product_name}</strong> {collectDueItem.device_category && `[${collectDueItem.device_category}]`}
+                </p>
+                <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-slate-200 text-center font-mono text-[11px]">
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">{txt('মোট বিল', 'Total Bill')}</span>
+                    <span className="font-bold text-slate-800">৳{collectDueItem.final_cost || collectDueItem.estimated_cost || 0}</span>
+                  </div>
+                  <div>
+                    <span className="text-emerald-700 block text-[10px]">{txt('পূর্বে আদায়', 'Previously Paid')}</span>
+                    <span className="font-bold text-emerald-700">৳{collectDueItem.paid_amount || 0}</span>
+                  </div>
+                  <div>
+                    <span className="text-rose-700 block text-[10px]">{txt('বর্তমান বকেয়া', 'Current Due')}</span>
+                    <span className="font-black text-rose-700">৳{collectDueItem.due_amount || 0}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* কালেকশন তারিখ */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  {txt('টাকা আদায়ের তারিখ *', 'Collection Date *')}
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={collectDueForm.collection_date}
+                  onChange={e => setCollectDueForm({ ...collectDueForm, collection_date: e.target.value })}
+                  className="w-full border p-2 rounded-xl outline-none focus:border-emerald-500 font-bold"
+                />
+              </div>
+
+              {/* আদায়কৃত টাকা */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  {txt('আদায়কৃত টাকার পরিমাণ (৳) *', 'Amount Collected (৳) *')}
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max={collectDueItem.due_amount || undefined}
+                  required
+                  value={collectDueForm.amount}
+                  onChange={e => setCollectDueForm({ ...collectDueForm, amount: e.target.value })}
+                  className="w-full border border-emerald-300 p-2 rounded-xl bg-white outline-none focus:border-emerald-500 font-black text-emerald-800 text-sm"
+                />
+              </div>
+
+              {/* পেমেন্ট মাধ্যম */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  {txt('পেমেন্ট মাধ্যম', 'Payment Method')}
+                </label>
+                <select
+                  value={collectDueForm.payment_method}
+                  onChange={e => setCollectDueForm({ ...collectDueForm, payment_method: e.target.value })}
+                  className="w-full border p-2 rounded-xl bg-white outline-none focus:border-emerald-500 font-semibold"
+                >
+                  <option value="Cash">{txt('নগদ ক্যাশ (Cash)', 'Cash')}</option>
+                  <option value="bKash">{txt('বিকাশ (bKash)', 'bKash')}</option>
+                  <option value="Nagad">{txt('নগদ (Nagad)', 'Nagad')}</option>
+                  <option value="Rocket">{txt('রকেট (Rocket)', 'Rocket')}</option>
+                  <option value="Bank">{txt('ব্যাংক ট্রান্সফার (Bank Transfer)', 'Bank')}</option>
+                </select>
+              </div>
+
+              {/* নোট */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  {txt('মন্তব্য / নোট (ঐচ্ছিক)', 'Note (Optional)')}
+                </label>
+                <input
+                  type="text"
+                  placeholder={txt('বকেয়া আদায় সংক্রান্ত নোট...', 'Note...')}
+                  value={collectDueForm.note}
+                  onChange={e => setCollectDueForm({ ...collectDueForm, note: e.target.value })}
+                  className="w-full border p-2 rounded-xl bg-white outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 text-[11px] text-emerald-800 font-semibold flex items-center gap-1.5">
+                <CheckCircle size={14} className="text-emerald-600 shrink-0" />
+                <span>💡 উক্ত তারিখে ক্যাশ ড্রয়ার ও দৈনিক লাভ-ক্ষতিতে এই টাকা সরাসরি সমন্বয় হয়ে যাবে।</span>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setCollectDueItem(null)}
+                  className="px-3.5 py-1.5 border rounded-lg font-bold"
+                >
+                  {txt('বাতিল', 'Cancel')}
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold cursor-pointer transition shadow-xs"
+                >
+                  {txt('টাকা আদায় নিশ্চিত করুন', 'Confirm Collection')}
                 </button>
               </div>
             </form>

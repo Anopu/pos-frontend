@@ -8,9 +8,7 @@ import {
   Sparkles, HelpCircle, Layers, PieChart, CreditCard, Send
 } from 'lucide-react';
 import IspReceiptPrintModal from './IspReceiptPrintModal';
-
-const API_HOST = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : '127.0.0.1';
-const API_BASE = `http://${API_HOST}:5010/api`;
+import { API_BASE } from '../utils/apiConfig';
 
 const SPEED_PRESETS = [
   '5 Mbps', '10 Mbps', '15 Mbps', '20 Mbps', '25 Mbps', 
@@ -355,10 +353,6 @@ export default function IspManagementModule({
   // কাস্টমার সেভ বা আপডেট
   const handleSaveCustomer = async (e) => {
     e.preventDefault();
-    if (!isAdmin) {
-      alert(txt('শুধুমাত্র অ্যাডমিন গ্রাহকের তথ্য পরিবর্তন করতে পারবেন!', 'Only admin can edit customer details!'));
-      return;
-    }
     if (!customerForm.customer_name || !customerForm.mobile || !customerForm.speed) {
       alert(txt('দয়া করে কাস্টমারের নাম, মোবাইল ও স্পিড ফিল্ড পূরণ করুন!', 'Please enter customer name, mobile and speed!'));
       return;
@@ -391,12 +385,8 @@ export default function IspManagementModule({
     }
   };
 
-  // কাস্টমার এডিট মোড ওপেন (শুধুমাত্র অ্যাডমিন)
+  // কাস্টমার এডিট মোড ওপেন
   const handleEditCustomer = (c) => {
-    if (!isAdmin) {
-      alert(txt('শুধুমাত্র অ্যাডমিন গ্রাহকের তথ্য এডিট করতে পারবেন!', 'Only admin can edit customer details!'));
-      return;
-    }
     setEditingCustomer(c);
     setCustomerForm({
       customer_name: c.customer_name || '',
@@ -1441,23 +1431,21 @@ ${timingNotice}
                             </button>
 
                             {/* এডিট ও ডিলিট বাটন (শুধুমাত্র অ্যাডমিন এর জন্য) */}
+                            <button
+                              onClick={() => handleEditCustomer(c)}
+                              className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition cursor-pointer"
+                              title={txt('গ্রাহকের তথ্য এডিট করুন', 'Edit Customer Info')}
+                            >
+                              <Edit size={14} />
+                            </button>
                             {isAdmin && (
-                              <>
-                                <button
-                                  onClick={() => handleEditCustomer(c)}
-                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
-                                  title={txt('এডিট করুন', 'Edit')}
-                                >
-                                  <Edit size={14} />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteCustomer(c)}
-                                  className="p-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition cursor-pointer"
-                                  title={txt('মুছে ফেলুন', 'Delete')}
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </>
+                              <button
+                                onClick={() => handleDeleteCustomer(c)}
+                                className="p-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition cursor-pointer"
+                                title={txt('মুছে ফেলুন', 'Delete')}
+                              >
+                                <Trash2 size={14} />
+                              </button>
                             )}
                           </div>
                         </td>
