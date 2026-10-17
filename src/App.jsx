@@ -748,6 +748,29 @@ function App() {
     }
   };
 
+  const handleViewServiceSlip = async (serviceIdOrToken) => {
+    try {
+      const res = await fetch(`${API_BASE}/warranty-services/${serviceIdOrToken}`);
+      if (res.ok) {
+        const data = await res.json();
+        setActiveWarrantySlip(data);
+      } else {
+        const listRes = await fetch(`${API_BASE}/warranty-services`);
+        if (listRes.ok) {
+          const list = await listRes.json();
+          const found = list.find(s => s.id === Number(serviceIdOrToken) || s.token_no === serviceIdOrToken);
+          if (found) {
+            setActiveWarrantySlip(found);
+            return;
+          }
+        }
+        alert(txt('সার্ভিসিং স্লিপ পাওয়া যায়নি!', 'Service slip not found!'));
+      }
+    } catch (err) {
+      alert(txt('সার্ভিসিং স্লিপ লোড করতে সমস্যা: ', 'Failed to load service slip: ') + err.message);
+    }
+  };
+
   // ইনভয়েস এডিট ও নতুন পণ্য সংযোজন হ্যান্ডলার
   const handleOpenEditInvoice = async (invoiceId) => {
     try {
@@ -4786,146 +4809,318 @@ function App() {
               </div>
             )}
 
-            {/* ব্যয় এন্ট্রি ফর্ম ও ব্যয়ের তালিকা */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* ব্যয় সংযোজন ফর্ম */}
-              <div className="bg-white text-gray-800 p-5 rounded-xl shadow-sm border border-gray-200">
-                <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-3">{txt("নতুন দৈনিক ব্যয় সংযোজন", "Add New Daily Expense")}</h3>
-                <form onSubmit={handleExpenseSubmit} className="space-y-3 text-xs">
+            {/* ব্যয় এন্ট্রি ফর্ম ও ব্যয়ের তালিকা - নির্বাচিত তারিখের আয়ের খাতসমূহ ও খরচের তালিকা পাশাপাশি প্রদর্শন */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+              {/* বাম কলাম: নির্বাচিত তারিখের আয়ের খাতসমূহ ও বিস্তারিত তালিকা */}
+              <div className="bg-white text-gray-800 p-5 rounded-2xl shadow-sm border border-emerald-100 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
                   <div>
-                    <label className="font-bold text-gray-700">{txt("খরচের খাত *", "Expense Category *")}</label>
-                    <select
-                      value={expenseForm.category}
-                      onChange={e => setExpenseForm({ ...expenseForm, category: e.target.value })}
-                      className="w-full border p-2 rounded mt-1 bg-white outline-none focus:border-blue-500 font-medium"
-                    >
-                      {EXPENSE_CATEGORIES.map((cat, i) => <option key={i} value={cat}>{getExpenseCategoryLabel(cat)}</option>)}
-                    </select>
+                    <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+                      <DollarSign size={18} className="text-emerald-600" />
+                      {txt("নির্বাচিত তারিখের আয়ের খাত ও ডিটেলস তালিকা", "Income Breakdown & Details")}
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      {selectedDate} - {txt("পণ্য বিক্রয়, বকেয়া জমা, সার্ভিসিং বিল ও আইএসপি কালেকশন", "Product sales, due payments, servicing bills & ISP collections")}
+                    </p>
                   </div>
-                  <div>
-                    <label className="font-bold text-gray-700">{txt("টাকার পরিমাণ (৳) *", "Amount (৳) *")}</label>
-                    <input
-                      type="number"
-                      required
-                      placeholder={txt("টাকার পরিমাণ লিখুন", "Enter expense amount")}
-                      value={expenseForm.amount}
-                      onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                      className="w-full border p-2 rounded mt-1 outline-none focus:border-blue-500"
-                    />
+                  <div className="text-left sm:text-right bg-emerald-50 sm:bg-transparent p-2 sm:p-0 rounded-xl border sm:border-0 border-emerald-200">
+                    <span className="text-[10px] text-emerald-700 font-bold block">{txt("নির্বাচিত আয়ের মোট নগদ আদায়:", "Total Income Collected:")}</span>
+                    <span className="text-lg font-black text-emerald-800 font-mono">
+                      ৳ {Number(dailySummary?.total_income_collected || dailySummary?.total_collected || 0).toLocaleString()}
+                    </span>
                   </div>
-                  <div>
-                    <label className="font-bold text-gray-700">{txt("বিবরণ / নোট (ঐচ্ছিক)", "Description / Note (Optional)")}</label>
-                    <textarea
-                      rows="2"
-                      placeholder={txt("খরচের বিস্তারিত বিবরণ...", "Detailed expense note...")}
-                      value={expenseForm.note}
-                      onChange={e => setExpenseForm({ ...expenseForm, note: e.target.value })}
-                      className="w-full border p-2 rounded mt-1 outline-none focus:border-blue-500"
-                    />
-                  </div>
+                </div>
 
-                  {/* দোকান ভাড়ার ব্যাংক রশিদ বা খরচের ভাউচার ইমেজ আপলোড */}
-                  <div className={`p-2.5 rounded-xl border ${expenseForm.category === 'দোকান ভাড়া' ? 'bg-amber-50/80 border-amber-300' : 'bg-slate-50 border-slate-200'}`}>
-                    <label className="font-bold text-slate-700 block mb-1 flex items-center justify-between">
-                      <span className="flex items-center gap-1">
-                        <Camera size={13} className="text-emerald-600" />
-                        {expenseForm.category === 'দোকান ভাড়া' 
-                          ? txt('🏦 দোকান ভাড়ার ব্যাংক রশিদ ছবি (Bank Deposit Slip)', '🏦 Shop Rent Bank Deposit Slip') 
-                          : txt('ব্যাংক রশিদ / ভাউচার স্লিপ ইমেজ', 'Bank Slip / Voucher Image')}
+                {/* আয়ের খাতভিত্তিক সারসংক্ষেপ পিলস/কার্ডস */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  {dailySummary?.income_breakdown?.map((ib, i) => (
+                    <div key={i} className="p-2.5 rounded-xl border border-gray-200 bg-gray-50/70">
+                      <span className="text-[10px] font-bold text-gray-600 block truncate" title={ib.sector}>
+                        {ib.sector.split('(')[0]}
                       </span>
-                      {expenseForm.receipt_image && (
-                        <button
-                          type="button"
-                          onClick={() => setExpenseForm(prev => ({ ...prev, receipt_image: '' }))}
-                          className="text-[10px] text-red-600 hover:underline cursor-pointer font-bold"
-                        >
-                          {txt("ছবি মুছুন", "Remove")}
-                        </button>
-                      )}
-                    </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          setExpenseForm(prev => ({ ...prev, receipt_image: reader.result }));
-                        };
-                        reader.readAsDataURL(file);
-                      }}
-                      className="w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-emerald-600 file:text-white file:cursor-pointer hover:file:bg-emerald-700 cursor-pointer"
-                    />
-                    {expenseForm.receipt_image && (
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <img
-                          src={expenseForm.receipt_image}
-                          alt="Receipt Preview"
-                          className="h-10 w-14 object-contain rounded border border-slate-300 bg-white"
-                        />
-                        <span className="text-[10px] text-emerald-700 font-bold">{txt("রশিদ সংযুক্ত হয়েছে", "Receipt attached")}</span>
+                      <div className="text-sm font-black text-gray-900 font-mono mt-0.5">
+                        ৳ {Number(ib.collected || 0).toLocaleString()}
                       </div>
-                    )}
-                  </div>
+                      <span className="text-[9px] text-gray-500 block">
+                        {ib.count} {txt("টি এন্ট্রি", "entries")}
+                        {Number(ib.due || 0) > 0 && ` | বকেয়া ৳${Number(ib.due).toLocaleString()}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
 
-                  <button type="submit" className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg cursor-pointer transition">
-                    {txt("+ খরচ সেভ করুন", "+ Save Expense")}
-                  </button>
-                </form>
+                {/* আয়ের বিস্তারিত এন্ট্রি টেবিল */}
+                <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead className="sticky top-0 bg-gray-50 shadow-2xs z-10">
+                      <tr className="border-b text-gray-700">
+                        <th className="p-2.5">{txt("খাত", "Sector")}</th>
+                        <th className="p-2.5">{txt("বিল/ভাউচার নং", "Ref / Slip No")}</th>
+                        <th className="p-2.5">{txt("ক্রেতা / গ্রাহক", "Customer")}</th>
+                        <th className="p-2.5">{txt("মাধ্যম", "Method")}</th>
+                        <th className="p-2.5 text-right">{txt("মোট বিল", "Total")}</th>
+                        <th className="p-2.5 text-right">{txt("আদায় (৳)", "Paid (৳)")}</th>
+                        <th className="p-2.5 text-center print:hidden">{txt("অ্যাকশন", "Action")}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {dailySummary?.income_entries?.map(entry => (
+                        <tr key={entry.id} className="hover:bg-gray-50">
+                          <td className="p-2.5 font-bold">
+                            {entry.type === 'invoice' ? (
+                              <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded text-[10px] border border-blue-200">
+                                📦 {txt("পণ্য বিক্রয়", "Sales")}
+                              </span>
+                            ) : entry.type === 'service' ? (
+                              <span className="text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded text-[10px] border border-purple-200">
+                                🛠️ {txt("সার্ভিস বিল", "Service")}
+                              </span>
+                            ) : entry.type === 'isp' ? (
+                              <span className="text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded text-[10px] border border-cyan-200">
+                                🌐 {txt("আইএসপি বিল", "ISP")}
+                              </span>
+                            ) : (
+                              <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded text-[10px] border border-emerald-200">
+                                💰 {txt("বকেয়া জমা", "Due Paid")}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-2.5 font-mono font-bold text-gray-700">{entry.ref_no}</td>
+                          <td className="p-2.5">
+                            <p className="font-bold text-gray-900 truncate max-w-[120px]">{entry.customer_name}</p>
+                            <p className="text-[10px] text-gray-500">{entry.customer_mobile || '-'}</p>
+                          </td>
+                          <td className="p-2.5">
+                            <span className="text-[10px] font-semibold text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">
+                              {entry.payment_method || 'Cash'}
+                            </span>
+                          </td>
+                          <td className="p-2.5 text-right font-mono text-gray-700">৳ {Number(entry.total_amount).toLocaleString()}</td>
+                          <td className="p-2.5 text-right font-mono font-bold text-emerald-700">৳ {Number(entry.paid_amount).toLocaleString()}</td>
+                          <td className="p-2.5 text-center print:hidden">
+                            {entry.type === 'invoice' ? (
+                              <button
+                                type="button"
+                                onClick={() => handleViewInvoiceDetails(entry.source_id)}
+                                className="px-2 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded text-[10px] font-bold cursor-pointer"
+                                title={txt("ইনভয়েস দেখুন", "View Invoice")}
+                              >
+                                📄 {txt("বিল", "Bill")}
+                              </button>
+                            ) : entry.type === 'service' ? (
+                              <button
+                                type="button"
+                                onClick={() => handleViewServiceSlip(entry.source_id)}
+                                className="px-2 py-0.5 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded text-[10px] font-bold cursor-pointer"
+                                title={txt("সার্ভিসিং স্লিপ দেখুন", "View Service Slip")}
+                              >
+                                🛠️ {txt("স্লিপ", "Slip")}
+                              </button>
+                            ) : entry.type === 'due_collection' ? (
+                              <button
+                                type="button"
+                                onClick={() => handleViewMoneyReceipt({ id: entry.source_id })}
+                                className="px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded text-[10px] font-bold cursor-pointer"
+                                title={txt("মানি রিসিপ্ট দেখুন", "View Money Receipt")}
+                              >
+                                🧾 {txt("রশিদ", "Receipt")}
+                              </button>
+                            ) : (
+                              <span className="text-gray-400 text-[10px]">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {(!dailySummary?.income_entries || dailySummary.income_entries.length === 0) && (
+                        <tr>
+                          <td colSpan="7" className="text-center py-6 text-gray-400">
+                            {txt("নির্বাচিত তারিখে কোনো আয়ের এন্ট্রি নেই", "No income entries on this date")}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                    {dailySummary?.income_entries?.length > 0 && (
+                      <tfoot className="border-t-2 border-gray-900 bg-gray-50 font-bold text-xs">
+                        <tr>
+                          <td colSpan={4} className="p-2 text-right font-black">
+                            {txt("সর্বমোট আয় জমা:", "Total Income Collected:")}
+                          </td>
+                          <td className="p-2 text-right font-mono font-bold text-gray-900">
+                            ৳ {Number(dailySummary?.total_income_billed || 0).toLocaleString()}
+                          </td>
+                          <td className="p-2 text-right font-mono font-black text-emerald-700">
+                            ৳ {Number(dailySummary?.total_income_collected || 0).toLocaleString()}
+                          </td>
+                          <td className="p-2 text-center print:hidden">-</td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
               </div>
 
-              {/* খরচের টেবিল */}
-              <div className="lg:col-span-2 bg-white text-gray-800 p-5 rounded-xl shadow-sm border border-gray-200">
-                <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-3">
-                  {txt("নির্বাচিত তারিখের খরচের তালিকা", "Expenses List for Selected Date")} ({selectedDate})
-                </h3>
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-gray-50 border-b text-gray-600">
-                      <th className="p-2.5">{txt("খাত", "Category")}</th>
-                      <th className="p-2.5">{txt("নোট", "Note")}</th>
-                      <th className="p-2.5 text-right">{txt("পরিমাণ (৳)", "Amount (৳)")}</th>
-                      <th className="p-2.5 text-center">{txt("ব্যাংক রশিদ", "Bank Receipt")}</th>
-                      <th className="p-2.5 text-center">{txt("মুছুন", "Delete")}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {expensesList.map(exp => (
-                      <tr key={exp.id} className="hover:bg-gray-50">
-                        <td className="p-2.5 font-bold text-gray-800">{getExpenseCategoryLabel(exp.category)}</td>
-                        <td className="p-2.5 text-gray-500">{exp.note || '-'}</td>
-                        <td className="p-2.5 text-right font-bold text-red-600">৳ {Number(exp.amount).toLocaleString()}</td>
-                        <td className="p-2.5 text-center">
-                          {exp.receipt_image ? (
-                            <button
-                              type="button"
-                              onClick={() => setActiveImageView({ 
-                                src: exp.receipt_image, 
-                                title: `${getExpenseCategoryLabel(exp.category)} - ${txt("ব্যাংক রশিদ / ভাউচার", "Bank Receipt / Voucher")} (${formatDateDMY(exp.expense_date)})` 
-                              })}
-                              className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer transition shadow-2xs"
-                            >
-                              <ImageIcon size={12} /> {txt("রশিদ দেখুন", "View Receipt")}
-                            </button>
-                          ) : (
-                            <span className="text-slate-400 text-[10px]">-</span>
-                          )}
-                        </td>
-                        <td className="p-2.5 text-center">
-                          <button onClick={() => handleDeleteExpense(exp.id)} className="text-red-500 hover:text-red-700 p-1 cursor-pointer" title={txt("মুছুন", "Delete")}>
-                            <Trash2 size={14} />
+              {/* ডান কলাম: নির্বাচিত তারিখের খরচের তালিকা ও ব্যয় সংযোজন */}
+              <div className="space-y-6">
+                {/* খরচের টেবিল */}
+                <div className="bg-white text-gray-800 p-5 rounded-2xl shadow-sm border border-gray-200 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
+                    <div>
+                      <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+                        <span className="text-rose-600">💸</span>
+                        {txt("নির্বাচিত তারিখের খরচের তালিকা", "Expenses List for Selected Date")}
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        {selectedDate} - {txt("দোকানের যাবতীয় দৈনন্দিন ব্যয়ের তালিকা", "List of all daily expenditures")}
+                      </p>
+                    </div>
+                    <div className="text-left sm:text-right bg-rose-50 sm:bg-transparent p-2 sm:p-0 rounded-xl border sm:border-0 border-rose-200">
+                      <span className="text-[10px] text-rose-700 font-bold block">{txt("নির্বাচিত মোট খরচ:", "Total Expenses:")}</span>
+                      <span className="text-lg font-black text-rose-700 font-mono">
+                        ৳ {Number(dailySummary?.total_expense || 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead className="sticky top-0 bg-gray-50 shadow-2xs z-10">
+                        <tr className="border-b text-gray-600">
+                          <th className="p-2.5">{txt("খাত", "Category")}</th>
+                          <th className="p-2.5">{txt("নোট", "Note")}</th>
+                          <th className="p-2.5 text-right">{txt("পরিমাণ (৳)", "Amount (৳)")}</th>
+                          <th className="p-2.5 text-center">{txt("ব্যাংক রশিদ", "Receipt")}</th>
+                          <th className="p-2.5 text-center">{txt("মুছুন", "Delete")}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {expensesList.map(exp => (
+                          <tr key={exp.id} className="hover:bg-gray-50">
+                            <td className="p-2.5 font-bold text-gray-800">{getExpenseCategoryLabel(exp.category)}</td>
+                            <td className="p-2.5 text-gray-500">{exp.note || '-'}</td>
+                            <td className="p-2.5 text-right font-bold text-red-600">৳ {Number(exp.amount).toLocaleString()}</td>
+                            <td className="p-2.5 text-center">
+                              {exp.receipt_image ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveImageView({ 
+                                    src: exp.receipt_image, 
+                                    title: `${getExpenseCategoryLabel(exp.category)} - ${txt("ব্যাংক রশিদ / ভাউচার", "Bank Receipt / Voucher")} (${formatDateDMY(exp.expense_date)})` 
+                                  })}
+                                  className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer transition shadow-2xs"
+                                >
+                                  <ImageIcon size={12} /> {txt("রশিদ", "Receipt")}
+                                </button>
+                              ) : (
+                                <span className="text-slate-400 text-[10px]">-</span>
+                              )}
+                            </td>
+                            <td className="p-2.5 text-center">
+                              <button onClick={() => handleDeleteExpense(exp.id)} className="text-red-500 hover:text-red-700 p-1 cursor-pointer" title={txt("মুছুন", "Delete")}>
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        {expensesList.length === 0 && (
+                          <tr>
+                            <td colSpan="5" className="text-center py-6 text-gray-400">{txt("এই তারিখে কোনো খরচের এন্ট্রি নেই", "No expense entries on this date")}</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* ব্যয় সংযোজন ফর্ম */}
+                <div className="bg-white text-gray-800 p-5 rounded-2xl shadow-sm border border-gray-200">
+                  <h3 className="text-sm font-bold text-gray-800 border-b pb-2 mb-3 flex items-center gap-2">
+                    <span>➕</span> {txt("নতুন দৈনিক ব্যয় সংযোজন", "Add New Daily Expense")}
+                  </h3>
+                  <form onSubmit={handleExpenseSubmit} className="space-y-3 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-gray-700">{txt("খরচের খাত *", "Expense Category *")}</label>
+                        <select
+                          value={expenseForm.category}
+                          onChange={e => setExpenseForm({ ...expenseForm, category: e.target.value })}
+                          className="w-full border p-2 rounded-xl mt-1 bg-white outline-none focus:border-blue-500 font-medium"
+                        >
+                          {EXPENSE_CATEGORIES.map((cat, i) => <option key={i} value={cat}>{getExpenseCategoryLabel(cat)}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="font-bold text-gray-700">{txt("টাকার পরিমাণ (৳) *", "Amount (৳) *")}</label>
+                        <input
+                          type="number"
+                          required
+                          placeholder={txt("টাকার পরিমাণ লিখুন", "Enter expense amount")}
+                          value={expenseForm.amount}
+                          onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                          className="w-full border p-2 rounded-xl mt-1 outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="font-bold text-gray-700">{txt("বিবরণ / নোট (ঐচ্ছিক)", "Description / Note (Optional)")}</label>
+                      <input
+                        type="text"
+                        placeholder={txt("খরচের বিস্তারিত বিবরণ...", "Detailed expense note...")}
+                        value={expenseForm.note}
+                        onChange={e => setExpenseForm({ ...expenseForm, note: e.target.value })}
+                        className="w-full border p-2 rounded-xl mt-1 outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    {/* দোকান ভাড়ার ব্যাংক রশিদ বা খরচের ভাউচার ইমেজ আপলোড */}
+                    <div className={`p-2.5 rounded-xl border ${expenseForm.category === 'দোকান ভাড়া' ? 'bg-amber-50/80 border-amber-300' : 'bg-slate-50 border-slate-200'}`}>
+                      <label className="font-bold text-slate-700 block mb-1 flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <Camera size={13} className="text-emerald-600" />
+                          {expenseForm.category === 'দোকান ভাড়া' 
+                            ? txt('🏦 দোকান ভাড়ার ব্যাংক রশিদ ছবি (Bank Deposit Slip)', '🏦 Shop Rent Bank Deposit Slip') 
+                            : txt('ব্যাংক রশিদ / ভাউচার স্লিপ ইমেজ', 'Bank Slip / Voucher Image')}
+                        </span>
+                        {expenseForm.receipt_image && (
+                          <button
+                            type="button"
+                            onClick={() => setExpenseForm(prev => ({ ...prev, receipt_image: '' }))}
+                            className="text-[10px] text-red-600 hover:underline cursor-pointer font-bold"
+                          >
+                            {txt("ছবি মুছুন", "Remove")}
                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {expensesList.length === 0 && (
-                      <tr>
-                        <td colSpan="5" className="text-center py-6 text-gray-400">{txt("এই তারিখে কোনো খরচের এন্ট্রি নেই", "No expense entries on this date")}</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                        )}
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            setExpenseForm(prev => ({ ...prev, receipt_image: reader.result }));
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                        className="w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-emerald-600 file:text-white file:cursor-pointer hover:file:bg-emerald-700 cursor-pointer"
+                      />
+                      {expenseForm.receipt_image && (
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <img
+                            src={expenseForm.receipt_image}
+                            alt="Receipt Preview"
+                            className="h-10 w-14 object-contain rounded border border-slate-300 bg-white"
+                          />
+                          <span className="text-[10px] text-emerald-700 font-bold">{txt("রশিদ সংযুক্ত হয়েছে", "Receipt attached")}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <button type="submit" className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl cursor-pointer transition shadow-sm">
+                      {txt("+ খরচ সেভ করুন", "+ Save Expense")}
+                    </button>
+                  </form>
+                </div>
               </div>
             </div>
 
@@ -5174,6 +5369,25 @@ function App() {
           const countDue = salesReports.filter(r => Number(r.due_amount) > 0).length;
           const countPaid = salesReports.filter(r => Number(r.due_amount) <= 0).length;
 
+          // প্রতিটি তারিখের সাবটোটাল ও হিসাব
+          const dailySubtotals = {};
+          filteredSalesReports.forEach(r => {
+            const dStr = formatDateDMY(r.created_at);
+            if (!dailySubtotals[dStr]) {
+              dailySubtotals[dStr] = { count: 0, total_amount: 0, paid_amount: 0, due_amount: 0, net_profit: 0, serviceCount: 0, productCount: 0 };
+            }
+            dailySubtotals[dStr].count += 1;
+            dailySubtotals[dStr].total_amount += Number(r.total_amount || 0);
+            dailySubtotals[dStr].paid_amount += Number(r.paid_amount || 0);
+            dailySubtotals[dStr].due_amount += Number(r.due_amount || 0);
+            dailySubtotals[dStr].net_profit += Number(r.net_profit || 0);
+            if (r.entry_type === 'service') {
+              dailySubtotals[dStr].serviceCount += 1;
+            } else {
+              dailySubtotals[dStr].productCount += 1;
+            }
+          });
+
           return (
             <div className="bg-white text-gray-800 p-6 rounded-2xl shadow-sm border border-fuchsia-100 space-y-5">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -5218,7 +5432,7 @@ function App() {
                   <h3 className="text-lg md:text-xl font-black text-blue-950 mt-1 font-mono">
                     ৳ {totalSalesSum.toLocaleString()}
                   </h3>
-                  <span className="text-[10px] text-blue-600 block mt-0.5">{salesReports.length} {txt("টি ইনভয়েস", "invoices")}</span>
+                  <span className="text-[10px] text-blue-600 block mt-0.5">{salesReports.length} {txt("টি এন্ট্রি (পণ্য ও সার্ভিস)", "entries (products & services)")}</span>
                 </div>
 
                 <div className="p-3.5 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/70 to-teal-50/40">
@@ -5242,7 +5456,7 @@ function App() {
                   <h3 className={`text-lg md:text-xl font-black mt-1 font-mono ${totalNetProfitSum >= 0 ? 'text-green-700' : 'text-rose-700'}`}>
                     {totalNetProfitSum >= 0 ? '+' : ''}৳ {totalNetProfitSum.toLocaleString()}
                   </h3>
-                  <span className="text-[10px] text-fuchsia-600 block mt-0.5">{txt("বিক্রয় লাভ হিসাব", "Calculated Gross Profit")}</span>
+                  <span className="text-[10px] text-fuchsia-600 block mt-0.5">{txt("বিক্রয় ও সার্ভিসিং লাভ হিসাব", "Sales & Servicing Profit")}</span>
                 </div>
               </div>
 
@@ -5287,10 +5501,10 @@ function App() {
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-gray-50 border-b text-gray-700">
-                      <th className="p-3">{txt("ইনভয়েস নং", "Invoice No")}</th>
+                      <th className="p-3">{txt("ইনভয়েস / স্লিপ নং", "Invoice / Slip No")}</th>
                       <th className="p-3">{txt("তারিখ", "Date")}</th>
                       <th className="p-3">{txt("ক্রেতার তথ্য", "Customer Info")}</th>
-                      <th className="p-3">{txt("সেলসম্যান", "Salesman")}</th>
+                      <th className="p-3">{txt("সেলসম্যান / গ্রহণকারী", "Salesman / Receiver")}</th>
                       <th className="p-3 text-right">{txt("মোট বিল", "Total Bill")}</th>
                       <th className="p-3 text-right">{txt("নিট লাভ", "Net Profit")}</th>
                       <th className="p-3 text-center">{txt("পরিশোধের অবস্থা", "Payment Status")}</th>
@@ -5298,75 +5512,140 @@ function App() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {filteredSalesReports.map(r => (
-                      <tr key={r.id} className="hover:bg-gray-50">
-                        <td className="p-3 font-mono font-bold text-blue-600">{r.invoice_no}</td>
-                        <td className="p-3">{formatDateDMY(r.created_at)}</td>
-                        <td className="p-3">
-                          <p className="font-bold text-gray-900">{r.customer_name}</p>
-                          <p className="text-[11px] text-gray-500">{r.customer_mobile || '-'}</p>
-                        </td>
-                        <td className="p-3 font-medium text-gray-700">{r.salesman_name || 'Admin'}</td>
-                        <td className="p-3 text-right font-bold text-gray-900">
-                          ৳ {Number(r.total_amount).toLocaleString()}
-                          {Number(r.discount_amount) > 0 && (
-                            <span className="block text-[10px] text-orange-600 font-normal">
-                              ({txt("ছাড়: ৳", "Discount: ৳")}{r.discount_amount})
-                            </span>
+                    {filteredSalesReports.map((r, idx) => {
+                      const currDate = formatDateDMY(r.created_at);
+                      const prevDate = idx > 0 ? formatDateDMY(filteredSalesReports[idx - 1].created_at) : null;
+                      const isNewDate = currDate !== prevDate;
+                      const dTotals = dailySubtotals[currDate] || { count: 0, total_amount: 0, paid_amount: 0, due_amount: 0, net_profit: 0, serviceCount: 0 };
+
+                      return (
+                        <React.Fragment key={r.entry_type === 'service' ? `serv-${r.id}` : `inv-${r.id}`}>
+                          {/* প্রতিটি তারিখের এন্ট্রিগুলো মোটা দাগ দিয়ে এক তারিখ হতে আরেক তারিখ পৃথক দেখাবে */}
+                          {isNewDate && (
+                            <tr className="border-t-4 border-fuchsia-600 bg-gradient-to-r from-fuchsia-100/90 via-pink-50 to-purple-50 font-bold text-gray-800 shadow-2xs">
+                              <td colSpan="8" className="py-2.5 px-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <Calendar size={14} className="text-fuchsia-700" />
+                                    <span className="text-xs sm:text-sm font-black text-fuchsia-950 font-mono tracking-tight">{currDate}</span>
+                                    <span className="text-[11px] font-bold text-fuchsia-900 bg-white/90 px-2 py-0.5 rounded-full border border-fuchsia-200 shadow-2xs">
+                                      {dTotals.count} {txt("টি এন্ট্রি", "entries")}
+                                      {dTotals.serviceCount > 0 && ` (${txt("সার্ভিস বিল:", "Service:")} ${dTotals.serviceCount})`}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-xs font-mono">
+                                    <span className="text-blue-950 font-bold">{txt("মোট বিল:", "Total:")} ৳{dTotals.total_amount.toLocaleString()}</span>
+                                    <span className="text-emerald-700 font-bold">{txt("আদায়:", "Paid:")} ৳{dTotals.paid_amount.toLocaleString()}</span>
+                                    {dTotals.due_amount > 0 && (
+                                      <span className="text-rose-700 font-bold">{txt("বকেয়া:", "Due:")} ৳{dTotals.due_amount.toLocaleString()}</span>
+                                    )}
+                                    <span className="text-purple-900 font-bold">{txt("নিট লাভ:", "Profit:")} +৳{dTotals.net_profit.toLocaleString()}</span>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
                           )}
-                        </td>
-                        <td className="p-3 text-right font-bold text-green-600">+৳ {Number(r.net_profit).toLocaleString()}</td>
-                        <td className="p-3 text-center">
-                          {Number(r.due_amount) > 0 ? (
-                            <div className="flex flex-col items-center">
-                              <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded font-bold text-[10px]">
-                                {txt("বকেয়া: ৳ ", "Due: ৳ ")}{Number(r.due_amount).toLocaleString()}
-                              </span>
-                              <span className="text-[10px] text-emerald-700 font-bold mt-0.5">
-                                {txt("আদায়: ৳ ", "Paid: ৳ ")}{Number(r.paid_amount || 0).toLocaleString()}
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center">
-                              <span className="px-2 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded font-bold text-[10px]">
-                                {txt("পরিশোধিত (Paid)", "Paid")}
-                              </span>
-                              <span className="text-[10px] text-gray-500 font-medium mt-0.5">
-                                {txt("আদায়: ৳ ", "Paid: ৳ ")}{Number(r.paid_amount || 0).toLocaleString()}
-                              </span>
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-3 text-center">
-                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                            <button
-                              type="button"
-                              onClick={() => handleViewInvoiceDetails(r.id)}
-                              className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
-                              title={txt("সম্পূর্ণ ইনভয়েসটি দেখুন ও প্রিন্ট করুন", "View full invoice and print")}
-                            >
-                              <FileText size={13} /> {txt("ইনভয়েস দেখুন", "View Invoice")}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditInvoice(r.id)}
-                              className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
-                              title={txt("এই ইনভয়েস এডিট করে নতুন পণ্য অ্যাড করুন বা সংশোধন করুন", "Edit this invoice and add or update items")}
-                            >
-                              <Edit size={13} /> {txt("ইনভয়েস এডিট", "Edit Invoice")}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteInvoice(r.id, r.invoice_no)}
-                              className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
-                              title={txt("ভুলবশত ডুপ্লিকেট হওয়া এই ইনভয়েসটি ডিলিট করুন (সেলস রিপোর্ট ও কাস্টমার লেজার থেকে মাইনাস হবে)", "Delete this duplicate invoice")}
-                            >
-                              <Trash2 size={13} /> {txt("ডিলিট", "Delete")}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          <tr className="hover:bg-gray-50">
+                            <td className="p-3">
+                              {r.entry_type === 'service' ? (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-mono font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                                    {r.invoice_no}
+                                  </span>
+                                  <span className="text-[10px] bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold px-1.5 py-0.5 rounded-full shadow-2xs">
+                                    🛠️ {txt("সার্ভিস বিল", "Service Bill")}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="font-mono font-bold text-blue-600">{r.invoice_no}</span>
+                              )}
+                            </td>
+                            <td className="p-3">{formatDateDMY(r.created_at)}</td>
+                            <td className="p-3">
+                              <p className="font-bold text-gray-900">{r.customer_name}</p>
+                              <p className="text-[11px] text-gray-500">{r.customer_mobile || '-'}</p>
+                              {r.product_name && (
+                                <p className="text-[10px] text-purple-700 font-medium mt-0.5 truncate max-w-[200px]" title={r.product_name}>
+                                  🔧 {r.product_name}
+                                </p>
+                              )}
+                            </td>
+                            <td className="p-3 font-medium text-gray-700">{r.salesman_name || 'Admin'}</td>
+                            <td className="p-3 text-right font-bold text-gray-900">
+                              ৳ {Number(r.total_amount).toLocaleString()}
+                              {Number(r.discount_amount) > 0 && (
+                                <span className="block text-[10px] text-orange-600 font-normal">
+                                  ({txt("ছাড়: ৳", "Discount: ৳")}{r.discount_amount})
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-3 text-right font-bold text-green-600">+৳ {Number(r.net_profit).toLocaleString()}</td>
+                            <td className="p-3 text-center">
+                              {Number(r.due_amount) > 0 ? (
+                                <div className="flex flex-col items-center">
+                                  <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded font-bold text-[10px]">
+                                    {txt("বকেয়া: ৳ ", "Due: ৳ ")}{Number(r.due_amount).toLocaleString()}
+                                  </span>
+                                  <span className="text-[10px] text-emerald-700 font-bold mt-0.5">
+                                    {txt("আদায়: ৳ ", "Paid: ৳ ")}{Number(r.paid_amount || 0).toLocaleString()}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center">
+                                  <span className="px-2 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded font-bold text-[10px]">
+                                    {txt("পরিশোধিত (Paid)", "Paid")}
+                                  </span>
+                                  <span className="text-[10px] text-gray-500 font-medium mt-0.5">
+                                    {txt("আদায়: ৳ ", "Paid: ৳ ")}{Number(r.paid_amount || 0).toLocaleString()}
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-3 text-center">
+                              <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                {r.entry_type === 'service' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleViewServiceSlip(r.id)}
+                                    className="px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
+                                    title={txt("সার্ভিসিং স্লিপ দেখুন ও প্রিন্ট করুন", "View & print service slip")}
+                                  >
+                                    <FileText size={13} /> {txt("সার্ভিস স্লিপ", "Service Slip")}
+                                  </button>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleViewInvoiceDetails(r.id)}
+                                      className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
+                                      title={txt("সম্পূর্ণ ইনভয়েসটি দেখুন ও প্রিন্ট করুন", "View full invoice and print")}
+                                    >
+                                      <FileText size={13} /> {txt("ইনভয়েস দেখুন", "View Invoice")}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditInvoice(r.id)}
+                                      className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
+                                      title={txt("এই ইনভয়েস এডিট করে নতুন পণ্য অ্যাড করুন বা সংশোধন করুন", "Edit this invoice and add or update items")}
+                                    >
+                                      <Edit size={13} /> {txt("ইনভয়েস এডিট", "Edit Invoice")}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteInvoice(r.id, r.invoice_no)}
+                                      className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
+                                      title={txt("ভুলবশত ডুপ্লিকেট হওয়া এই ইনভয়েসটি ডিলিট করুন (সেলস রিপোর্ট ও কাস্টমার লেজার থেকে মাইনাস হবে)", "Delete this duplicate invoice")}
+                                    >
+                                      <Trash2 size={13} /> {txt("ডিলিট", "Delete")}
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        </React.Fragment>
+                      );
+                    })}
                     {filteredSalesReports.length === 0 && (
                       <tr>
                         <td colSpan="8" className="text-center py-6 text-gray-400">
@@ -9006,6 +9285,10 @@ function App() {
                           <td className="p-2.5 font-bold">
                             {t.type === 'Invoice' ? (
                               <span className="text-blue-700">{txt("বিক্রয় বিল", "Sales Invoice")}</span>
+                            ) : t.type === 'Service' ? (
+                              <span className="text-purple-700 inline-flex items-center gap-1 font-bold">
+                                🛠️ {txt("সার্ভিসিং বিল", "Service Bill")}
+                              </span>
                             ) : (
                               <span className="text-emerald-700">{txt("বকেয়া জমা", "Due Received")}</span>
                             )}
@@ -9040,6 +9323,34 @@ function App() {
                                 >
                                   <Trash2 size={11} /> {txt("ডিলিট", "Delete")}
                                 </button>
+                              </div>
+                            ) : t.type === 'Service' ? (
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                                <div>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-mono font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                                      {t.token_no}
+                                    </span>
+                                    <span className="text-[11px] font-bold text-gray-800">
+                                      {t.product_name}
+                                    </span>
+                                    {t.problem_description && (
+                                      <span className="text-[10px] text-gray-500">
+                                        ({t.problem_description})
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleViewServiceSlip(t.id)}
+                                    className="px-2 py-0.5 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1 shrink-0"
+                                    title={txt("এই সার্ভিসিং স্লিপ দেখুন ও প্রিন্ট করুন", "View & print service slip")}
+                                  >
+                                    📄 {txt("সার্ভিস স্লিপ", "Service Slip")}
+                                  </button>
+                                </div>
                               </div>
                             ) : (
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
@@ -9093,10 +9404,10 @@ function App() {
                             )}
                           </td>
                           <td className="p-2.5 text-right font-mono font-bold text-gray-800">
-                            {t.type === 'Invoice' ? `৳ ${Number(t.total_amount).toLocaleString()}` : '-'}
+                            {t.type === 'Invoice' || t.type === 'Service' ? `৳ ${Number(t.total_amount).toLocaleString()}` : '-'}
                           </td>
                           <td className="p-2.5 text-right font-mono font-bold text-green-600">
-                            {t.type === 'Invoice' ? `৳ ${Number(t.paid_amount).toLocaleString()}` : `৳ ${Number(t.amount).toLocaleString()}`}
+                            {t.type === 'Invoice' || t.type === 'Service' ? `৳ ${Number(t.paid_amount).toLocaleString()}` : `৳ ${Number(t.amount).toLocaleString()}`}
                           </td>
                         </tr>
                       ))}
@@ -9115,10 +9426,10 @@ function App() {
                             {(custLedgerFromDate || custLedgerToDate) ? txt('নির্বাচিত সময়ের সর্বমোট:', 'Total in Selected Period:') : txt('সর্বমোট হিসাব:', 'Grand Total:')}
                           </td>
                           <td className="p-2.5 text-right font-mono font-black text-gray-900">
-                            ৳ {transactions.reduce((acc, t) => acc + (t.type === 'Invoice' ? Number(t.total_amount || 0) : 0), 0).toLocaleString()}
+                            ৳ {transactions.reduce((acc, t) => acc + (t.type === 'Invoice' || t.type === 'Service' ? Number(t.total_amount || 0) : 0), 0).toLocaleString()}
                           </td>
                           <td className="p-2.5 text-right font-mono font-black text-green-700">
-                            ৳ {transactions.reduce((acc, t) => acc + (t.type === 'Invoice' ? Number(t.paid_amount || 0) : Number(t.amount || 0)), 0).toLocaleString()}
+                            ৳ {transactions.reduce((acc, t) => acc + (t.type === 'Invoice' || t.type === 'Service' ? Number(t.paid_amount || 0) : Number(t.amount || 0)), 0).toLocaleString()}
                           </td>
                         </tr>
                       </tfoot>
