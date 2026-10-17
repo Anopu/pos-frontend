@@ -389,6 +389,8 @@ function App() {
   const [supplierSearch, setSupplierSearch] = useState('');
   const [inventorySearch, setInventorySearch] = useState('');
   const [reportSearch, setReportSearch] = useState('');
+  const [reportPaymentFilter, setReportPaymentFilter] = useState('all');
+  const [isSyncingReports, setIsSyncingReports] = useState(false);
 
   // কোটেশন স্টেট
   const [quotationCustomer, setQuotationCustomer] = useState('');
@@ -1057,6 +1059,25 @@ function App() {
       }
     } catch (err) {
       alert(txt('বিল ডিলিট ব্যর্থ: ', 'Failed to delete invoice: ') + err.message);
+    }
+  };
+
+  // কাস্টমার লেজার ও সেলস রিপোর্ট ইনভয়েসের ব্যালেন্স সমন্বয় (Sync)
+  const handleSyncCustomerInvoices = async () => {
+    setIsSyncingReports(true);
+    try {
+      const res = await fetch(`${API_BASE}/reports/reconcile-customer-invoices`, { method: 'POST' });
+      const data = await res.json();
+      fetchReports();
+      fetchCustomers();
+      if (typeof fetchDailySummary === 'function') {
+        fetchDailySummary(selectedDate);
+      }
+      alert(data.message || txt('সেলস রিপোর্ট ও লেজার সমন্বয় সফল হয়েছে!', 'Sales reports and customer ledger synced successfully!'));
+    } catch (err) {
+      alert(txt('সমন্বয় ব্যর্থ: ', 'Sync failed: ') + err.message);
+    } finally {
+      setIsSyncingReports(false);
     }
   };
 
@@ -2149,6 +2170,8 @@ function App() {
         setCustomers(prev => prev.map(c => c.id === data.customer.id ? { ...c, total_due: data.customer.total_due } : c));
         setLedgerCustomer(prev => (prev && prev.id === data.customer.id) ? { ...prev, total_due: data.customer.total_due } : prev);
       }
+      fetchReports();
+      fetchDailySummary(selectedDate);
 
       // ২. কাস্টমার লেজার ট্রানজেকশন তালিকা রিলোড
       const targetCustId = editingPayment.customer_id || ledgerCustomer?.id;
@@ -5131,120 +5154,234 @@ function App() {
         )}
 
         {/* ৯. সেলস ও প্রফিট রিপোর্ট (ইনভয়েস দেখা ও প্রিন্ট করার সুবিধাসহ) */}
-        {activeTab === 'reports' && currentUser.role === 'admin' && (
-          <div className="bg-white text-gray-800 p-6 rounded-2xl shadow-sm border border-fuchsia-100">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-fuchsia-500 to-pink-600 flex items-center justify-center text-white shadow-md shadow-fuchsia-500/20 shrink-0">
-                  <FileText size={20} />
+        {activeTab === 'reports' && currentUser.role === 'admin' && (() => {
+          const filteredSalesReports = salesReports.filter(r => {
+            const matchesSearch = 
+              (r.invoice_no && r.invoice_no.toLowerCase().includes(reportSearch.toLowerCase())) ||
+              (r.customer_name && r.customer_name.toLowerCase().includes(reportSearch.toLowerCase())) ||
+              (r.customer_mobile && r.customer_mobile.includes(reportSearch)) ||
+              (r.salesman_name && r.salesman_name.toLowerCase().includes(reportSearch.toLowerCase()));
+            if (!matchesSearch) return false;
+            if (reportPaymentFilter === 'due') return Number(r.due_amount) > 0;
+            if (reportPaymentFilter === 'paid') return Number(r.due_amount) <= 0;
+            return true;
+          });
+
+          const totalSalesSum = salesReports.reduce((s, r) => s + Number(r.total_amount || 0), 0);
+          const totalPaidSum = salesReports.reduce((s, r) => s + Number(r.paid_amount || 0), 0);
+          const totalDueSum = salesReports.reduce((s, r) => s + Number(r.due_amount || 0), 0);
+          const totalNetProfitSum = salesReports.reduce((s, r) => s + Number(r.net_profit || 0), 0);
+          const countDue = salesReports.filter(r => Number(r.due_amount) > 0).length;
+          const countPaid = salesReports.filter(r => Number(r.due_amount) <= 0).length;
+
+          return (
+            <div className="bg-white text-gray-800 p-6 rounded-2xl shadow-sm border border-fuchsia-100 space-y-5">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-fuchsia-500 to-pink-600 flex items-center justify-center text-white shadow-md shadow-fuchsia-500/20 shrink-0">
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-800">{txt("বিক্রয় ও লাভ রিপোর্ট (ইনভয়েস তালিকা)", "Sales & Profit Report (Invoices)")}</h2>
+                    <p className="text-xs text-gray-500">{txt("কাস্টমার বকেয়া পরিশোধ ও সমন্বয়সহ প্রতিটি বিক্রয়ের পূর্ণ বিবরণ ও লাভ-ক্ষতির হিসাব", "Complete sales details, due adjustments, invoice viewing, printing and profit calculation")}</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-800">{txt("বিক্রয় ও লাভ রিপোর্ট (ইনভয়েস তালিকা)", "Sales & Profit Report (Invoices)")}</h2>
-                  <p className="text-xs text-gray-500">{txt("প্রতিটি বিক্রয়ের পূর্ণ বিবরণ, ইনভয়েস দেখা, প্রিন্ট এবং লাভ-ক্ষতির হিসাব", "Complete sales details, view invoice, print and profit/loss calculation")}</p>
+
+                <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
+                  <div className="relative flex-1 md:w-72">
+                    <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
+                    <input
+                      type="text"
+                      placeholder={txt("ইনভয়েস নং, ক্রেতা, মোবাইল বা সেলসম্যান...", "Invoice No, customer, mobile or salesman...")}
+                      value={reportSearch}
+                      onChange={e => setReportSearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 border border-fuchsia-200 rounded-xl text-xs outline-none focus:border-fuchsia-500"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSyncCustomerInvoices}
+                    disabled={isSyncingReports}
+                    className="px-3 py-2 bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-800 border border-fuchsia-200 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition shadow-2xs disabled:opacity-50"
+                    title={txt("কাস্টমার লেজারের বকেয়া আদায়ের সাথে ইনভয়েস ও সেলস রিপোর্ট সিঙ্ক করুন", "Sync customer ledger due payments with sales report invoices")}
+                  >
+                    <RefreshCw size={13} className={isSyncingReports ? "animate-spin" : ""} />
+                    {isSyncingReports ? txt("সমন্বয় হচ্ছে...", "Syncing...") : txt("লেজার সিঙ্ক", "Sync Ledger")}
+                  </button>
                 </div>
               </div>
 
-              <div className="relative w-full md:w-80">
-                <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
-                <input
-                  type="text"
-                  placeholder={txt("ইনভয়েস নং, ক্রেতা, মোবাইল বা সেলসম্যান...", "Invoice No, customer, mobile or salesman...")}
-                  value={reportSearch}
-                  onChange={e => setReportSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-fuchsia-200 rounded-xl text-xs outline-none focus:border-fuchsia-500"
-                />
+              {/* কেপিআই সামারি কার্ডসমূহ (বিক্রয়, আদায়, অবশিষ্ট বকেয়া, নিট লাভ) */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div className="p-3.5 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50/70 to-indigo-50/40">
+                  <span className="text-[11px] font-bold text-blue-700 block">{txt("১. মোট বিক্রয় বিল", "1. Total Sales Bill")}</span>
+                  <h3 className="text-lg md:text-xl font-black text-blue-950 mt-1 font-mono">
+                    ৳ {totalSalesSum.toLocaleString()}
+                  </h3>
+                  <span className="text-[10px] text-blue-600 block mt-0.5">{salesReports.length} {txt("টি ইনভয়েস", "invoices")}</span>
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/70 to-teal-50/40">
+                  <span className="text-[11px] font-bold text-emerald-700 block">{txt("২. মোট আদায় / পরিশোধিত", "2. Total Paid / Collected")}</span>
+                  <h3 className="text-lg md:text-xl font-black text-emerald-950 mt-1 font-mono">
+                    ৳ {totalPaidSum.toLocaleString()}
+                  </h3>
+                  <span className="text-[10px] text-emerald-600 block mt-0.5">{txt("নগদ ও বকেয়া আদায়সহ", "Cash & Due Collected")}</span>
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50/70 to-red-50/40">
+                  <span className="text-[11px] font-bold text-rose-700 block">{txt("৩. মোট অবশিষ্ট বকেয়া", "3. Total Invoice Due")}</span>
+                  <h3 className="text-lg md:text-xl font-black text-rose-950 mt-1 font-mono">
+                    ৳ {totalDueSum.toLocaleString()}
+                  </h3>
+                  <span className="text-[10px] text-rose-600 block mt-0.5">{countDue} {txt("টি ইনভয়েসে বকেয়া রয়েছে", "due invoices")}</span>
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-fuchsia-200 bg-gradient-to-br from-fuchsia-50/70 to-pink-50/40">
+                  <span className="text-[11px] font-bold text-fuchsia-700 block">{txt("৪. মোট নিট লাভ", "4. Total Net Profit")}</span>
+                  <h3 className={`text-lg md:text-xl font-black mt-1 font-mono ${totalNetProfitSum >= 0 ? 'text-green-700' : 'text-rose-700'}`}>
+                    {totalNetProfitSum >= 0 ? '+' : ''}৳ {totalNetProfitSum.toLocaleString()}
+                  </h3>
+                  <span className="text-[10px] text-fuchsia-600 block mt-0.5">{txt("বিক্রয় লাভ হিসাব", "Calculated Gross Profit")}</span>
+                </div>
+              </div>
+
+              {/* ফিল্টার পিলস (সব, বকেয়া, পরিশোধিত) */}
+              <div className="flex items-center gap-2 border-b pb-3 overflow-x-auto text-xs">
+                <button
+                  type="button"
+                  onClick={() => setReportPaymentFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition ${
+                    reportPaymentFilter === 'all'
+                      ? 'bg-gray-900 text-white shadow-xs'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  {txt("সকল ইনভয়েস", "All Invoices")} ({salesReports.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportPaymentFilter('due')}
+                  className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition inline-flex items-center gap-1 ${
+                    reportPaymentFilter === 'due'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
+                  }`}
+                >
+                  ⚠️ {txt("বকেয়া ইনভয়েস", "Due Invoices")} ({countDue})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportPaymentFilter('paid')}
+                  className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition inline-flex items-center gap-1 ${
+                    reportPaymentFilter === 'paid'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                  }`}
+                >
+                  ✅ {txt("পরিশোধিত", "Paid")} ({countPaid})
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 border-b text-gray-700">
+                      <th className="p-3">{txt("ইনভয়েস নং", "Invoice No")}</th>
+                      <th className="p-3">{txt("তারিখ", "Date")}</th>
+                      <th className="p-3">{txt("ক্রেতার তথ্য", "Customer Info")}</th>
+                      <th className="p-3">{txt("সেলসম্যান", "Salesman")}</th>
+                      <th className="p-3 text-right">{txt("মোট বিল", "Total Bill")}</th>
+                      <th className="p-3 text-right">{txt("নিট লাভ", "Net Profit")}</th>
+                      <th className="p-3 text-center">{txt("পরিশোধের অবস্থা", "Payment Status")}</th>
+                      <th className="p-3 text-center">{txt("অ্যাকশন", "Action")}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {filteredSalesReports.map(r => (
+                      <tr key={r.id} className="hover:bg-gray-50">
+                        <td className="p-3 font-mono font-bold text-blue-600">{r.invoice_no}</td>
+                        <td className="p-3">{formatDateDMY(r.created_at)}</td>
+                        <td className="p-3">
+                          <p className="font-bold text-gray-900">{r.customer_name}</p>
+                          <p className="text-[11px] text-gray-500">{r.customer_mobile || '-'}</p>
+                        </td>
+                        <td className="p-3 font-medium text-gray-700">{r.salesman_name || 'Admin'}</td>
+                        <td className="p-3 text-right font-bold text-gray-900">
+                          ৳ {Number(r.total_amount).toLocaleString()}
+                          {Number(r.discount_amount) > 0 && (
+                            <span className="block text-[10px] text-orange-600 font-normal">
+                              ({txt("ছাড়: ৳", "Discount: ৳")}{r.discount_amount})
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-right font-bold text-green-600">+৳ {Number(r.net_profit).toLocaleString()}</td>
+                        <td className="p-3 text-center">
+                          {Number(r.due_amount) > 0 ? (
+                            <div className="flex flex-col items-center">
+                              <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded font-bold text-[10px]">
+                                {txt("বকেয়া: ৳ ", "Due: ৳ ")}{Number(r.due_amount).toLocaleString()}
+                              </span>
+                              <span className="text-[10px] text-emerald-700 font-bold mt-0.5">
+                                {txt("আদায়: ৳ ", "Paid: ৳ ")}{Number(r.paid_amount || 0).toLocaleString()}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center">
+                              <span className="px-2 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded font-bold text-[10px]">
+                                {txt("পরিশোধিত (Paid)", "Paid")}
+                              </span>
+                              <span className="text-[10px] text-gray-500 font-medium mt-0.5">
+                                {txt("আদায়: ৳ ", "Paid: ৳ ")}{Number(r.paid_amount || 0).toLocaleString()}
+                              </span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleViewInvoiceDetails(r.id)}
+                              className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
+                              title={txt("সম্পূর্ণ ইনভয়েসটি দেখুন ও প্রিন্ট করুন", "View full invoice and print")}
+                            >
+                              <FileText size={13} /> {txt("ইনভয়েস দেখুন", "View Invoice")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditInvoice(r.id)}
+                              className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
+                              title={txt("এই ইনভয়েস এডিট করে নতুন পণ্য অ্যাড করুন বা সংশোধন করুন", "Edit this invoice and add or update items")}
+                            >
+                              <Edit size={13} /> {txt("ইনভয়েস এডিট", "Edit Invoice")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteInvoice(r.id, r.invoice_no)}
+                              className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
+                              title={txt("ভুলবশত ডুপ্লিকেট হওয়া এই ইনভয়েসটি ডিলিট করুন (সেলস রিপোর্ট ও কাস্টমার লেজার থেকে মাইনাস হবে)", "Delete this duplicate invoice")}
+                            >
+                              <Trash2 size={13} /> {txt("ডিলিট", "Delete")}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredSalesReports.length === 0 && (
+                      <tr>
+                        <td colSpan="8" className="text-center py-6 text-gray-400">
+                          {salesReports.length === 0 
+                            ? txt("কোনো বিক্রয় রিপোর্ট পাওয়া যায়নি", "No sales reports found")
+                            : txt("ফিল্টারের সাথে মিল থাকা কোনো ইনভয়েস পাওয়া যায়নি", "No invoices match the current filter")}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
-
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-gray-50 border-b text-gray-700">
-                  <th className="p-3">{txt("ইনভয়েস নং", "Invoice No")}</th>
-                  <th className="p-3">{txt("তারিখ", "Date")}</th>
-                  <th className="p-3">{txt("ক্রেতার তথ্য", "Customer Info")}</th>
-                  <th className="p-3">{txt("সেলসম্যান", "Salesman")}</th>
-                  <th className="p-3 text-right">{txt("মোট বিল", "Total Bill")}</th>
-                  <th className="p-3 text-right">{txt("নিট লাভ", "Net Profit")}</th>
-                  <th className="p-3 text-center">{txt("পরিশোধের অবস্থা", "Payment Status")}</th>
-                  <th className="p-3 text-center">{txt("অ্যাকশন", "Action")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {salesReports
-                  .filter(r => 
-                    (r.invoice_no && r.invoice_no.toLowerCase().includes(reportSearch.toLowerCase())) ||
-                    (r.customer_name && r.customer_name.toLowerCase().includes(reportSearch.toLowerCase())) ||
-                    (r.customer_mobile && r.customer_mobile.includes(reportSearch)) ||
-                    (r.salesman_name && r.salesman_name.toLowerCase().includes(reportSearch.toLowerCase()))
-                  )
-                  .map(r => (
-                    <tr key={r.id} className="hover:bg-gray-50">
-                      <td className="p-3 font-mono font-bold text-blue-600">{r.invoice_no}</td>
-                      <td className="p-3">{formatDateDMY(r.created_at)}</td>
-                      <td className="p-3">
-                        <p className="font-bold text-gray-900">{r.customer_name}</p>
-                        <p className="text-[11px] text-gray-500">{r.customer_mobile || '-'}</p>
-                      </td>
-                      <td className="p-3 font-medium text-gray-700">{r.salesman_name || 'Admin'}</td>
-                      <td className="p-3 text-right font-bold text-gray-900">
-                        ৳ {Number(r.total_amount).toLocaleString()}
-                        {Number(r.discount_amount) > 0 && (
-                          <span className="block text-[10px] text-orange-600 font-normal">
-                            ({txt("ছাড়: ৳", "Discount: ৳")}{r.discount_amount})
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3 text-right font-bold text-green-600">+৳ {Number(r.net_profit).toLocaleString()}</td>
-                      <td className="p-3 text-center">
-                        {Number(r.due_amount) > 0 ? (
-                          <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded font-bold text-[10px]">
-                            {txt("বকেয়া: ৳ ", "Due: ৳ ")}{r.due_amount}
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded font-bold text-[10px]">
-                            {txt("পরিশোধিত (Paid)", "Paid")}
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3 text-center">
-                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => handleViewInvoiceDetails(r.id)}
-                            className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
-                            title={txt("সম্পূর্ণ ইনভয়েসটি দেখুন ও প্রিন্ট করুন", "View full invoice and print")}
-                          >
-                            <FileText size={13} /> {txt("ইনভয়েস দেখুন", "View Invoice")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditInvoice(r.id)}
-                            className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
-                            title={txt("এই ইনভয়েস এডিট করে নতুন পণ্য অ্যাড করুন বা সংশোধন করুন", "Edit this invoice and add or update items")}
-                          >
-                            <Edit size={13} /> {txt("ইনভয়েস এডিট", "Edit Invoice")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteInvoice(r.id, r.invoice_no)}
-                            className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
-                            title={txt("ভুলবশত ডুপ্লিকেট হওয়া এই ইনভয়েসটি ডিলিট করুন (সেলস রিপোর্ট ও কাস্টমার লেজার থেকে মাইনাস হবে)", "Delete this duplicate invoice")}
-                          >
-                            <Trash2 size={13} /> {txt("ডিলিট", "Delete")}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                {salesReports.length === 0 && (
-                  <tr>
-                    <td colSpan="8" className="text-center py-6 text-gray-400">{txt("কোনো বিক্রয় রিপোর্ট পাওয়া যায়নি", "No sales reports found")}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* ===================== সব প্রিন্ট ও পপ-আপ মডালসমূহ ===================== */}
@@ -6126,10 +6263,12 @@ function App() {
                 setChequeBank('');
                 setChequeNo('');
 
-                // সরাসরি কাস্টমার লিস্ট ও চেক এলার্ট রিফ্রেশ
+                // সরাসরি কাস্টমার লিস্ট, চেক এলার্ট, সেলস রিপোর্ট ও দৈনিক সামারি রিফ্রেশ
                 fetchCustomers();
                 fetchChequeAlerts();
                 fetchAllCheques();
+                fetchReports();
+                fetchDailySummary(selectedDate);
 
                 // যদি কাস্টমার লেজার (খাতা) ওপেন থাকে, সরাসরি সমন্বয় ও আপডেট
                 if (ledgerCustomer && ledgerCustomer.id === payingCustId) {
