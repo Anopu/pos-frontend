@@ -1359,7 +1359,7 @@ function App() {
     // ১. কার্টে কোনো ফাঁকা সারি থাকলে সেখানে সেট করা
     const emptyRowIdx = cart.findIndex(item => item.is_empty_row);
     if (emptyRowIdx !== -1) {
-      selectProductIntoCartRow(emptyRowIdx, product);
+      selectProductIntoCartRow(emptyRowIdx, product, autoSerial);
       return;
     }
 
@@ -1481,20 +1481,23 @@ function App() {
 
   const toggleCartSerial = (index, serial) => {
     const item = cart[index];
+    if (!item) return;
+    const itemQty = Math.max(1, Number(item.qty || 1));
     const currentSerials = (typeof item.raw_serials_input === 'string' && item.raw_serials_input.trim())
       ? item.raw_serials_input.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
       : (Array.isArray(item.selected_serials) ? item.selected_serials : []);
     const cleanSerial = serial.trim();
+    if (!cleanSerial) return;
     const isAlreadySelected = currentSerials.some(s => s.toUpperCase() === cleanSerial.toUpperCase());
 
     let newSerials;
     if (isAlreadySelected) {
       newSerials = currentSerials.filter(s => s.toUpperCase() !== cleanSerial.toUpperCase());
     } else {
-      if (item.qty === 1) {
+      if (itemQty === 1) {
         newSerials = [cleanSerial];
-      } else if (currentSerials.length >= item.qty) {
-        alert(txt(`"${item.name}" পণ্যের জন্য ইতিমধ্যে ${item.qty} টি সিরিয়াল নির্বাচিত হয়েছে! অতিরিক্ত সিরিয়াল দিতে চাইলে আগে পণ্যের সংখ্যা (+) বাড়ান।`, `Already ${item.qty} serials selected for "${item.name}"! Increase quantity (+) to add more.`));
+      } else if (currentSerials.length >= itemQty) {
+        alert(txt(`"${item.name}" পণ্যের জন্য ইতিমধ্যে ${itemQty} টি সিরিয়াল নির্বাচিত হয়েছে! অতিরিক্ত সিরিয়াল দিতে চাইলে আগে পণ্যের সংখ্যা (+) বাড়ান।`, `Already ${itemQty} serials selected for "${item.name}"! Increase quantity (+) to add more.`));
         return;
       } else {
         newSerials = [...currentSerials, cleanSerial];
@@ -1503,6 +1506,10 @@ function App() {
 
     const rawInput = newSerials.join(', ');
     setCart(prev => prev.map((c, i) => i === index ? { ...c, raw_serials_input: rawInput, selected_serials: newSerials } : c));
+  };
+
+  const clearCartSerials = (index) => {
+    setCart(prev => prev.map((c, i) => i === index ? { ...c, raw_serials_input: '', selected_serials: [] } : c));
   };
 
   const handleSerialKeyDown = (index, e) => {
@@ -1600,28 +1607,36 @@ function App() {
       }
     }
 
-    // সিরিয়াল প্রয়োজনীয়তা ও সঠিকতা ভ্যালিডেশন (শুধুমাত্র যেসব পণ্যে স্টকে সিরিয়াল আছে)
+    // সিরিয়াল প্রয়োজনীয়তা ও সঠিকতা ভ্যালিডেশন
     for (const item of validItems) {
       const hasSerials = item.available_serials && item.available_serials.trim();
+      let serials = [];
+      if (typeof item.raw_serials_input === 'string' && item.raw_serials_input.trim()) {
+        serials = item.raw_serials_input.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+      } else if (Array.isArray(item.selected_serials)) {
+        serials = item.selected_serials.map(s => String(s).trim()).filter(Boolean);
+      }
+
+      const itemQty = Math.max(1, Number(item.qty || 1));
+
       if (hasSerials) {
-        let serials = [];
-        if (typeof item.raw_serials_input === 'string' && item.raw_serials_input.trim()) {
-          serials = item.raw_serials_input.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
-        } else if (Array.isArray(item.selected_serials)) {
-          serials = item.selected_serials.map(s => String(s).trim()).filter(Boolean);
+        if (serials.length !== itemQty) {
+          return alert(txt(`"${item.name}" পণ্যের জন্য ${itemQty} টি সিরিয়াল প্রয়োজন, কিন্তু ${serials.length} টি দেওয়া হয়েছে! স্টকে থাকা সঠিক সিরিয়াল দিন।`, `"${item.name}" requires ${itemQty} serials, but ${serials.length} provided! Provide valid stock serials.`));
         }
 
-        if (serials.length !== item.qty) {
-          return alert(txt(`"${item.name}" পণ্যের জন্য ${item.qty} টি সিরিয়াল প্রয়োজন, কিন্তু ${serials.length} টি দেওয়া হয়েছে! স্টকে থাকা সঠিক সিরিয়াল দিন।`, `"${item.name}" requires ${item.qty} serials, but ${serials.length} provided! Provide valid stock serials.`));
-        }
-
-        const availableUpper = item.available_serials.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+        const availableUpper = item.available_serials.split(/[\n,]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
         for (const sn of serials) {
           if (!availableUpper.includes(sn.toUpperCase())) {
             return alert(txt(`⚠️ ওয়ার্নিং: "${sn}" সিরিয়ালটি "${item.name}" পণ্যের স্টকে নেই অথবা ভুল! সঠিক সিরিয়াল নির্বাচন বা স্ক্যান করুন।`, `⚠️ Warning: Serial "${sn}" is not in stock for "${item.name}"! Select or scan valid serial.`));
           }
         }
 
+        const upperSet = new Set(serials.map(s => s.toUpperCase()));
+        if (upperSet.size !== serials.length) {
+          return alert(txt(`⚠️ "${item.name}" পণ্যে একই সিরিয়াল নম্বর একাধিকবার দেওয়া হয়েছে! প্রতিটি আইটেমের জন্য আলাদা সিরিয়াল দিন।`, `⚠️ Duplicate serial number provided for "${item.name}"! Each item must have a unique serial.`));
+        }
+      } else if (serials.length > 0) {
+        // পণ্যে স্টকে পূর্বে প্রি-সেভড সিরিয়াল না থাকলে কিন্তু ইউজার ম্যানুয়ালি সিরিয়াল দিলে ডুপ্লিকেট চেক
         const upperSet = new Set(serials.map(s => s.toUpperCase()));
         if (upperSet.size !== serials.length) {
           return alert(txt(`⚠️ "${item.name}" পণ্যে একই সিরিয়াল নম্বর একাধিকবার দেওয়া হয়েছে! প্রতিটি আইটেমের জন্য আলাদা সিরিয়াল দিন।`, `⚠️ Duplicate serial number provided for "${item.name}"! Each item must have a unique serial.`));
@@ -3017,48 +3032,115 @@ function App() {
                                     </div>
                                   )}
 
-                                  {/* সিরিয়াল সেকশন (যদি স্টকে সিরিয়াল থাকে) */}
-                                  {item.available_serials ? (() => {
-                                    const availableList = item.available_serials.split(',').map(s => s.trim()).filter(Boolean);
+                                  {/* সিরিয়াল সেকশন */}
+                                  {(() => {
+                                    if (item.is_service || item.is_empty_row || !item.name) return null;
+
+                                    const hasStockSerials = Boolean(item.available_serials && item.available_serials.trim());
+                                    const availableList = hasStockSerials 
+                                      ? item.available_serials.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+                                      : [];
                                     const availableUpper = availableList.map(s => s.toUpperCase());
                                     const currentSerials = (typeof item.raw_serials_input === 'string')
                                       ? item.raw_serials_input.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
                                       : (Array.isArray(item.selected_serials) ? item.selected_serials : []);
-                                    const invalidSerials = currentSerials.filter(sn => !availableUpper.includes(sn.toUpperCase()));
-                                    const isCountMatch = currentSerials.length === item.qty && invalidSerials.length === 0;
+                                    
+                                    const invalidSerials = hasStockSerials 
+                                      ? currentSerials.filter(sn => !availableUpper.includes(sn.toUpperCase()))
+                                      : [];
+                                    const itemQty = Math.max(1, Number(item.qty || 1));
+                                    const isCountMatch = currentSerials.length === itemQty && invalidSerials.length === 0;
 
                                     return (
-                                      <div className="mt-1 space-y-1 bg-blue-50/30 p-2 rounded-lg border border-blue-100">
+                                      <div className="mt-1 space-y-1.5 bg-blue-50/40 p-2 rounded-lg border border-blue-200">
+                                        {/* হেডার / লেবেল ও কাউন্টার */}
+                                        <div className="flex items-center justify-between text-[10px]">
+                                          <span className="font-bold text-gray-700 flex items-center gap-1">
+                                            <Barcode size={12} className="text-blue-600" />
+                                            {hasStockSerials 
+                                              ? txt('সিরিয়াল নম্বর (ম্যানুয়ালি সিলেক্ট / স্ক্যান করুন):', 'Serial Number (Select / Scan):')
+                                              : txt('সিরিয়াল নম্বর (ম্যানুয়ালি লিখুন বা স্ক্যান করুন):', 'Serial Number (Enter or Scan):')}
+                                          </span>
+                                          <div className="flex items-center gap-1.5">
+                                            <span className={`font-bold px-1.5 py-0.2 rounded text-[10px] ${
+                                              hasStockSerials
+                                                ? (isCountMatch ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800')
+                                                : (currentSerials.length > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600')
+                                            }`}>
+                                              {currentSerials.length}/{itemQty} {isCountMatch && '✓'}
+                                            </span>
+                                            {currentSerials.length > 0 && (
+                                              <button
+                                                type="button"
+                                                onClick={() => clearCartSerials(index)}
+                                                className="text-red-500 hover:text-red-700 text-[10px] hover:underline cursor-pointer font-medium"
+                                                title={txt('সকল সিরিয়াল বাদ দিন', 'Clear serials')}
+                                              >
+                                                {txt('রিসেট', 'Reset')}
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        {/* ১. স্টকে থাকা সিরিয়াল ড্রপডাউন সিলেক্টর */}
+                                        {hasStockSerials && availableList.length > 0 && (
+                                          <div>
+                                            <select
+                                              value=""
+                                              onChange={(e) => {
+                                                if (e.target.value) {
+                                                  toggleCartSerial(index, e.target.value);
+                                                }
+                                              }}
+                                              className="w-full border border-blue-300 rounded p-1 text-[11px] font-mono bg-white text-gray-800 outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
+                                            >
+                                              <option value="">
+                                                {txt(
+                                                  `-- ড্রপডাউন থেকে সিরিয়াল সিলেক্ট করুন (${availableList.length} টি স্টকে) --`,
+                                                  `-- Select Serial from Dropdown (${availableList.length} in stock) --`
+                                                )}
+                                              </option>
+                                              {availableList.map((sn, sIdx) => {
+                                                const isSelected = currentSerials.some(s => s.toUpperCase() === sn.toUpperCase());
+                                                return (
+                                                  <option key={sIdx} value={sn} disabled={isSelected}>
+                                                    {isSelected ? `✓ ${sn} (${txt('সিলেক্টেড', 'Selected')})` : `+ ${sn}`}
+                                                  </option>
+                                                );
+                                              })}
+                                            </select>
+                                          </div>
+                                        )}
+
+                                        {/* ২. ম্যানুয়াল ইনপুট / বারকোড স্ক্যানার ইনপুট */}
                                         <div className="flex items-center gap-1.5">
                                           <input
                                             type="text"
-                                            placeholder={txt("সিরিয়াল স্ক্যান বা লিখুন (SN01, SN02)...", "Scan or enter serials (SN01, SN02)...")}
+                                            placeholder={hasStockSerials 
+                                              ? txt("সিরিয়াল স্ক্যান বা লিখুন (SN01, SN02)...", "Scan or enter serials (SN01, SN02)...")
+                                              : txt("সিরিয়াল নম্বর লিখুন বা স্ক্যান করুন (ঐচ্ছিক)...", "Enter or scan serial number (optional)...")}
                                             value={item.raw_serials_input !== undefined ? item.raw_serials_input : (Array.isArray(item.selected_serials) ? item.selected_serials.join(', ') : '')}
                                             onChange={(e) => handleSerialChange(index, e.target.value)}
                                             onKeyDown={(e) => handleSerialKeyDown(index, e)}
                                             className={`w-full text-[11px] border rounded p-1 font-mono outline-none shadow-inner transition ${
                                               invalidSerials.length > 0 
                                                 ? 'border-red-400 bg-red-50 text-red-900 focus:border-red-600' 
-                                                : isCountMatch
+                                                : (hasStockSerials && isCountMatch)
                                                 ? 'border-green-400 bg-green-50/40 text-green-900 focus:border-green-600'
-                                                : 'border-blue-300 bg-yellow-50 focus:bg-white focus:border-blue-600'
+                                                : 'border-blue-300 bg-white focus:border-blue-600'
                                             }`}
                                           />
-                                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap ${
-                                            isCountMatch ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
-                                          }`}>
-                                            {currentSerials.length}/{item.qty} {isCountMatch && '✓'}
-                                          </span>
                                         </div>
 
+                                        {/* ভুল সিরিয়াল এরর মেসেজ */}
                                         {invalidSerials.length > 0 && (
                                           <p className="text-[10px] text-red-600 font-bold bg-red-50 p-1 rounded border border-red-200">
                                             ⚠️ {txt('স্টকে নেই বা ভুল সিরিয়াল: ', 'Not in stock or invalid serial: ')}"{invalidSerials.join(', ')}"
                                           </p>
                                         )}
 
-                                        {/* স্টকে থাকা সিরিয়াল ব্যাজ */}
-                                        {availableList.length > 0 && (
+                                        {/* ৩. স্টকে থাকা সিরিয়াল ব্যাজ বাটন */}
+                                        {hasStockSerials && availableList.length > 0 && (
                                           <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto pt-0.5 scrollbar-thin">
                                             {availableList.map((sn, sIdx) => {
                                               const isSelected = currentSerials.some(s => s.toUpperCase() === sn.toUpperCase());
@@ -3067,9 +3149,9 @@ function App() {
                                                   key={sIdx}
                                                   type="button"
                                                   onClick={() => toggleCartSerial(index, sn)}
-                                                  className={`text-[9px] font-mono px-1.5 py-0.2 rounded border transition cursor-pointer flex items-center gap-0.5 ${
+                                                  className={`text-[9px] font-mono px-1.5 py-0.5 rounded border transition cursor-pointer flex items-center gap-0.5 ${
                                                     isSelected 
-                                                      ? 'bg-blue-600 text-white border-blue-600 font-bold' 
+                                                      ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-2xs' 
                                                       : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50'
                                                   }`}
                                                   title={isSelected ? txt('বাদ দিতে ক্লিক করুন', 'Click to remove') : txt('যোগ করতে ক্লিক করুন', 'Click to add')}
@@ -3082,7 +3164,7 @@ function App() {
                                         )}
                                       </div>
                                     );
-                                  })() : null}
+                                  })()}
                                 </div>
                               </td>
 
@@ -3123,7 +3205,18 @@ function App() {
                                 <div className="flex items-center justify-center gap-1">
                                   <button
                                     type="button"
-                                    onClick={() => setCart(cart.map((c, i) => i === index ? { ...c, qty: Math.max(1, Number(c.qty || 1) - 1) } : c))}
+                                    onClick={() => setCart(cart.map((c, i) => {
+                                      if (i !== index) return c;
+                                      const newQ = Math.max(1, Number(c.qty || 1) - 1);
+                                      const currentSns = Array.isArray(c.selected_serials) ? c.selected_serials : [];
+                                      const trimmedSns = currentSns.slice(0, newQ);
+                                      return {
+                                        ...c,
+                                        qty: newQ,
+                                        selected_serials: trimmedSns,
+                                        raw_serials_input: trimmedSns.join(', ')
+                                      };
+                                    }))}
                                     className="w-6 h-6 bg-gray-200 hover:bg-gray-300 rounded font-bold cursor-pointer flex items-center justify-center text-xs"
                                   >
                                     -
@@ -3139,7 +3232,17 @@ function App() {
                                         alert(txt('স্টকের চেয়ে বেশি বিক্রি সম্ভব নয়!', 'Cannot sell more than available stock!'));
                                         return;
                                       }
-                                      setCart(cart.map((c, i) => i === index ? { ...c, qty: val } : c));
+                                      setCart(cart.map((c, i) => {
+                                        if (i !== index) return c;
+                                        const currentSns = Array.isArray(c.selected_serials) ? c.selected_serials : [];
+                                        const trimmedSns = currentSns.slice(0, val);
+                                        return {
+                                          ...c,
+                                          qty: val,
+                                          selected_serials: trimmedSns,
+                                          raw_serials_input: trimmedSns.join(', ')
+                                        };
+                                      }));
                                     }}
                                     className="w-12 border p-1 rounded text-xs outline-none focus:border-blue-500 text-center font-bold"
                                   />
