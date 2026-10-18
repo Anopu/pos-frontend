@@ -8,15 +8,29 @@ import {
 import { API_BASE } from '../utils/apiConfig';
 
 export const DEVICE_CATEGORIES = [
-  'প্রিন্টার সার্ভিস',
-  'ক্যামেরা ইনস্টলেশন',
-  'ক্যামেরা সার্ভিস',
-  'ইউপিএস সার্ভিস',
-  'ল্যাপটপ সার্ভিসিং',
-  'ডেস্কটপ সার্ভিসিং',
-  'সাধারণ সার্ভিসিং',
-  'অন্যান্য'
+  { bn: 'প্রিন্টার সার্ভিস', en: 'Printer Service' },
+  { bn: 'ক্যামেরা ইনস্টলেশন', en: 'Camera Installation' },
+  { bn: 'ক্যামেরা সার্ভিস', en: 'Camera Service' },
+  { bn: 'ইউপিএস সার্ভিস', en: 'UPS Service' },
+  { bn: 'ল্যাপটপ সার্ভিস', en: 'Laptop Service' },
+  { bn: 'ডেস্কটপ সার্ভিস', en: 'Desktop Service' },
+  { bn: 'সাধারণ সার্ভিস', en: 'General Service' },
+  { bn: 'অন্যান্য', en: 'Other' }
 ];
+
+export const formatDeviceCategory = (cat, currentLang = 'bn') => {
+  if (!cat) return '';
+  const item = DEVICE_CATEGORIES.find(c => 
+    c.bn === cat || 
+    c.en === cat || 
+    c.en.toLowerCase() === String(cat).toLowerCase() ||
+    (cat === 'ল্যাপটপ সার্ভিসিং' && c.bn === 'ল্যাপটপ সার্ভিস') ||
+    (cat === 'ডেস্কটপ সার্ভিসিং' && c.bn === 'ডেস্কটপ সার্ভিস') ||
+    (cat === 'সাধারণ সার্ভিসিং' && c.bn === 'সাধারণ সার্ভিস')
+  );
+  if (!item) return cat;
+  return currentLang === 'en' ? item.en : item.bn;
+};
 
 export default function WarrantyServiceModule({
   currentUser,
@@ -68,7 +82,7 @@ export default function WarrantyServiceModule({
     product_name: '',
     model_no: '',
     serial_no: '',
-    device_category: 'সাধারণ সার্ভিসিং',
+    device_category: 'সাধারণ সার্ভিস',
     problem_description: '',
     has_accessories: 'না',
     accessories_received: '',
@@ -229,7 +243,7 @@ export default function WarrantyServiceModule({
       product_name: '',
       model_no: '',
       serial_no: '',
-      device_category: 'সাধারণ সার্ভিসিং',
+      device_category: 'সাধারণ সার্ভিস',
       problem_description: '',
       has_accessories: 'না',
       accessories_received: '',
@@ -266,7 +280,7 @@ export default function WarrantyServiceModule({
       product_name: slip.product_name || '',
       model_no: slip.model_no || '',
       serial_no: slip.serial_no || '',
-      device_category: slip.device_category || 'সাধারণ সার্ভিসিং',
+      device_category: slip.device_category || 'সাধারণ সার্ভিস',
       problem_description: slip.problem_description || '',
       has_accessories: slip.has_accessories || 'না',
       accessories_received: slip.accessories_received || '',
@@ -863,7 +877,7 @@ export default function WarrantyServiceModule({
                       <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                         {item.device_category && (
                           <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.2 rounded">
-                            {item.device_category}
+                            {formatDeviceCategory(item.device_category, lang)}
                           </span>
                         )}
                         <span className="text-[10px] font-bold text-blue-600 uppercase">
@@ -1215,29 +1229,36 @@ export default function WarrantyServiceModule({
                   <span className="text-[10px] text-amber-800 font-semibold">{txt('ক্যাটাগরি নির্বাচন করুন', 'Select Category')}</span>
                 </label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {DEVICE_CATEGORIES.map(cat => (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setCustomerForm(prev => ({ ...prev, device_category: cat }))}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                        customerForm.device_category === cat
-                          ? 'bg-amber-600 text-white shadow-xs'
-                          : 'bg-white hover:bg-amber-100 text-slate-700 border border-amber-200'
-                      }`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
+                  {DEVICE_CATEGORIES.map(cat => {
+                    const label = lang === 'en' ? cat.en : cat.bn;
+                    const isSelected = formatDeviceCategory(customerForm.device_category, 'bn') === cat.bn;
+                    return (
+                      <button
+                        key={cat.bn}
+                        type="button"
+                        onClick={() => setCustomerForm(prev => ({ ...prev, device_category: label }))}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                          isSelected
+                            ? 'bg-amber-600 text-white shadow-xs'
+                            : 'bg-white hover:bg-amber-100 text-slate-700 border border-amber-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
                 <select
-                  value={customerForm.device_category || 'সাধারণ সার্ভিসিং'}
+                  value={formatDeviceCategory(customerForm.device_category, lang) || (lang === 'en' ? 'General Service' : 'সাধারণ সার্ভিস')}
                   onChange={e => setCustomerForm({ ...customerForm, device_category: e.target.value })}
                   className="w-full border p-2 rounded-xl bg-white outline-none focus:border-amber-500 font-bold text-slate-800"
                 >
-                  {DEVICE_CATEGORIES.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
+                  {DEVICE_CATEGORIES.map(cat => {
+                    const label = lang === 'en' ? cat.en : cat.bn;
+                    return (
+                      <option key={cat.bn} value={label}>{label}</option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -1859,7 +1880,7 @@ export default function WarrantyServiceModule({
                   {txt('গ্রাহক:', 'Customer:')} <span className="text-slate-900 font-black">{collectDueItem.customer_name}</span> ({collectDueItem.customer_mobile})
                 </p>
                 <p className="text-slate-600">
-                  {txt('পণ্য:', 'Product:')} <strong>{collectDueItem.product_name}</strong> {collectDueItem.device_category && `[${collectDueItem.device_category}]`}
+                  {txt('পণ্য:', 'Product:')} <strong>{collectDueItem.product_name}</strong> {collectDueItem.device_category && `[${formatDeviceCategory(collectDueItem.device_category, lang)}]`}
                 </p>
                 <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-slate-200 text-center font-mono text-[11px]">
                   <div>

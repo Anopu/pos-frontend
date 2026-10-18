@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Printer, Share2, Wrench, Shield, CheckCircle, Clock, Edit3 } from 'lucide-react';
 import { buildDocumentPdfFilename, triggerPrintWithFilename } from '../utils/pdfGenerator';
+import { formatDeviceCategory } from './WarrantyServiceModule';
 
 export default function WarrantySlipPrintModal({ slip, onClose, onShare, onEdit, lang = 'bn' }) {
   if (!slip) return null;
@@ -115,7 +116,7 @@ export default function WarrantySlipPrintModal({ slip, onClose, onShare, onEdit,
                       {lang === 'en' ? 'Shop #18, RF Johura Tower, Ground Floor, Chowmuhani, Agrabad, Chattogram.' : 'দোকান নং #১৮, আর এফ জোহরা টাওয়ার, নীচ তলা, চৌমুহনী, আগ্রাবাদ, চট্টগ্রাম।'}
                     </p>
                     <p className="text-[11px] text-gray-500 font-medium">
-                      Hotline: 09613-181920, 01812-091939 | Email: fctechnology2018@gmail.com
+                      Hotline: 09613-181920, 01812-091939 | Email: fctechnologist@gmail.com
                     </p>
                   </div>
                 </div>
@@ -250,7 +251,7 @@ export default function WarrantySlipPrintModal({ slip, onClose, onShare, onEdit,
                     <h4 className="text-sm font-bold text-slate-900 leading-tight">{slip.product_name}</h4>
                     {slip.device_category && (
                       <span className="text-[10px] font-bold text-purple-900 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded">
-                        {slip.device_category}
+                        {formatDeviceCategory(slip.device_category, lang)}
                       </span>
                     )}
                   </div>

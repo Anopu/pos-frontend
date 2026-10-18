@@ -4895,16 +4895,38 @@ function App() {
                             {txt("+ সিরিয়াল স্টক ইন", "+ Serial Stock-In")}
                           </button>
                           <button
-                            onClick={() => { 
+                            onClick={async () => { 
                               setEditingProductId(p.id); 
+                              const initialBarcode = p.available_serials || p.all_serials || p.barcode || '';
                               setFormData({
                                 ...p,
+                                barcode: initialBarcode,
                                 min_selling_price: p.min_selling_price !== undefined && p.min_selling_price !== null ? p.min_selling_price : '',
                                 model: p.model || '',
                                 supplier_id: p.supplier_id || '',
                                 bill_image: p.bill_image || ''
                               }); 
                               setShowProductModal(true); 
+
+                              // নিশ্চিত হওয়ার জন্য ব্যাকএন্ড থেকে তাজা এভেইলেবল সিরিয়াল ফেচ করা
+                              try {
+                                const sRes = await fetch(`${API_BASE}/products/${p.id}/serials`);
+                                if (sRes.ok) {
+                                  const sData = await sRes.json();
+                                  if (Array.isArray(sData) && sData.length > 0) {
+                                    const freshSerials = sData.map(s => s.serial_number).filter(Boolean).join(', ');
+                                    if (freshSerials) {
+                                      setFormData(prev => ({
+                                        ...prev,
+                                        barcode: freshSerials,
+                                        current_stock: sData.length
+                                      }));
+                                    }
+                                  }
+                                }
+                              } catch (err) {
+                                console.warn("Could not fetch fresh serials for product edit:", err);
+                              }
                             }}
                             className="px-2.5 py-1 bg-yellow-50 text-yellow-700 border border-yellow-300 rounded font-bold cursor-pointer"
                           >
@@ -5906,12 +5928,49 @@ function App() {
                   )}
                 </div>
                 <textarea
-                  rows="2"
+                  rows="3"
                   placeholder={txt("একটি বারকোড স্ক্যান করুন অথবা একাধিক ইউনিক সিরিয়াল হলে কমা দিয়ে লিখুন (যেমন: SN01, SN02, SN03)", "Scan a barcode or enter multiple unique serials separated by comma (e.g. SN01, SN02, SN03)")}
                   value={formData.barcode}
                   onChange={handleSingleBarcodeChange}
                   className="w-full border border-blue-300 rounded p-2 text-xs font-mono bg-white text-gray-900 outline-none focus:border-blue-600 shadow-inner"
                 />
+                <p className="text-[11px] text-gray-500 mt-1">
+                  {txt(
+                    "ভুল সিরিয়াল সংশোধন করতে টেক্সটবক্সে পরিবর্তন করুন অথবা নতুন সিরিয়াল যোগ করতে কমা (,) দিয়ে যুক্ত করুন।",
+                    "Edit in the box to correct wrong serials or add new serials separated by commas (,)."
+                  )}
+                </p>
+                {(() => {
+                  const sList = (formData.barcode || '').split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+                  if (sList.length === 0) return null;
+                  return (
+                    <div className="mt-1.5 flex flex-wrap gap-1 max-h-24 overflow-y-auto p-1.5 bg-slate-50 border border-slate-200 rounded">
+                      <span className="text-[10px] text-gray-500 font-bold self-center mr-1">
+                        {txt("বর্তমান সিরিয়ালসমূহ:", "Current Serials:")}
+                      </span>
+                      {sList.map((sn, idx) => (
+                        <span key={idx} className="inline-flex items-center gap-1 text-[11px] font-mono bg-white border border-blue-200 text-blue-900 px-1.5 py-0.5 rounded shadow-2xs">
+                          <span>{sn}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = sList.filter((_, i) => i !== idx).join(', ');
+                              setFormData(prev => ({
+                                ...prev,
+                                barcode: updated,
+                                current_stock: Math.max(0, sList.length - 1)
+                              }));
+                            }}
+                            className="text-red-500 hover:text-red-700 font-bold ml-0.5 cursor-pointer"
+                            title={txt("সিরিয়ালটি বাদ দিন", "Remove serial")}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div>

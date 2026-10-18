@@ -388,7 +388,7 @@ export function createFallbackPrintableElement(data, lang = 'bn') {
         <h1 style="font-size: 26px; font-weight: 900; color: #020617; margin: 0; text-transform: uppercase;">FC TECHNOLOGY</h1>
         <p style="font-size: 11px; color: #475569; margin: 4px 0 2px 0;">কম্পিউটার, ল্যাপটপ, সিসি ক্যামেরা ও আইটি পণ্যের বিশ্বস্ত প্রতিষ্ঠান</p>
         <p style="font-size: 11px; color: #64748b; margin: 0;">দোকান নং #১৮, আর এফ জোহরা টাওয়ার, নীচ তলা, আগ্রাবাদ, চট্টগ্রাম।</p>
-        <p style="font-size: 11px; color: #64748b; margin: 2px 0 0 0;">হটলাইন: 09613-181920, 01812-091939 | Email: fctechnology2018@gmail.com</p>
+        <p style="font-size: 11px; color: #64748b; margin: 2px 0 0 0;">হটলাইন: 09613-181920, 01812-091939 | Email: fctechnologist@gmail.com</p>
       </div>
       <div style="text-align: right;">
         <div style="background-color: #0f172a; color: #ffffff; font-weight: 800; font-size: 11px; padding: 4px 10px; border-radius: 4px; display: inline-block; text-transform: uppercase; margin-bottom: 6px;">
