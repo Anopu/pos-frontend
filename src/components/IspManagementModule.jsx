@@ -61,6 +61,77 @@ export default function IspManagementModule({
     return `${bnMonths[m]} ${bnYear}`;
   };
 
+  // গ্রাহকের সংযোগ তারিখ বা পূর্ববর্তী পেমেন্ট থেকে সঞ্চিত মোট বকেয়া ও মাসের হিসাব
+  const calculateCustomerDues = (c) => {
+    if (!c) return { unpaid_months: 1, monthly_due: 0, unpaid_line_charge: 0, total_due: 0, billing_month_range: 'চলতি মাস' };
+    
+    const monthlyFee = parseFloat(c.monthly_fee) || 0;
+    const lineCharge = parseFloat(c.line_charge) || 0;
+    const lineChargePaid = parseFloat(c.line_charge_paid) || 0;
+    const unpaidLineCharge = Math.max(0, lineCharge - lineChargePaid);
+    const isPaid = (c.payment_status === 'Paid');
+    const today = new Date();
+
+    const connDate = c.connection_date ? new Date(c.connection_date) : today;
+    
+    if (isPaid && (c.days_remaining > 0 || c.days_remaining === null || c.days_remaining === undefined)) {
+      return {
+        unpaid_months: 0,
+        monthly_due: 0,
+        unpaid_line_charge: unpaidLineCharge,
+        total_due: unpaidLineCharge,
+        billing_month_range: getMonthYearName(today, c.billing_type === 'prepaid', lang),
+        start_date: c.connection_date,
+        end_date: c.billing_cycle_end
+      };
+    }
+    
+    let baseDate = connDate;
+    if (c.last_payment_date) {
+      const lastPay = new Date(c.last_payment_date);
+      if (!isNaN(lastPay.getTime()) && lastPay > connDate) {
+        baseDate = lastPay;
+      }
+    }
+    
+    const diffYears = today.getFullYear() - baseDate.getFullYear();
+    const diffMonths = (diffYears * 12) + (today.getMonth() - baseDate.getMonth());
+    
+    let unpaidMonths = 1;
+    if (diffMonths > 0) {
+      unpaidMonths = diffMonths + (today.getDate() >= baseDate.getDate() ? 1 : 0);
+    } else {
+      unpaidMonths = 1;
+    }
+    if (unpaidMonths < 1) unpaidMonths = 1;
+    
+    const monthlyDue = unpaidMonths * monthlyFee;
+    const totalDue = monthlyDue + unpaidLineCharge;
+    
+    let rangeText = '';
+    const startMonthName = getMonthYearName(baseDate, false, lang);
+    const endMonthName = getMonthYearName(today, false, lang);
+    if (unpaidMonths > 1) {
+      rangeText = lang === 'en'
+        ? `${startMonthName} to ${endMonthName} (${unpaidMonths} Months Due)`
+        : `${startMonthName} হতে ${endMonthName} (${unpaidMonths} মাসের মোট বকেয়া)`;
+    } else {
+      rangeText = (c.billing_type === 'prepaid') 
+        ? getMonthYearName(today, true, lang) 
+        : getMonthYearName(today, false, lang);
+    }
+    
+    return {
+      unpaid_months: unpaidMonths,
+      monthly_due: monthlyDue,
+      unpaid_line_charge: unpaidLineCharge,
+      total_due: totalDue,
+      billing_month_range: rangeText,
+      start_date: c.connection_date,
+      end_date: c.billing_cycle_end
+    };
+  };
+
   // ================= গ্রাহক ম্যানেজমেন্ট স্টেট =================
   const [customers, setCustomers] = useState([]);
   const [customerSearch, setCustomerSearch] = useState('');
@@ -365,10 +436,21 @@ export default function IspManagementModule({
         : `${API_BASE}/isp/customers`;
       const method = editingCustomer ? 'PUT' : 'POST';
 
+      // যদি কাস্টমার অপরিশোধিত (Due) হয় এবং সংযোগ তারিখ অতীতের হয়, তবে billing_cycle_end সংযোগ তারিখের ১ মাস পরের সাইকেল হবে
+      let finalForm = { ...customerForm };
+      if (!editingCustomer && finalForm.payment_status !== 'Paid' && finalForm.connection_date) {
+        const connD = new Date(finalForm.connection_date);
+        if (connD < new Date()) {
+          const nextCycle = new Date(connD);
+          nextCycle.setMonth(nextCycle.getMonth() + 1);
+          finalForm.billing_cycle_end = nextCycle.toISOString().slice(0, 10);
+        }
+      }
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(customerForm)
+        body: JSON.stringify(finalForm)
       });
       const data = await res.json();
 
@@ -643,6 +725,8 @@ export default function IspManagementModule({
     const targetMobile = cleanMobile.startsWith('88') ? cleanMobile : `88${cleanMobile}`;
 
     const days = c.days_remaining;
+    const dues = calculateCustomerDues(c);
+
     let timingNotice = '';
     if (days <= 0) {
       timingNotice = '⚠️ আপনার বিলের মেয়াদ ইতোমধ্যে উত্তীর্ণ হয়েছে।';
@@ -651,6 +735,16 @@ export default function IspManagementModule({
     } else {
       timingNotice = `বিলের মেয়াদ শেষ হবে আগামী ${c.billing_cycle_end ? c.billing_cycle_end.slice(0, 10) : ''} তারিখে।`;
     }
+
+    let dueBreakdown = '';
+    if (dues.unpaid_months > 1) {
+      dueBreakdown = `⚠️ বকেয়া সময়কাল: ${dues.billing_month_range}\n⚠️ মোট বকেয়া সাবস্ক্রিপশন ফি (${dues.unpaid_months} মাস): ৳ ${dues.monthly_due.toLocaleString()}\n`;
+    }
+    if (dues.unpaid_line_charge > 0) {
+      dueBreakdown += `🔌 বকেয়া লাইন চার্জ: ৳ ${dues.unpaid_line_charge.toLocaleString()}\n`;
+    }
+
+    const grandDue = dues.total_due > 0 ? dues.total_due : Number(c.monthly_fee || 0);
 
     const message = `*FC TECHNOLOGY - ISP INTERNET BILL ALERT*
 ----------------------------------------
@@ -661,6 +755,7 @@ FC Technology হাই-স্পিড ব্রডব্যান্ড সা
 📡 প্যাকেজ / স্পিড: ${c.speed}
 💰 মাসিক সাবস্ক্রিপশন ফি: ৳ ${Number(c.monthly_fee).toLocaleString()}
 📅 মাস পূর্ণের তারিখ: ${c.billing_cycle_end ? c.billing_cycle_end.slice(0, 10) : '-'}
+${dueBreakdown}💵 এক বিলে সর্বমোট প্রদেয় বকেয়া: ৳ ${grandDue.toLocaleString()}
 
 ${timingNotice}
 
@@ -679,30 +774,35 @@ ${timingNotice}
   const handleOpenPayModal = (c, initialDocType = 'receipt') => {
     setPayingCustomer(c);
     const billingType = c.billing_type || 'prepaid';
-    
-    // পরবর্তী মাস পূর্ণের তারিখ প্রি-ক্যালকুলেশন (+১ মাস)
-    const currentEnd = c.billing_cycle_end ? new Date(c.billing_cycle_end) : new Date();
-    currentEnd.setMonth(currentEnd.getMonth() + 1);
-    const nextEndDate = currentEnd.toISOString().slice(0, 10);
+    const dues = calculateCustomerDues(c);
 
-    // প্রিপেইড হলে স্বয়ংক্রিয় পরবর্তী মাস, পোস্টপেইড হলে চলতি মাস
-    const initialMonth = billingType === 'prepaid'
-      ? getMonthYearName(new Date(), true, lang)
-      : getMonthYearName(new Date(), false, lang);
+    // পরবর্তী মাস পূর্ণের তারিখ (+১ মাস স্বয়ংক্রিয় - একই তারিখ বজায় রাখা)
+    const today = new Date();
+    const connDay = c.connection_date ? new Date(c.connection_date).getDate() : today.getDate();
+    const futureEnd = new Date(today.getFullYear(), today.getMonth() + 1, connDay);
+    const nextEndDate = futureEnd.toISOString().slice(0, 10);
+
+    const initialMonth = (dues.unpaid_months > 1)
+      ? dues.billing_month_range
+      : (billingType === 'prepaid' ? getMonthYearName(today, true, lang) : getMonthYearName(today, false, lang));
 
     setPayFormData({
-      amount: c.monthly_fee || '',
-      payment_type: 'monthly_fee',
+      amount: dues.total_due || c.monthly_fee || '',
+      payment_type: dues.unpaid_line_charge > 0 ? 'both' : 'monthly_fee',
       billing_type: billingType,
       doc_type: initialDocType,
       payment_status: initialDocType === 'bill' ? 'Due' : 'Paid',
       billing_month: initialMonth,
-      payment_date: new Date().toISOString().slice(0, 10),
+      payment_date: today.toISOString().slice(0, 10),
       payment_method: 'Cash',
       next_billing_cycle_end: nextEndDate,
+      unpaid_months: dues.unpaid_months,
+      monthly_due: dues.monthly_due,
+      unpaid_line_charge: dues.unpaid_line_charge,
+      total_due: dues.total_due,
       note: initialDocType === 'bill' 
-        ? txt('মাসিক ইন্টারনেট বিল চালান', 'Monthly internet bill invoice') 
-        : txt('মাসিক ইন্টারনেট সাবস্ক্রিপশন ফি পরিশোধ', 'Monthly internet subscription fee paid')
+        ? (dues.unpaid_months > 1 ? `ইন্টারনেট বকেয়া বিল চালান (${dues.billing_month_range})` : txt('মাসিক ইন্টারনেট বিল চালান', 'Monthly internet bill invoice'))
+        : (dues.unpaid_months > 1 ? `ইন্টারনেট বকেয়া সাবস্ক্রিপশন ফি পরিশোধ (${dues.billing_month_range})` : txt('মাসিক ইন্টারনেট সাবস্ক্রিপশন ফি পরিশোধ', 'Monthly internet subscription fee paid'))
     });
   };
 
@@ -735,6 +835,10 @@ ${timingNotice}
           customer_address: payingCustomer.address,
           speed: payingCustomer.speed,
           monthly_fee: payingCustomer.monthly_fee,
+          unpaid_months: payFormData.unpaid_months || 1,
+          monthly_due: payFormData.monthly_due || payFormData.amount,
+          unpaid_line_charge: payFormData.unpaid_line_charge || 0,
+          total_due: payFormData.total_due || payFormData.amount,
           billing_type: payFormData.billing_type,
           doc_type: payFormData.doc_type,
           payment_status: payFormData.payment_status
@@ -757,40 +861,50 @@ ${timingNotice}
 
   // কাস্টমারের জন্য রিসিট / বিল ভিউ মোডাল ওপেন করা
   const handleViewCustomerReceipt = (c) => {
-    // সেভ করা পেমেন্টগুলো থেকে এই গ্রাহকের লেটেস্ট রিসিট খোঁজা
-    const latestPayment = savedPayments.find(p => p.customer_id === c.id);
-    if (latestPayment) {
-      setActiveReceipt(latestPayment);
-      setIsReceiptModalOpen(true);
-      return;
+    const dues = calculateCustomerDues(c);
+    const isUnpaid = (c.payment_status !== 'Paid' || dues.total_due > 0);
+
+    // যদি গ্রাহক সম্পূর্ণ পরিশোধিত থাকে এবং কোনো বকেয়া না থাকে, তবে সেভ করা রিসিট দেখানো যেতে পারে
+    if (!isUnpaid) {
+      const latestPayment = savedPayments.find(p => p.customer_id === c.id);
+      if (latestPayment) {
+        setActiveReceipt(latestPayment);
+        setIsReceiptModalOpen(true);
+        return;
+      }
     }
 
-    // অন্যথায় গ্রাহকের তথ্য দিয়ে একটি তৈরি করে ভিউ করা
+    // অন্যথায় গ্রাহকের সম্পূর্ণ বকেয়া হিসাব সহ এক বিল / রিসিট ভিউ করা
     setActiveReceipt({
-      receipt_no: `ISP-REC-${c.id}-${Date.now().toString().slice(-4)}`,
+      receipt_no: `ISP-BILL-${c.id}-${Date.now().toString().slice(-4)}`,
       customer_id: c.id,
       customer_name: c.customer_name,
       customer_mobile: c.mobile,
       customer_address: c.address,
       speed: c.speed,
-      amount: c.monthly_fee,
+      amount: dues.total_due || c.monthly_fee,
       monthly_fee: c.monthly_fee,
-      line_charge: c.line_charge,
-      payment_type: 'monthly_fee',
+      line_charge: dues.unpaid_line_charge,
+      line_charge_paid: c.line_charge_paid || 0,
+      unpaid_months: dues.unpaid_months,
+      monthly_due: dues.monthly_due,
+      unpaid_line_charge: dues.unpaid_line_charge,
+      total_due: dues.total_due,
+      payment_type: dues.unpaid_line_charge > 0 ? 'both' : 'monthly_fee',
       billing_type: c.billing_type || 'prepaid',
-      doc_type: 'receipt',
-      payment_status: c.payment_status || 'Paid',
-      billing_month: (c.billing_type === 'prepaid') 
-        ? getMonthYearName(new Date(), true, lang) 
-        : getMonthYearName(new Date(), false, lang),
+      doc_type: isUnpaid ? 'bill' : 'receipt',
+      payment_status: c.payment_status || 'Due',
+      billing_month: dues.billing_month_range,
       cycle_start: c.connection_date ? c.connection_date.slice(0, 10) : '',
       cycle_end: c.billing_cycle_end ? c.billing_cycle_end.slice(0, 10) : '',
-      payment_date: c.last_payment_date ? c.last_payment_date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      payment_date: new Date().toISOString().slice(0, 10),
       payment_method: 'Cash',
       received_by: currentUser.fullname || 'Admin',
       ip_address: c.ip_address,
       pppoe_username: c.pppoe_username,
-      note: c.note || ''
+      note: isUnpaid 
+        ? `ইন্টারনেট বকেয়া বিল (${dues.billing_month_range})` 
+        : (c.note || 'মাসিক ইন্টারনেট সাবস্ক্রিপশন ফি পরিশোধ')
     });
     setIsReceiptModalOpen(true);
   };
@@ -1276,12 +1390,13 @@ ${timingNotice}
                   </tr>
                 ) : (
                   filteredCustomers.map((c) => {
+                    const dues = calculateCustomerDues(c);
                     const days = c.days_remaining;
-                    const isAlert = c.is_alert_active === 1 || (days <= 3 && c.payment_status !== 'Paid');
+                    const isAlert = c.is_alert_active === 1 || (days <= 3 && c.payment_status !== 'Paid') || (dues.unpaid_months > 1 && c.payment_status !== 'Paid');
                     const isPaid = c.payment_status === 'Paid';
 
                     // কালার থিমিং:
-                    // ৩ দিন বাকি থাকলে বা মেয়াদ উত্তীর্ণ হলে: স্পষ্ট লাল ব্যাকগ্রাউন্ড ও বর্ডার
+                    // ৩ দিন বাকি থাকলে বা মেয়াদ উত্তীর্ণ হলে: স্পষ্ট লাল ব্যাকগ্রাউন্ড ও বর্ডার
                     // বিল পরিশোধ করা হলে: লাল সতর্কতা মুছে সুন্দর শান্ত নীল ব্যাকগ্রাউন্ড
                     let rowBgClass = 'bg-white hover:bg-slate-50 text-slate-800';
                     if (isAlert) {
@@ -1357,9 +1472,21 @@ ${timingNotice}
                           )}
                         </td>
 
-                        {/* মাসিক সাবস্ক্রিপশন ফি */}
-                        <td className="py-3 px-3 text-right font-mono font-bold text-sm whitespace-nowrap text-blue-900">
-                          ৳ {Number(c.monthly_fee).toLocaleString()}
+                        {/* মাসিক সাবস্ক্রিপশন ফি ও মোট বকেয়া */}
+                        <td className="py-3 px-3 text-right font-mono text-[11px] whitespace-nowrap">
+                          <div className="font-bold text-sm text-blue-900">৳ {Number(c.monthly_fee).toLocaleString()}</div>
+                          {dues.unpaid_months > 1 && !isPaid && (
+                            <div className="mt-1">
+                              <span className="inline-block px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-bold text-[10px] border border-rose-200">
+                                ⚠️ {dues.unpaid_months} {txt('মাসের বকেয়া:', 'mo due:')} ৳ {dues.monthly_due.toLocaleString()}
+                              </span>
+                            </div>
+                          )}
+                          {dues.total_due > 0 && !isPaid && (
+                            <div className="mt-0.5 text-[11px] font-black text-rose-700">
+                              {txt('মোট ডিউ: ৳ ', 'Total Due: ৳')}{dues.total_due.toLocaleString()}
+                            </div>
+                          )}
                         </td>
 
                         {/* মাস পূর্ণ হবে কখন (Due Date) */}
@@ -2448,6 +2575,43 @@ ${timingNotice}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none"
                   />
                 </div>
+
+                {/* সংযোগ তারিখ ৩-৪ মাস বা তার বেশি আগের হলে লাইভ বকেয়া নোটিশ */}
+                {customerForm.payment_status !== 'Paid' && (() => {
+                  const modalLiveDues = calculateCustomerDues(customerForm);
+                  if (modalLiveDues.unpaid_months > 1) {
+                    return (
+                      <div className="col-span-1 md:col-span-2 p-3 bg-amber-50 border border-amber-300 rounded-2xl text-amber-950 text-xs">
+                        <div className="flex items-center gap-2 font-bold text-amber-900 mb-1">
+                          <AlertTriangle size={15} className="text-amber-600 shrink-0" />
+                          <span>{txt(`সংযোগ তারিখ ${modalLiveDues.unpaid_months} মাস আগের (${customerForm.connection_date}) - সঞ্চিত বকেয়া হিসাব`, `Connection date is ${modalLiveDues.unpaid_months} months ago`)}</span>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1 border-t border-amber-200 font-mono text-[11px]">
+                          <div>
+                            <span className="text-slate-600 text-[10px] block font-sans">{txt('বকেয়া মাস:', 'Due Months:')}</span>
+                            <span className="font-bold text-amber-900">{modalLiveDues.unpaid_months} {txt('মাস', 'months')}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-600 text-[10px] block font-sans">{txt('মাসিক সাবস্ক্রিপশন ডিউ:', 'Monthly Due:')}</span>
+                            <span className="font-bold text-amber-900">৳ {modalLiveDues.monthly_due.toLocaleString()}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-600 text-[10px] block font-sans">{txt('লাইন চার্জ ডিউ:', 'Line Charge Due:')}</span>
+                            <span className="font-bold text-amber-900">৳ {modalLiveDues.unpaid_line_charge.toLocaleString()}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-600 text-[10px] block font-sans">{txt('সর্বমোট ডিউ (এক বিলে):', 'Total Due (One Bill):')}</span>
+                            <span className="font-black text-rose-700 text-sm">৳ {modalLiveDues.total_due.toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-amber-800 mt-1.5 font-medium font-sans">
+                          ✓ {txt('গ্রাহক যুক্ত হওয়ার পর এই সম্পূর্ণ বকেয়া এক বিলে ও মানি রিসিপ্টে স্বয়ংক্রিয়ভাবে দেখাবে।', 'This full accumulated due will show automatically in one bill.')}
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
 
               {/* লাইন চার্জ ও পরিশোধিত স্ট্যাটাস এবং মাসিক ফি */}
@@ -2748,6 +2912,85 @@ ${timingNotice}
                   </p>
                 </div>
               </div>
+
+              {/* সঞ্চিত বকেয়া হিসাব সারাংশ বক্স */}
+              {(() => {
+                const dues = calculateCustomerDues(payingCustomer);
+                if (dues.unpaid_months > 1 || dues.unpaid_line_charge > 0) {
+                  return (
+                    <div className="bg-amber-50/90 border border-amber-300 rounded-2xl p-3 text-amber-950">
+                      <div className="flex items-center justify-between font-bold text-xs pb-2 border-b border-amber-200">
+                        <span className="flex items-center gap-1.5 text-amber-900">
+                          <AlertTriangle size={15} className="text-amber-600 shrink-0" />
+                          {txt('সংযোগ তারিখ হতে সঞ্চিত মোট বকেয়া সারাংশ', 'Accumulated Due Summary')}
+                        </span>
+                        <span className="font-mono text-rose-700 font-black">
+                          {dues.unpaid_months} {txt('মাসের বকেয়া', 'months due')}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 pt-2 text-[11px] font-mono">
+                        <div>
+                          <span className="text-slate-600 text-[10px] block font-sans">{txt('মাসিক ফি:', 'Monthly Fee:')}</span>
+                          <span className="font-bold">৳ {Number(payingCustomer.monthly_fee).toLocaleString()}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-600 text-[10px] block font-sans">{txt('মাসিক সাবস্ক্রিপশন ডিউ:', 'Monthly Due:')}</span>
+                          <span className="font-bold">৳ {dues.monthly_due.toLocaleString()} ({dues.unpaid_months} মাস)</span>
+                        </div>
+                        {dues.unpaid_line_charge > 0 && (
+                          <div>
+                            <span className="text-slate-600 text-[10px] block font-sans">{txt('লাইন চার্জ বকেয়া:', 'Line Charge Due:')}</span>
+                            <span className="font-bold">৳ {dues.unpaid_line_charge.toLocaleString()}</span>
+                          </div>
+                        )}
+                        <div className="col-span-2 md:col-span-3 pt-1 border-t border-amber-200 flex items-center justify-between font-sans">
+                          <span className="font-bold text-amber-950">{txt('এক বিলে সর্বমোট বকেয়া (Total Due):', 'Total Due (One Bill):')}</span>
+                          <span className="font-black font-mono text-base text-rose-700">৳ {dues.total_due.toLocaleString()}</span>
+                        </div>
+                      </div>
+                      
+                      {/* কুইক সিলেকশন বাটন: এক বিলে সম্পূর্ণ বকেয়া vs ১ মাসের ফি */}
+                      <div className="flex gap-2 mt-2.5 pt-2 border-t border-amber-200">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPayFormData({
+                              ...payFormData,
+                              amount: dues.total_due,
+                              billing_month: dues.billing_month_range
+                            });
+                          }}
+                          className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 ${
+                            Number(payFormData.amount) === dues.total_due
+                              ? 'bg-rose-600 text-white shadow-sm'
+                              : 'bg-white border border-amber-300 text-amber-900 hover:bg-amber-100'
+                          }`}
+                        >
+                          ⚡ {txt(`এক বিলে সম্পূর্ণ বকেয়া (৳ ${dues.total_due.toLocaleString()})`, `Full Due in One Bill (৳ ${dues.total_due.toLocaleString()})`)}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPayFormData({
+                              ...payFormData,
+                              amount: payingCustomer.monthly_fee,
+                              billing_month: getMonthYearName(new Date(), false, lang)
+                            });
+                          }}
+                          className={`py-1.5 px-3 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 ${
+                            Number(payFormData.amount) === Number(payingCustomer.monthly_fee)
+                              ? 'bg-slate-900 text-white shadow-sm'
+                              : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          📅 {txt(`শুধুমাত্র ১ মাস (৳ ${Number(payingCustomer.monthly_fee).toLocaleString()})`, `Only 1 Month (৳ ${Number(payingCustomer.monthly_fee).toLocaleString()})`)}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               {/* ১. ডকুমেন্ট টাইপ ও বিলিং ধরণ সিলেকশন (প্রিপেইড vs পোস্টপেইড) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">

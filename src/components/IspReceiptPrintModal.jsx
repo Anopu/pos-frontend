@@ -152,6 +152,25 @@ export default function IspReceiptPrintModal({
     ? txt('বকেয়া / অপরিশোধিত (Due)', 'Due / Unpaid') 
     : txt('পরিশোধিত / সম্পন্ন (Paid)', 'Paid / Completed');
 
+  const mFee = parseFloat(monthly_fee) || 0;
+  const totAmount = parseFloat(amount) || 0;
+
+  let monthsCount = parseInt(receiptData?.unpaid_months) || 1;
+  let lineChargeDue = parseFloat(receiptData?.unpaid_line_charge);
+  if (isNaN(lineChargeDue)) {
+    const lc = parseFloat(line_charge) || 0;
+    const lcp = parseFloat(line_charge_paid) || 0;
+    lineChargeDue = Math.max(0, lc - lcp);
+  }
+
+  if (monthsCount <= 1 && mFee > 0 && (totAmount - lineChargeDue) >= (mFee * 2)) {
+    monthsCount = Math.round((totAmount - lineChargeDue) / mFee);
+  }
+
+  const subtotalMonthly = monthsCount > 1 && mFee > 0
+    ? (monthsCount * mFee)
+    : (lineChargeDue > 0 && totAmount > lineChargeDue ? totAmount - lineChargeDue : totAmount);
+
   // হোয়াটসঅ্যাপ মেসেজ ও টেক্সট সামারি
   const formattedSummary = docLang === 'en'
     ? `*FC TECHNOLOGY - ISP INTERNET*
@@ -164,7 +183,7 @@ Mobile: ${customer_mobile || '-'}
 Package / Speed: ${speed || 'Standard'}
 Billing Type: ${billingTypeText}
 Billing Month: ${displayBillingMonth}
-${cycle_start && cycle_end ? `Period: ${cycle_start} to ${cycle_end}\n` : ''}Amount: ৳ ${Number(amount).toLocaleString()} (${numberToWordsEn(amount)})
+${cycle_start && cycle_end ? `Period: ${cycle_start} to ${cycle_end}\n` : ''}${monthsCount > 1 ? `Due Period: ${displayBillingMonth} (${monthsCount} Months)\nMonthly Fee: ৳ ${mFee.toLocaleString()} × ${monthsCount} = ৳ ${subtotalMonthly.toLocaleString()}\n` : ''}${lineChargeDue > 0 ? `Line Charge Due: ৳ ${lineChargeDue.toLocaleString()}\n` : ''}Total Amount: ৳ ${Number(totAmount).toLocaleString()} (${numberToWordsEn(totAmount)})
 Payment Method: ${payment_method}
 Status: ${paymentStatusText}
 ------------------------------------
@@ -181,7 +200,7 @@ Thank you for choosing FC Technology!`
 প্যাকেজ / স্পিড: ${speed || 'Standard'}
 বিলিং ধরণ: ${billingTypeText}
 বিলিং মাস: ${displayBillingMonth}
-${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cycle_end}\n` : ''}টাকার পরিমাণ: ৳ ${Number(amount).toLocaleString()} (${numberToWordsBn(amount)})
+${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cycle_end}\n` : ''}${monthsCount > 1 ? `বকেয়া সময়কাল: ${displayBillingMonth} (${monthsCount} মাস)\nমাসিক ফি: ৳ ${mFee.toLocaleString()} × ${monthsCount} মাস = ৳ ${subtotalMonthly.toLocaleString()}\n` : ''}${lineChargeDue > 0 ? `বকেয়া লাইন চার্জ: ৳ ${lineChargeDue.toLocaleString()}\n` : ''}টাকার পরিমাণ: ৳ ${Number(totAmount).toLocaleString()} (${numberToWordsBn(totAmount)})
 পরিশোধ মাধ্যম: ${payment_method}
 স্ট্যাটাস: ${paymentStatusText}
 ------------------------------------
@@ -640,33 +659,39 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                         <td className="py-2.5 px-3 text-center font-mono font-bold">{txt('০১', '01')}</td>
                         <td className="py-2.5 px-4">
                           <span className="font-bold text-slate-900 block">
-                            {txt(`ইন্টারনেট মাসিক সাবস্ক্রিপশন ফি (${speed || 'Standard'})`, `Monthly Internet Subscription Fee (${speed || 'Standard'})`)}
+                            {txt(
+                              `ইন্টারনেট মাসিক সাবস্ক্রিপশন ফি (${speed || 'Standard'})${monthsCount > 1 ? ` (${monthsCount} মাসের মোট বকেয়া)` : ''}`,
+                              `Monthly Internet Subscription Fee (${speed || 'Standard'})${monthsCount > 1 ? ` (${monthsCount} Months Total Due)` : ''}`
+                            )}
                           </span>
                           <span className="text-[11px] text-slate-500 block">
-                            {txt('নিরবচ্ছিন্ন হাই-স্পিড ব্রডব্যান্ড ইন্টারনেট সংযোগ', 'High-speed uninterrupted broadband internet service')}
+                            {monthsCount > 1 
+                              ? `${monthsCount} ${txt('মাস', 'months')} × ৳ ${mFee.toLocaleString()} = ৳ ${subtotalMonthly.toLocaleString()}`
+                              : txt('নিরবচ্ছিন্ন হাই-স্পিড ব্রডব্যান্ড ইন্টারনেট সংযোগ', 'High-speed uninterrupted broadband internet service')
+                            }
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-center font-mono text-[11px]">
                           {displayBillingMonth}
                         </td>
                         <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
-                          {Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {Number(subtotalMonthly).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                       </tr>
 
-                      {line_charge > 0 && (
+                      {lineChargeDue > 0 && (
                         <tr className="hover:bg-slate-50/40 bg-transparent print:bg-transparent">
                           <td className="py-2 px-3 text-center font-mono font-bold">{txt('০২', '02')}</td>
                           <td className="py-2 px-4">
                             <span className="font-semibold text-slate-800">
-                              {txt('ফাইবার লাইন সংযোগ ও সেটআপ চার্জ', 'Fiber Line Connection & Setup Charge')}
+                              {txt('ফাইবার লাইন সংযোগ ও সেটআপ চার্জ (বকেয়া)', 'Fiber Line Connection & Setup Charge (Due)')}
                             </span>
                           </td>
                           <td className="py-2 px-3 text-center font-mono text-[11px]">
                             {txt('এককালীন', 'One-time')}
                           </td>
                           <td className="py-2 px-4 text-right font-mono font-bold text-slate-900">
-                            {Number(line_charge).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {Number(lineChargeDue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
                         </tr>
                       )}
@@ -683,7 +708,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                         {txt('কথায় (Amount in Words):', 'Amount in Words:')}
                       </span>
                       <p className="font-bold text-indigo-950 italic text-[12px] leading-relaxed">
-                        {docLang === 'en' ? numberToWordsEn(amount) : numberToWordsBn(amount)}
+                        {docLang === 'en' ? numberToWordsEn(totAmount) : numberToWordsBn(totAmount)}
                       </p>
                     </div>
 
@@ -702,18 +727,18 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                   {/* ডান পাশে হিসাব সারাংশ */}
                   <div className="bg-white/40 border border-slate-200/90 rounded-xl p-3 text-xs space-y-1.5 backdrop-blur-[0.5px] print:bg-transparent print:border-slate-300">
                     <div className="flex justify-between text-slate-700">
-                      <span>{txt('সাবস্ক্রিপশন ফি:', 'Subscription Fee:')}</span>
-                      <span className="font-mono font-bold">৳ {Number(amount).toLocaleString()}</span>
+                      <span>{txt(`সাবস্ক্রিপশন ফি${monthsCount > 1 ? ` (${monthsCount} মাস)` : ''}:`, `Subscription Fee${monthsCount > 1 ? ` (${monthsCount} mo)` : ''}:`)}</span>
+                      <span className="font-mono font-bold">৳ {Number(subtotalMonthly).toLocaleString()}</span>
                     </div>
-                    {line_charge > 0 && (
+                    {lineChargeDue > 0 && (
                       <div className="flex justify-between text-slate-700">
-                        <span>{txt('লাইন চার্জ:', 'Line Charge:')}</span>
-                        <span className="font-mono font-bold">৳ {Number(line_charge).toLocaleString()}</span>
+                        <span>{txt('লাইন চার্জ (বকেয়া):', 'Line Charge (Due):')}</span>
+                        <span className="font-mono font-bold">৳ {Number(lineChargeDue).toLocaleString()}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-slate-700 pt-1 border-t border-slate-200/80">
                       <span className="font-bold">{txt('সর্বমোট প্রদেয়:', 'Total Payable:')}</span>
-                      <span className="font-mono font-bold text-slate-900">৳ {Number(amount).toLocaleString()}</span>
+                      <span className="font-mono font-bold text-slate-900">৳ {Number(totAmount).toLocaleString()}</span>
                     </div>
                     <div className={`flex justify-between px-2 py-1 rounded-lg font-bold border print:bg-transparent ${
                       isDue 
@@ -721,12 +746,12 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                         : 'text-emerald-800 bg-emerald-50/70 border-emerald-200/80'
                     }`}>
                       <span>{txt('পরিশোধিত টাকা:', 'Amount Paid:')}</span>
-                      <span className="font-mono text-[13px]">৳ {isDue ? '0.00' : Number(amount).toLocaleString()}</span>
+                      <span className="font-mono text-[13px]">৳ {isDue ? '0.00' : Number(totAmount).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-[11px] px-1 font-bold">
                       <span className={isDue ? 'text-rose-600' : 'text-slate-500'}>{txt('অবশিষ্ট বকেয়া:', 'Remaining Due:')}</span>
                       <span className={`font-mono ${isDue ? 'text-rose-600 font-black text-[12px]' : 'text-slate-700'}`}>
-                        ৳ {isDue ? Number(amount).toLocaleString() : '0.00'}
+                        ৳ {isDue ? Number(totAmount).toLocaleString() : '0.00'}
                       </span>
                     </div>
                   </div>
