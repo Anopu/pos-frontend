@@ -11,6 +11,7 @@ import { translations } from './translations';
 import ShareModal from './components/ShareModal';
 import ImageViewModal from './components/ImageViewModal';
 import WarrantySlipPrintModal from './components/WarrantySlipPrintModal';
+import SupplierReturnSlipModal from './components/SupplierReturnSlipModal';
 import DashboardView from './components/DashboardView';
 import WarrantyServiceModule from './components/WarrantyServiceModule';
 import IspManagementModule from './components/IspManagementModule';
@@ -228,6 +229,8 @@ function App() {
   const [companyReturnDate, setCompanyReturnDate] = useState(new Date().toISOString().slice(0, 10));
   const [companyReturnImage, setCompanyReturnImage] = useState('');
   const [isSubmittingCompanyReturn, setIsSubmittingCompanyReturn] = useState(false);
+  const [showReturnSlipModal, setShowReturnSlipModal] = useState(false);
+  const [activeReturnSlip, setActiveReturnSlip] = useState(null);
 
   // হিস্ট্রি ও প্রিন্ট মডাল স্টেট
   const [barcodeSearch, setBarcodeSearch] = useState('');
@@ -2028,6 +2031,29 @@ function App() {
       if (!res.ok) throw new Error(data.error || txt('রিটার্ন সম্পন্ন করতে ব্যর্থ হয়েছে', 'Failed to complete return'));
 
       alert(data.message || txt('কোম্পানি রিটার্ন সফল হয়েছে!', 'Company return completed successfully!'));
+      
+      const suppObj = suppliers.find(s => String(s.id) === String(companyReturnSupplier));
+      const slipData = data.return_slip || {
+        id: data.return_id,
+        return_no: `RET-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${data.return_id || '001'}`,
+        product_id: companyReturnProduct.id,
+        product_name: companyReturnProduct.name,
+        product_model: companyReturnProduct.model || '',
+        product_barcode: companyReturnProduct.barcode || '',
+        supplier_id: companyReturnSupplier ? Number(companyReturnSupplier) : null,
+        supplier_name: suppObj?.name || 'General Supplier',
+        supplier_mobile: suppObj?.mobile || '',
+        supplier_address: suppObj?.address || '',
+        serial_numbers: selectedReturnSerials,
+        quantity: returnQty,
+        unit_price: uPrice,
+        total_amount: totalAmt,
+        settlement_type: companyReturnSettlement,
+        reason: finalReason,
+        return_date: companyReturnDate,
+        returned_by: currentUser?.fullname || currentUser?.username || 'Admin'
+      };
+
       setShowCompanyReturnModal(false);
       setCompanyReturnProduct(null);
       setSelectedReturnSerials([]);
@@ -2035,6 +2061,9 @@ function App() {
       setCompanyReturnImage('');
       fetchProducts();
       fetchSuppliers();
+
+      setActiveReturnSlip(slipData);
+      setShowReturnSlipModal(true);
     } catch (err) {
       alert(txt('রিটার্ন প্রক্রিয়ায় এরর: ', 'Return error: ') + err.message);
     } finally {
@@ -10442,16 +10471,45 @@ function App() {
                               <td className="p-2.5 text-gray-700">
                                 <div className="flex items-center justify-between gap-2">
                                   <span>{st.note || '-'}</span>
-                                  {st.bill_image && (
-                                    <button 
-                                      type="button" 
-                                      onClick={() => setActiveImageView({ src: st.bill_image, title: `${supplierLedger.name} (${formatDateDMY(st.created_at)})` })}
-                                      className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer print:hidden shrink-0 transition"
-                                      title={txt("বিল বা মেমোর ছবি দেখুন", "View bill or memo image")}
-                                    >
-                                      <Camera size={11} /> {txt("বিল দেখুন", "View Bill")}
-                                    </button>
-                                  )}
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {(st.type === 'Return' || st.type === 'Return_Refund') && (
+                                      <button 
+                                        type="button" 
+                                        onClick={() => {
+                                          setActiveReturnSlip({
+                                            id: st.id,
+                                            return_no: `RET-${st.id}`,
+                                            product_name: st.note?.split('-')[0]?.replace('কোম্পানি রিটার্ন:', '')?.trim() || 'Returned Product',
+                                            supplier_name: supplierLedger.name,
+                                            supplier_mobile: supplierLedger.mobile,
+                                            supplier_address: supplierLedger.address,
+                                            quantity: 1,
+                                            unit_price: Number(st.amount || 0),
+                                            total_amount: Number(st.amount || 0),
+                                            settlement_type: st.type === 'Return_Refund' ? 'Cash_Refund' : 'Deduce_Payable',
+                                            reason: st.note || 'Company Return',
+                                            return_date: st.created_at,
+                                            returned_by: 'Staff'
+                                          });
+                                          setShowReturnSlipModal(true);
+                                        }}
+                                        className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer print:hidden shrink-0 transition"
+                                        title={txt("রিটার্ন চালান ও স্লিপ দেখুন ও প্রিন্ট করুন", "View & print return challan/slip")}
+                                      >
+                                        <Printer size={11} /> {txt("রিটার্ন চালান", "Return Challan")}
+                                      </button>
+                                    )}
+                                    {st.bill_image && (
+                                      <button 
+                                        type="button" 
+                                        onClick={() => setActiveImageView({ src: st.bill_image, title: `${supplierLedger.name} (${formatDateDMY(st.created_at)})` })}
+                                        className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer print:hidden shrink-0 transition"
+                                        title={txt("বিল বা মেমোর ছবি দেখুন", "View bill or memo image")}
+                                      >
+                                        <Camera size={11} /> {txt("বিল দেখুন", "View Bill")}
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                               <td className={`p-2.5 text-right font-mono font-bold ${
@@ -10678,6 +10736,18 @@ function App() {
         }}
         lang={lang}
       />
+
+      {/* কোম্পানি / সাপ্লায়ার পণ্য রিটার্ন চালান ও স্লিপ প্রিন্ট মডাল */}
+      {showReturnSlipModal && activeReturnSlip && (
+        <SupplierReturnSlipModal
+          slip={activeReturnSlip}
+          onClose={() => {
+            setShowReturnSlipModal(false);
+            setActiveReturnSlip(null);
+          }}
+          lang={lang}
+        />
+      )}
 
       {/* ১-ক্লিক ডাটাবেজ ব্যাকআপ ও রিস্টোর মডাল */}
       <DatabaseBackupModal

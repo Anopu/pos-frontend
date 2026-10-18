@@ -607,6 +607,11 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                     <div>
                       <span className="text-[10px] text-slate-500 uppercase font-bold block">{txt('গ্রাহকের নাম:', 'Customer Name:')}</span>
                       <span className="font-bold text-slate-900 text-[13px]">{customer_name}</span>
+                      {receiptData?.contact_person && (
+                        <span className="text-[10px] text-slate-600 block mt-0.5">
+                          {txt('কন্টাক্ট: ', 'Contact: ')}<span className="font-semibold text-slate-800">{receiptData.contact_person}</span>
+                        </span>
+                      )}
                     </div>
                     <div className="bg-blue-50/70 border border-blue-200/90 rounded-xl px-2.5 py-1 flex flex-col justify-center">
                       <span className="text-[10px] text-blue-800 uppercase font-black block tracking-wider">{txt('কাস্টমার ইউজার আইডি:', 'Customer User ID:')}</span>

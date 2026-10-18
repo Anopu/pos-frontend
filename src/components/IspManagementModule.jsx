@@ -144,6 +144,7 @@ export default function IspManagementModule({
   const [customerForm, setCustomerForm] = useState({
     customer_user_id: '',
     customer_name: '',
+    contact_person: '',
     mobile: '',
     address: '',
     speed: '10 Mbps',
@@ -474,6 +475,7 @@ export default function IspManagementModule({
     setCustomerForm({
       customer_user_id: c.customer_user_id || '',
       customer_name: c.customer_name || '',
+      contact_person: c.contact_person || '',
       mobile: c.mobile || '',
       address: c.address || '',
       speed: c.speed || '10 Mbps',
@@ -838,6 +840,7 @@ ${timingNotice}
         setActiveReceipt({
           ...data.receipt,
           customer_user_id: payingCustomer.customer_user_id || payingCustomer.pppoe_username || ('FC-' + payingCustomer.id),
+          contact_person: payingCustomer.contact_person || '',
           customer_address: payingCustomer.address,
           speed: payingCustomer.speed,
           monthly_fee: payingCustomer.monthly_fee,
@@ -890,6 +893,7 @@ ${timingNotice}
       customer_id: c.id,
       customer_user_id: userIdVal,
       customer_name: c.customer_name,
+      contact_person: c.contact_person || '',
       customer_mobile: c.mobile,
       customer_address: c.address,
       speed: c.speed,
@@ -1088,6 +1092,7 @@ ${timingNotice}
                 setCustomerForm({
                   customer_user_id: '',
                   customer_name: '',
+                  contact_person: '',
                   mobile: '',
                   address: '',
                   speed: '10 Mbps',
@@ -1449,6 +1454,12 @@ ${timingNotice}
                               </span>
                             )}
                           </div>
+                          {c.contact_person && (
+                            <div className="text-[11px] text-slate-600 flex items-center gap-1 mt-0.5 font-medium">
+                              <span className="text-slate-400">👤 {txt('কন্টাক্ট:', 'Contact:')}</span>
+                              <span className="text-slate-800">{c.contact_person}</span>
+                            </div>
+                          )}
                           <span className="font-mono text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
                             <Phone size={11} /> {c.mobile}
                           </span>
@@ -2511,8 +2522,8 @@ ${timingNotice}
 
             <form onSubmit={handleSaveCustomer} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto text-xs">
               
-              {/* কাস্টমার ইউজার আইডি, নাম ও মোবাইল */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* কাস্টমার ইউজার আইডি, নাম, কন্টাক্ট পারসন ও মোবাইল */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
                     <span>{txt('কাস্টমার ইউজার আইডি', 'Customer User ID')}</span>
@@ -2537,6 +2548,19 @@ ${timingNotice}
                     placeholder={txt('যেমন: মোরশেদ আলম', 'e.g. Morshed Alam')}
                     value={customerForm.customer_name}
                     onChange={(e) => setCustomerForm({ ...customerForm, customer_name: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    {txt('কন্টাক্ট পারসন', 'Contact Person')}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={txt('যেমন: ম্যানেজার / দায়িত্বপ্রাপ্ত ব্যক্তি', 'e.g. Manager / Rep')}
+                    value={customerForm.contact_person || ''}
+                    onChange={(e) => setCustomerForm({ ...customerForm, contact_person: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   />
                 </div>
