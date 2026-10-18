@@ -214,6 +214,21 @@ function App() {
   const [stockInPrice, setStockInPrice] = useState('');
   const [serialsInput, setSerialsInput] = useState('');
 
+  // কোম্পানি / সাপ্লায়ার পণ্য রিটার্ন স্টেট
+  const [showCompanyReturnModal, setShowCompanyReturnModal] = useState(false);
+  const [companyReturnProduct, setCompanyReturnProduct] = useState(null);
+  const [companyReturnSupplier, setCompanyReturnSupplier] = useState('');
+  const [companyReturnPrice, setCompanyReturnPrice] = useState('');
+  const [companyReturnQty, setCompanyReturnQty] = useState(1);
+  const [companyReturnSerials, setCompanyReturnSerials] = useState([]);
+  const [selectedReturnSerials, setSelectedReturnSerials] = useState([]);
+  const [companyReturnSettlement, setCompanyReturnSettlement] = useState('Deduce_Payable');
+  const [companyReturnReason, setCompanyReturnReason] = useState('নষ্ট / ত্রুটিপূর্ণ পণ্য');
+  const [companyReturnCustomReason, setCompanyReturnCustomReason] = useState('');
+  const [companyReturnDate, setCompanyReturnDate] = useState(new Date().toISOString().slice(0, 10));
+  const [companyReturnImage, setCompanyReturnImage] = useState('');
+  const [isSubmittingCompanyReturn, setIsSubmittingCompanyReturn] = useState(false);
+
   // হিস্ট্রি ও প্রিন্ট মডাল স্টেট
   const [barcodeSearch, setBarcodeSearch] = useState('');
   const [productLifecycle, setProductLifecycle] = useState(null);
@@ -1925,6 +1940,106 @@ function App() {
           fetchSuppliers();
         }
       });
+  };
+
+  const handleOpenCompanyReturnModal = async (product) => {
+    setCompanyReturnProduct(product);
+    setCompanyReturnSupplier(product.supplier_id ? String(product.supplier_id) : (suppliers.length > 0 ? String(suppliers[0].id) : ''));
+    setCompanyReturnPrice(product.purchase_price || 0);
+    setCompanyReturnQty(1);
+    setSelectedReturnSerials([]);
+    setCompanyReturnSettlement('Deduce_Payable');
+    setCompanyReturnReason('নষ্ট / ত্রুটিপূর্ণ পণ্য');
+    setCompanyReturnCustomReason('');
+    setCompanyReturnImage('');
+    setCompanyReturnDate(new Date().toISOString().slice(0, 10));
+    setShowCompanyReturnModal(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/products/${product.id}/serials?status=available`);
+      if (res.ok) {
+        const data = await res.json();
+        setCompanyReturnSerials(Array.isArray(data) ? data : []);
+      } else {
+        setCompanyReturnSerials([]);
+      }
+    } catch (err) {
+      console.warn("Could not fetch serials for company return:", err);
+      setCompanyReturnSerials([]);
+    }
+  };
+
+  const handleCompanyReturnSubmit = async (e) => {
+    e.preventDefault();
+    if (!companyReturnProduct) return;
+
+    const hasSerials = companyReturnSerials.length > 0;
+    if (hasSerials && selectedReturnSerials.length === 0) {
+      alert(txt('অনুগ্রহ করে অন্তত একটি সিরিয়াল নম্বর সিলেক্ট করুন!', 'Please select at least one serial number to return!'));
+      return;
+    }
+
+    const returnQty = hasSerials ? selectedReturnSerials.length : Number(companyReturnQty || 1);
+    if (returnQty <= 0) {
+      alert(txt('সঠিক রিটার্ন পরিমাণ দিন!', 'Enter a valid return quantity!'));
+      return;
+    }
+    if (returnQty > Number(companyReturnProduct.current_stock || 0)) {
+      alert(txt(`স্টকে পর্যাপ্ত পরিমাণ পণ্য নেই! বর্তমান স্টক: ${companyReturnProduct.current_stock} টি`, `Insufficient stock! Current stock: ${companyReturnProduct.current_stock} pcs`));
+      return;
+    }
+
+    const finalReason = companyReturnReason === 'অন্যান্য' 
+      ? (companyReturnCustomReason.trim() || 'অন্যান্য কারণ')
+      : companyReturnReason;
+
+    const uPrice = Number(companyReturnPrice || 0);
+    const totalAmt = returnQty * uPrice;
+
+    if (!window.confirm(txt(
+      `আপনি কি নিশ্চিতভাবে "${companyReturnProduct.name}" পণ্যটি ${returnQty} টি কোম্পানি/সাপ্লায়ারে রিটার্ন করতে চান?\nমোট মূল্য: ৳${totalAmt.toLocaleString()}`,
+      `Are you sure you want to return ${returnQty} pcs of "${companyReturnProduct.name}" to company/supplier?\nTotal Amount: ৳${totalAmt.toLocaleString()}`
+    ))) {
+      return;
+    }
+
+    setIsSubmittingCompanyReturn(true);
+    try {
+      const payload = {
+        product_id: companyReturnProduct.id,
+        supplier_id: companyReturnSupplier ? Number(companyReturnSupplier) : null,
+        quantity: returnQty,
+        selected_serials: selectedReturnSerials,
+        unit_price: uPrice,
+        total_amount: totalAmt,
+        settlement_type: companyReturnSettlement,
+        reason: finalReason,
+        return_image: companyReturnImage || null,
+        return_date: companyReturnDate,
+        returned_by: currentUser?.fullname || currentUser?.username || 'Admin'
+      };
+
+      const res = await fetch(`${API_BASE}/products/return-to-supplier`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || txt('রিটার্ন সম্পন্ন করতে ব্যর্থ হয়েছে', 'Failed to complete return'));
+
+      alert(data.message || txt('কোম্পানি রিটার্ন সফল হয়েছে!', 'Company return completed successfully!'));
+      setShowCompanyReturnModal(false);
+      setCompanyReturnProduct(null);
+      setSelectedReturnSerials([]);
+      setCompanyReturnSerials([]);
+      setCompanyReturnImage('');
+      fetchProducts();
+      fetchSuppliers();
+    } catch (err) {
+      alert(txt('রিটার্ন প্রক্রিয়ায় এরর: ', 'Return error: ') + err.message);
+    } finally {
+      setIsSubmittingCompanyReturn(false);
+    }
   };
 
   const handleDirectSupplierPurchase = async (e) => {
@@ -4934,6 +5049,14 @@ function App() {
                           </button>
                           <button
                             type="button"
+                            onClick={() => handleOpenCompanyReturnModal(p)}
+                            className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-300 rounded font-bold cursor-pointer hover:bg-amber-100 flex items-center gap-1 transition shadow-2xs"
+                            title={txt("কোম্পানি/সাপ্লায়ারকে প্রোডাক্ট রিটার্ন করুন", "Return product to company / supplier")}
+                          >
+                            <RotateCcw size={12} /> {txt("কোম্পানি রিটার্ন", "Company Return")}
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleDeleteProduct(p.id, p.name)}
                             className="px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 rounded font-bold cursor-pointer hover:bg-red-100 flex items-center gap-1"
                             title={txt("পণ্য ডিলিট করুন", "Delete Product")}
@@ -6504,6 +6627,355 @@ function App() {
               <button type="submit" className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-sm transition cursor-pointer">
                 {txt("স্টক ইন কনফার্ম করুন", "Confirm Stock-In")}
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* কোম্পানি / সাপ্লায়ার পণ্য রিটার্ন মডাল */}
+      {showCompanyReturnModal && companyReturnProduct && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white text-gray-800 rounded-2xl shadow-2xl w-full max-w-lg p-6 relative my-8 border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <button
+              type="button"
+              onClick={() => {
+                setShowCompanyReturnModal(false);
+                setCompanyReturnProduct(null);
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+
+            {/* হেডার */}
+            <div className="flex items-center gap-2.5 mb-2 border-b pb-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                <RotateCcw size={18} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900 leading-tight">
+                  {txt("কোম্পানি / সাপ্লায়ার পণ্য রিটার্ন", "Return Product to Company / Supplier")}
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  <span className="font-semibold text-gray-800">{companyReturnProduct.name}</span>
+                  {companyReturnProduct.model && <span className="font-mono text-gray-600"> ({companyReturnProduct.model})</span>}
+                  <span className="mx-1.5">•</span>
+                  <span>{txt("বর্তমান স্টক:", "Current Stock:")} <strong className="text-emerald-700">{companyReturnProduct.current_stock}</strong> {txt("টি", "pcs")}</span>
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCompanyReturnSubmit} className="space-y-3.5 text-xs">
+              {/* ১. সাপ্লায়ার নির্বাচন */}
+              <div>
+                <label className="font-bold text-gray-700 block mb-1">
+                  {txt("সাপ্লায়ার / কোম্পানি সিলেক্ট করুন", "Select Supplier / Company")}
+                </label>
+                <select
+                  value={companyReturnSupplier}
+                  onChange={e => setCompanyReturnSupplier(e.target.value)}
+                  className="w-full border border-gray-300 p-2 rounded-lg text-xs bg-white text-gray-900 outline-none focus:border-amber-500"
+                >
+                  <option value="">{txt("সাপ্লায়ার নির্দিষ্ট নয় / সরাসরি স্টক সমন্বয়", "No specific supplier / Stock adjust only")}</option>
+                  {suppliers.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} {s.company ? `(${s.company})` : ''} — {txt("বর্তমান বকেয়া পাওনা:", "Current Payable:")} ৳{Number(s.total_payable || 0).toLocaleString()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* ২. সিরিয়াল নির্বাচন (যদি পণ্যটিতে সিরিয়াল থাকে) */}
+              {companyReturnSerials.length > 0 ? (
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="font-bold text-gray-700">
+                      {txt("ফেরতযোগ্য সিরিয়ালসমূহ সিলেক্ট করুন *", "Select Serials to Return *")}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedReturnSerials.length === companyReturnSerials.length) {
+                            setSelectedReturnSerials([]);
+                          } else {
+                            setSelectedReturnSerials(companyReturnSerials.map(s => s.serial_number));
+                          }
+                        }}
+                        className="text-[11px] text-blue-600 hover:underline font-semibold cursor-pointer"
+                      >
+                        {selectedReturnSerials.length === companyReturnSerials.length 
+                          ? txt("সব বাদ দিন", "Deselect All") 
+                          : txt("সব সিলেক্ট করুন", "Select All")}
+                      </button>
+                      <span className="text-[11px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold">
+                        {txt("সিলেক্টেড:", "Selected:")} {selectedReturnSerials.length} {txt("টি", "pcs")}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="max-h-36 overflow-y-auto p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {companyReturnSerials.map(sn => {
+                        const isChecked = selectedReturnSerials.includes(sn.serial_number);
+                        return (
+                          <label
+                            key={sn.id || sn.serial_number}
+                            className={`flex items-center gap-1.5 p-1.5 rounded border text-[11px] font-mono cursor-pointer transition ${
+                              isChecked 
+                                ? 'bg-amber-50 border-amber-400 text-amber-900 font-bold shadow-2xs' 
+                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                if (isChecked) {
+                                  setSelectedReturnSerials(prev => prev.filter(s => s !== sn.serial_number));
+                                } else {
+                                  setSelectedReturnSerials(prev => [...prev, sn.serial_number]);
+                                }
+                              }}
+                              className="accent-amber-600 cursor-pointer"
+                            />
+                            <span className="truncate">{sn.serial_number}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-1">
+                    {txt("প্রতিটি সিলেক্ট করা সিরিয়াল স্টকে 'returned_to_supplier' হিসেবে চিহ্নিত হবে।", "Each selected serial will be marked as returned to supplier.")}
+                  </p>
+                </div>
+              ) : (
+                /* নন-সিরিয়াল পণ্যের ক্ষেত্রে পরিমাণ ইনপুট */
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">
+                    {txt("ফেরতের পরিমাণ (সংখ্যা) *", "Return Quantity (Pcs) *")}
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={companyReturnProduct.current_stock || 1}
+                    required
+                    value={companyReturnQty}
+                    onChange={e => setCompanyReturnQty(Math.max(1, Number(e.target.value) || 1))}
+                    className="w-full border border-gray-300 p-2 rounded-lg text-xs bg-white text-gray-900 font-bold outline-none focus:border-amber-500"
+                  />
+                </div>
+              )}
+
+              {/* ৩. একক মূল্য ও মোট ফেরত মূল্য */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">
+                    {txt("একক ক্রয়মূল্য (৳)", "Unit Purchase Price (৳)")}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={companyReturnPrice}
+                    onChange={e => setCompanyReturnPrice(e.target.value)}
+                    className="w-full border border-gray-300 p-2 rounded-lg text-xs font-semibold bg-white text-gray-900 outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">
+                    {txt("মোট ফেরত মূল্য (৳)", "Total Refund Value (৳)")}
+                  </label>
+                  <div className="w-full border border-gray-300 bg-gray-50 p-2 rounded-lg text-xs font-bold text-emerald-800 flex items-center justify-between">
+                    <span>৳</span>
+                    <span>
+                      {(
+                        (companyReturnSerials.length > 0 ? selectedReturnSerials.length : Number(companyReturnQty || 1)) *
+                        Number(companyReturnPrice || 0)
+                      ).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ৪. টাকা সমন্বয়ের মাধ্যম */}
+              <div>
+                <label className="font-bold text-gray-700 block mb-1">
+                  {txt("টাকা সমন্বয়ের মাধ্যম *", "Financial Settlement *")}
+                </label>
+                <div className="space-y-1.5 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="settlement_type"
+                      value="Deduce_Payable"
+                      checked={companyReturnSettlement === 'Deduce_Payable'}
+                      onChange={e => setCompanyReturnSettlement(e.target.value)}
+                      className="mt-0.5 accent-amber-600"
+                    />
+                    <div>
+                      <span className="font-bold text-slate-800 block">
+                        {txt("সাপ্লায়ারের বকেয়া দেনা থেকে বিয়োগ (Deduct from Payable)", "Deduct from Supplier Payable")}
+                      </span>
+                      <span className="text-[10px] text-slate-500 block">
+                        {txt("সাপ্লায়ারের সাথে পূর্বে থাকা মোট বকেয়া পাওনা থেকে এই টাকা কমে যাবে।", "The returned amount will reduce existing supplier payable balance.")}
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2 cursor-pointer pt-1 border-t border-slate-200">
+                    <input
+                      type="radio"
+                      name="settlement_type"
+                      value="Cash_Refund"
+                      checked={companyReturnSettlement === 'Cash_Refund'}
+                      onChange={e => setCompanyReturnSettlement(e.target.value)}
+                      className="mt-0.5 accent-amber-600"
+                    />
+                    <div>
+                      <span className="font-bold text-slate-800 block">
+                        {txt("ক্যাশ রিফান্ড গ্রহণ (Cash Refund)", "Cash Refund Received")}
+                      </span>
+                      <span className="text-[10px] text-slate-500 block">
+                        {txt("সাপ্লায়ার/কোম্পানি সরাসরি নগদ টাকা ফেরত প্রদান করেছে।", "Supplier has paid physical cash refund.")}
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2 cursor-pointer pt-1 border-t border-slate-200">
+                    <input
+                      type="radio"
+                      name="settlement_type"
+                      value="Stock_Only"
+                      checked={companyReturnSettlement === 'Stock_Only'}
+                      onChange={e => setCompanyReturnSettlement(e.target.value)}
+                      className="mt-0.5 accent-amber-600"
+                    />
+                    <div>
+                      <span className="font-bold text-slate-800 block">
+                        {txt("শুধুমাত্র স্টক সমন্বয় (Stock Adjustment Only)", "Stock Adjustment Only")}
+                      </span>
+                      <span className="text-[10px] text-slate-500 block">
+                        {txt("দেনা-পাওনা সমন্বয় ছাড়া শুধুমাত্র ইনভেন্টরি স্টক মাইনাস হবে।", "Only decrements inventory without changing ledger balances.")}
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* ৫. রিটার্নের কারণ ও তারিখ */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">
+                    {txt("রিটার্নের কারণ", "Reason for Return")}
+                  </label>
+                  <select
+                    value={companyReturnReason}
+                    onChange={e => setCompanyReturnReason(e.target.value)}
+                    className="w-full border border-gray-300 p-2 rounded-lg text-xs bg-white text-gray-900 outline-none focus:border-amber-500"
+                  >
+                    <option value="নষ্ট / ত্রুটিপূর্ণ পণ্য">{txt("নষ্ট / ত্রুটিপূর্ণ পণ্য", "Defective Product")}</option>
+                    <option value="অতিরিক্ত স্টক ফেরত">{txt("অতিরিক্ত স্টক ফেরত", "Excess Stock")}</option>
+                    <option value="ভুল মডেল / অর্ডার">{txt("ভুল মডেল / অর্ডার", "Wrong Model / Order")}</option>
+                    <option value="মেয়াদোত্তীর্ণ / ড্যামেজ">{txt("মেয়াদোত্তীর্ণ / ড্যামেজ", "Damaged / Expired")}</option>
+                    <option value="অন্যান্য">{txt("অন্যান্য...", "Other...")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">
+                    {txt("রিটার্নের তারিখ", "Return Date")}
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={companyReturnDate}
+                    onChange={e => setCompanyReturnDate(e.target.value)}
+                    className="w-full border border-gray-300 p-2 rounded-lg text-xs bg-white text-gray-900 outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              {companyReturnReason === 'অন্যান্য' && (
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">
+                    {txt("কাস্টম কারণ লিখুন", "Custom Reason")}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={txt("কারণ বিস্তারিত লিখুন...", "Enter reason details...")}
+                    value={companyReturnCustomReason}
+                    onChange={e => setCompanyReturnCustomReason(e.target.value)}
+                    className="w-full border border-gray-300 p-2 rounded-lg text-xs bg-white text-gray-900 outline-none focus:border-amber-500"
+                  />
+                </div>
+              )}
+
+              {/* ৬. রিটার্ন মেমো / চালান ছবি (ঐচ্ছিক) */}
+              <div>
+                <label className="font-bold text-gray-700 flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1">
+                    <Camera size={13} className="text-amber-600" />
+                    {txt("কোম্পানি রিটার্ন স্লিপ / মেমো ছবি (ঐচ্ছিক)", "Return Voucher / Memo Photo (Optional)")}
+                  </span>
+                  {companyReturnImage && (
+                    <button
+                      type="button"
+                      onClick={() => setCompanyReturnImage('')}
+                      className="text-[10px] text-red-600 hover:underline cursor-pointer"
+                    >
+                      {txt("মুছুন", "Remove")}
+                    </button>
+                  )}
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = () => setCompanyReturnImage(reader.result);
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="text-xs border border-gray-300 p-1.5 rounded-lg flex-1 bg-white cursor-pointer"
+                  />
+                  {companyReturnImage && (
+                    <img
+                      src={companyReturnImage}
+                      alt="Memo Preview"
+                      onClick={() => setActiveImageView({ src: companyReturnImage, title: txt('কোম্পানি রিটার্ন মেমো', 'Company Return Memo') })}
+                      className="w-10 h-10 object-cover rounded-lg border border-amber-400 cursor-pointer shadow-xs hover:scale-105 transition"
+                      title={txt("ক্লিক করে বড় করুন", "Click to enlarge")}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* ফুটার বাটনসমূহ */}
+              <div className="pt-2 flex justify-end gap-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCompanyReturnModal(false);
+                    setCompanyReturnProduct(null);
+                  }}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-bold cursor-pointer transition"
+                >
+                  {txt("বাতিল", "Cancel")}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingCompanyReturn}
+                  className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold cursor-pointer transition flex items-center gap-1.5 shadow-md disabled:opacity-50"
+                >
+                  <RotateCcw size={14} className={isSubmittingCompanyReturn ? "animate-spin" : ""} />
+                  {isSubmittingCompanyReturn 
+                    ? txt("প্রক্রিয়াকরণ হচ্ছে...", "Processing...") 
+                    : txt("রিটার্ন নিশ্চিত করুন", "Confirm Return")}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -9959,6 +10431,10 @@ function App() {
                                   </span>
                                 ) : st.type === 'Purchase' ? (
                                   <span className="text-rose-700">{txt("পণ্য ক্রয় (+)", "Purchase (+)")}</span>
+                                ) : st.type === 'Return' ? (
+                                  <span className="text-amber-700 font-bold">↩️ {txt("কোম্পানি রিটার্ন (-)", "Company Return (-)")}</span>
+                                ) : st.type === 'Return_Refund' ? (
+                                  <span className="text-emerald-700 font-bold">💵 {txt("রিটার্ন ক্যাশ রিফান্ড", "Return Cash Refund")}</span>
                                 ) : (
                                   <span className="text-emerald-700">{txt("পেমেন্ট পরিশোধ (-)", "Payment (-)")}</span>
                                 )}
@@ -9980,6 +10456,8 @@ function App() {
                               </td>
                               <td className={`p-2.5 text-right font-mono font-bold ${
                                 st.type === 'Purchase' ? 'text-red-600' :
+                                st.type === 'Return' ? 'text-amber-700' :
+                                st.type === 'Return_Refund' ? 'text-emerald-700' :
                                 st.type === 'নতুন পণ্য ওয়ারেন্টি পেন্ডিং' ? 'text-amber-700' :
                                 st.type === 'সাপ্লায়ার পণ্য পরিবর্তন' ? 'text-blue-700' :
                                 'text-green-600'
