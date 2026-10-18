@@ -31,6 +31,8 @@ export default function IspReceiptPrintModal({
     id,
     receipt_no = `ISP-REC-${Date.now().toString().slice(-6)}`,
     customer_id,
+    customer_user_id = '',
+    user_id = '',
     customer_name = (docLang === 'en' ? 'Valued Customer' : 'সম্মানিত গ্রাহক'),
     customer_mobile = '',
     customer_address = '',
@@ -53,6 +55,8 @@ export default function IspReceiptPrintModal({
     pppoe_username = '',
     note = ''
   } = receiptData;
+
+  const displayUserId = customer_user_id || user_id || pppoe_username || (customer_id ? `FC-${customer_id}` : (id ? `FC-${id}` : 'FC-ISP'));
 
   useEffect(() => {
     if (receiptData?.doc_type) {
@@ -177,6 +181,7 @@ export default function IspReceiptPrintModal({
 📄 ${docMode === 'receipt' ? 'Money Receipt / Payment Receipt' : 'Monthly Internet Bill'}
 ------------------------------------
 ${docMode === 'receipt' ? 'Receipt No' : 'Bill No'}: ${receipt_no}
+User ID: ${displayUserId}
 Date: ${payment_date}
 Customer Name: ${customer_name}
 Mobile: ${customer_mobile || '-'}
@@ -187,6 +192,9 @@ ${cycle_start && cycle_end ? `Period: ${cycle_start} to ${cycle_end}\n` : ''}${m
 Payment Method: ${payment_method}
 Status: ${paymentStatusText}
 ------------------------------------
+*How to pay bill :*
+Go to your bKash Send Money option and enter our bKash number 01812-091939, enter the bill amount and provide your User ID in the Reference field, (User ID is mentioned at the top of your bill). Or call our support representative to learn about other payment methods. Thank you
+
 Shop #18, RF Johura Tower, Agrabad, Chattogram.
 Hotline: 09613-181920, 01812-091939
 Thank you for choosing FC Technology!`
@@ -194,6 +202,7 @@ Thank you for choosing FC Technology!`
 📄 ${docMode === 'receipt' ? 'মানি রিসিপ্ট / বিল পরিশোধ রশিদ' : 'ইন্টারনেট মাসিক বিল'}
 ------------------------------------
 রশিদ / বিল নং: ${receipt_no}
+ইউজার আইডি: ${displayUserId}
 তারিখ: ${payment_date}
 গ্রাহকের নাম: ${customer_name}
 মোবাইল: ${customer_mobile || '-'}
@@ -204,6 +213,9 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
 পরিশোধ মাধ্যম: ${payment_method}
 স্ট্যাটাস: ${paymentStatusText}
 ------------------------------------
+*যেভাবে বিল পরিশোধ করবেন :*
+আপনার বিকাশের সেন্ড মানি অপশনে গিয়ে আমাদের বিকাশ নাম্বার 01812-091939 টি উল্লেখ করুন, আপনার বিলের টাকার অ্যামাউন্ট দিন এবং রেফারেন্সে আপনার ইউজার আইডিটি প্রদান করুন, (ইউজার আইডিটি আপনার বিলের উপরে দেওয়া আছে)। অথবা আমাদের সাপোর্ট প্রতিনিধির কাছে ফোন করে আপনার বিল প্রদানের অন্যান্য মাধ্যমগুলো জেনে নিন। ধন্যবাদ
+
 দোকান নং #১৮, আর এফ জোহরা টাওয়ার, আগ্রাবাদ, চট্টগ্রাম।
 হটলাইন: 09613-181920, 01812-091939
 ধন্যবাদ, FC Technology এর সাথেই থাকুন!`;
@@ -577,7 +589,11 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                         {docMode === 'receipt' ? txt('রশিদ নং: ', 'Receipt No: ') : txt('বিল নং: ', 'Bill No: ')}
                         <span className="font-mono text-blue-900">{receipt_no}</span>
                       </p>
-                      <p className="text-slate-600">
+                      <p className="font-bold text-blue-950 mt-0.5">
+                        <span className="text-slate-600 font-normal">{txt('ইউজার আইডি: ', 'User ID: ')}</span>
+                        <span className="font-mono bg-blue-100/90 text-blue-900 px-1.5 py-0.5 rounded border border-blue-300 font-black">{displayUserId}</span>
+                      </p>
+                      <p className="text-slate-600 mt-0.5">
                         {txt('তারিখ: ', 'Date: ')}
                         <span className="font-semibold text-slate-900">{payment_date}</span>
                       </p>
@@ -591,6 +607,10 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                     <div>
                       <span className="text-[10px] text-slate-500 uppercase font-bold block">{txt('গ্রাহকের নাম:', 'Customer Name:')}</span>
                       <span className="font-bold text-slate-900 text-[13px]">{customer_name}</span>
+                    </div>
+                    <div className="bg-blue-50/70 border border-blue-200/90 rounded-xl px-2.5 py-1 flex flex-col justify-center">
+                      <span className="text-[10px] text-blue-800 uppercase font-black block tracking-wider">{txt('কাস্টমার ইউজার আইডি:', 'Customer User ID:')}</span>
+                      <span className="font-mono font-black text-blue-950 text-[13.5px]">{displayUserId}</span>
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-500 uppercase font-bold block">{txt('মোবাইল নম্বর:', 'Mobile Number:')}</span>
@@ -757,8 +777,31 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                   </div>
                 </div>
 
-                {/* ১.৫ নোট ও বিশেষ দ্রষ্টব্য */}
-                <div className="p-2.5 bg-blue-50/40 border border-blue-200/80 rounded-xl text-[11px] text-blue-900 mb-6 backdrop-blur-[0.5px] print:bg-transparent print:border-slate-300">
+                {/* ১.৫ যেভাবে বিল পরিশোধ করবেন (bKash Payment Instruction) */}
+                <div className="p-3 bg-pink-50/70 border border-pink-200/90 rounded-xl text-[11px] text-slate-800 mb-2.5 backdrop-blur-[0.5px] print:bg-slate-50/70 print:border-slate-300">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-5 h-5 rounded-full bg-[#E2136E] text-white flex items-center justify-center font-black text-[11px] shrink-0 mt-0.5 shadow-sm">
+                      ৳
+                    </div>
+                    <div>
+                      <p className="font-bold text-[#E2136E] mb-0.5 text-[11.5px]">
+                        {txt(
+                          'যেভাবে বিল পরিশোধ করবেন :',
+                          'How to pay bill :'
+                        )}
+                      </p>
+                      <p className="leading-relaxed text-slate-700">
+                        {txt(
+                          'আপনার বিকাশের সেন্ড মানি অপশনে গিয়ে আমাদের বিকাশ নাম্বার 01812-091939 টি উল্লেখ করুন, আপনার বিলের টাকার অ্যামাউন্ট দিন এবং রেফারেন্সে আপনার ইউজার আইডিটি প্রদান করুন, (ইউজার আইডিটি আপনার বিলের উপরে দেওয়া আছে)। অথবা আমাদের সাপোর্ট প্রতিনিধির কাছে ফোন করে আপনার বিল প্রদানের অন্যান্য মাধ্যমগুলো জেনে নিন। ধন্যবাদ',
+                          'Go to your bKash Send Money option and enter our bKash number 01812-091939, enter the bill amount and provide your User ID in the Reference field, (User ID is mentioned at the top of your bill). Or call our support representative to learn about other payment methods. Thank you'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ১.৬ নোট ও বিশেষ দ্রষ্টব্য */}
+                <div className="p-2.5 bg-blue-50/40 border border-blue-200/80 rounded-xl text-[10.5px] text-blue-900 mb-4 backdrop-blur-[0.5px] print:bg-transparent print:border-slate-300">
                   <p className="font-semibold">
                     📌 <strong>{txt('বিশেষ দ্রষ্টব্য:', 'Special Note:')}</strong> {txt(
                       'প্রতি মাসের নির্দিষ্ট মেয়াদের মধ্যে সাবস্ক্রিপশন ফি পরিশোধ করার অনুরোধ করা হচ্ছে। নিরবচ্ছিন্ন ইন্টারনেট সার্ভিস উপভোগ করার জন্য ধন্যবাদ।',

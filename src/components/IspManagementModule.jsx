@@ -142,6 +142,7 @@ export default function IspManagementModule({
 
   // কাস্টমার ফর্ম স্টেট
   const [customerForm, setCustomerForm] = useState({
+    customer_user_id: '',
     customer_name: '',
     mobile: '',
     address: '',
@@ -471,6 +472,7 @@ export default function IspManagementModule({
   const handleEditCustomer = (c) => {
     setEditingCustomer(c);
     setCustomerForm({
+      customer_user_id: c.customer_user_id || '',
       customer_name: c.customer_name || '',
       mobile: c.mobile || '',
       address: c.address || '',
@@ -550,6 +552,8 @@ export default function IspManagementModule({
     setEditPaymentForm({
       id: p.id,
       receipt_no: p.receipt_no || '',
+      customer_id: p.customer_id,
+      customer_user_id: p.customer_user_id || '',
       customer_name: p.customer_name || '',
       customer_mobile: p.customer_mobile || '',
       customer_address: p.customer_address || '',
@@ -744,7 +748,7 @@ export default function IspManagementModule({
       dueBreakdown += `🔌 বকেয়া লাইন চার্জ: ৳ ${dues.unpaid_line_charge.toLocaleString()}\n`;
     }
 
-    const grandDue = dues.total_due > 0 ? dues.total_due : Number(c.monthly_fee || 0);
+    const customerUserId = c.customer_user_id || c.pppoe_username || ('FC-' + c.id);
 
     const message = `*FC TECHNOLOGY - ISP INTERNET BILL ALERT*
 ----------------------------------------
@@ -752,6 +756,7 @@ export default function IspManagementModule({
 FC Technology হাই-স্পিড ব্রডব্যান্ড সার্ভিসের পক্ষ থেকে শুভেচ্ছা।
 
 আপনার ইন্টারনেট সংযোগের বিবরণ:
+🆔 কাস্টমার ইউজার আইডি: ${customerUserId}
 📡 প্যাকেজ / স্পিড: ${c.speed}
 💰 মাসিক সাবস্ক্রিপশন ফি: ৳ ${Number(c.monthly_fee).toLocaleString()}
 📅 মাস পূর্ণের তারিখ: ${c.billing_cycle_end ? c.billing_cycle_end.slice(0, 10) : '-'}
@@ -759,8 +764,8 @@ ${dueBreakdown}💵 এক বিলে সর্বমোট প্রদেয
 
 ${timingNotice}
 
-সংযোগ নিরবচ্ছিন্ন রাখতে অনুগ্রহ করে নির্দিষ্ট সময়ের মধ্যে বিল পরিশোধ করুন।
-পেমেন্ট মাধ্যম: বিকাশ / নগদ / ব্যাংক: 01812-091939 (Personal/Merchant)
+*যেভাবে বিল পরিশোধ করবেন :*
+আপনার বিকাশের সেন্ড মানি অপশনে গিয়ে আমাদের বিকাশ নাম্বার 01812-091939 টি উল্লেখ করুন, আপনার বিলের টাকার অ্যামাউন্ট দিন এবং রেফারেন্সে আপনার ইউজার আইডিটি প্রদান করুন, (ইউজার আইডিটি আপনার বিলের উপরে দেওয়া আছে)। অথবা আমাদের সাপোর্ট প্রতিনিধির কাছে ফোন করে আপনার বিল প্রদানের অন্যান্য মাধ্যমগুলো জেনে নিন। ধন্যবাদ
 
 দোকান নং #১৮, আর এফ জোহরা টাওয়ার, আগ্রাবাদ, চট্টগ্রাম।
 হটলাইন: 09613-181920, 01812-091939
@@ -832,6 +837,7 @@ ${timingNotice}
       if (data.receipt) {
         setActiveReceipt({
           ...data.receipt,
+          customer_user_id: payingCustomer.customer_user_id || payingCustomer.pppoe_username || ('FC-' + payingCustomer.id),
           customer_address: payingCustomer.address,
           speed: payingCustomer.speed,
           monthly_fee: payingCustomer.monthly_fee,
@@ -863,12 +869,16 @@ ${timingNotice}
   const handleViewCustomerReceipt = (c) => {
     const dues = calculateCustomerDues(c);
     const isUnpaid = (c.payment_status !== 'Paid' || dues.total_due > 0);
+    const userIdVal = c.customer_user_id || c.pppoe_username || ('FC-' + c.id);
 
     // যদি গ্রাহক সম্পূর্ণ পরিশোধিত থাকে এবং কোনো বকেয়া না থাকে, তবে সেভ করা রিসিট দেখানো যেতে পারে
     if (!isUnpaid) {
       const latestPayment = savedPayments.find(p => p.customer_id === c.id);
       if (latestPayment) {
-        setActiveReceipt(latestPayment);
+        setActiveReceipt({
+          ...latestPayment,
+          customer_user_id: latestPayment.customer_user_id || userIdVal
+        });
         setIsReceiptModalOpen(true);
         return;
       }
@@ -878,6 +888,7 @@ ${timingNotice}
     setActiveReceipt({
       receipt_no: `ISP-BILL-${c.id}-${Date.now().toString().slice(-4)}`,
       customer_id: c.id,
+      customer_user_id: userIdVal,
       customer_name: c.customer_name,
       customer_mobile: c.mobile,
       customer_address: c.address,
@@ -1075,6 +1086,7 @@ ${timingNotice}
               onClick={() => {
                 setEditingCustomer(null);
                 setCustomerForm({
+                  customer_user_id: '',
                   customer_name: '',
                   mobile: '',
                   address: '',
@@ -1429,7 +1441,14 @@ ${timingNotice}
 
                         {/* নাম ও মোবাইল */}
                         <td className="py-3 px-3">
-                          <span className="font-bold block text-sm">{c.customer_name}</span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-sm">{c.customer_name}</span>
+                            {(c.customer_user_id || c.pppoe_username) && (
+                              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                                ID: {c.customer_user_id || c.pppoe_username}
+                              </span>
+                            )}
+                          </div>
                           <span className="font-mono text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
                             <Phone size={11} /> {c.mobile}
                           </span>
@@ -2492,8 +2511,22 @@ ${timingNotice}
 
             <form onSubmit={handleSaveCustomer} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto text-xs">
               
-              {/* নাম ও মোবাইল */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* কাস্টমার ইউজার আইডি, নাম ও মোবাইল */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>{txt('কাস্টমার ইউজার আইডি', 'Customer User ID')}</span>
+                    <span className="text-[10px] text-blue-600 font-semibold">{txt('(বিলের রেফারেন্স)', 'Bill Ref')}</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={txt('যেমন: FC-1024 বা USER01', 'e.g. FC-1024')}
+                    value={customerForm.customer_user_id}
+                    onChange={(e) => setCustomerForm({ ...customerForm, customer_user_id: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-blue-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono font-bold text-blue-900"
+                  />
+                </div>
+
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
                     {txt('কাস্টমারের নাম', 'Customer Name')} <span className="text-red-500">*</span>
@@ -3639,8 +3672,20 @@ ${timingNotice}
             </div>
 
             <form onSubmit={handleSaveEditPayment} className="p-6 space-y-4 text-xs max-h-[85vh] overflow-y-auto">
-              {/* গ্রাহকের নাম ও মোবাইল */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* গ্রাহকের নাম, ইউজার আইডি ও মোবাইল */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    {txt('ইউজার আইডি', 'User ID')}
+                  </label>
+                  <input
+                    type="text"
+                    value={editPaymentForm.customer_user_id || ''}
+                    onChange={(e) => setEditPaymentForm({ ...editPaymentForm, customer_user_id: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none font-mono font-bold text-blue-900"
+                  />
+                </div>
+
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
                     {txt('গ্রাহকের নাম', 'Customer Name')} <span className="text-red-500">*</span>
