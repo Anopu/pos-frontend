@@ -241,6 +241,7 @@ function App() {
   const [supplierLedger, setSupplierLedger] = useState(null);
   const [supplierTransactions, setSupplierTransactions] = useState([]);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [editingSupplierId, setEditingSupplierId] = useState(null);
   const [supplierForm, setSupplierForm] = useState({ name: '', company: '', mobile: '', address: '' });
   const [supplierPayModal, setSupplierPayModal] = useState(null);
   const [supplierPayAmount, setSupplierPayAmount] = useState('');
@@ -433,6 +434,8 @@ function App() {
     { id: 1, name: '', warranty: '1 Year', qty: 1, unit_price: '', total_price: '' }
   ]);
   const [quotationSubTab, setQuotationSubTab] = useState('create'); // 'create' | 'history'
+  const [editingQuotationId, setEditingQuotationId] = useState(null);
+  const [editingQuotationNo, setEditingQuotationNo] = useState('');
   const [activeQuotationPrint, setActiveQuotationPrint] = useState(null);
 
   // চেক ট্র্যাকিং ও এলার্ট স্টেট
@@ -1924,16 +1927,20 @@ function App() {
   const handleSupplierSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_BASE}/suppliers`, {
-        method: 'POST',
+      const url = editingSupplierId ? `${API_BASE}/suppliers/${editingSupplierId}` : `${API_BASE}/suppliers`;
+      const method = editingSupplierId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(supplierForm)
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || txt('সাপ্লায়ার যুক্ত হতে ব্যর্থ হয়েছে', 'Failed to add supplier'));
+      if (!res.ok) throw new Error(data.error || txt('সাপ্লায়ার তথ্য সংরক্ষণ ব্যর্থ হয়েছে', 'Failed to save supplier'));
 
-      alert(data.message || txt('সাপ্লায়ার সফলভাবে যুক্ত হয়েছে!', 'Supplier added successfully!'));
+      alert(data.message || (editingSupplierId ? txt('সাপ্লায়ারের তথ্য সফলভাবে আপডেট হয়েছে!', 'Supplier updated successfully!') : txt('সাপ্লায়ার সফলভাবে যুক্ত হয়েছে!', 'Supplier added successfully!')));
       setShowSupplierModal(false);
+      setEditingSupplierId(null);
       setSupplierForm({ name: '', company: '', mobile: '', address: '' });
       fetchSuppliers();
     } catch (err) {
@@ -2178,6 +2185,62 @@ function App() {
 
   const quotationCalculatedTotal = quotationItems.reduce((sum, it) => sum + (Number(it.total_price) || (Number(it.qty || 1) * Number(it.unit_price || 0))), 0);
 
+  const handleOpenEditQuotation = async (qId) => {
+    try {
+      const res = await fetch(`${API_BASE}/quotations/${qId}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setEditingQuotationId(data.id);
+      setEditingQuotationNo(data.quotation_no || '');
+      setQuotationCustomer(data.customer_name || '');
+      setQuotationMobile(data.customer_mobile || '');
+      setQuotationAddress(data.customer_address || '');
+      setQuotationSubject(data.subject || 'QUOTATION / মূল্য প্রস্তাবনা');
+      setQuotationValid(data.valid_until ? String(data.valid_until).slice(0, 10) : '');
+      setQuotationNote(data.note || '');
+      setQuotationTerms(data.terms || '');
+      if (data.items && data.items.length > 0) {
+        setQuotationItems(data.items.map((it, idx) => ({
+          id: idx + 1,
+          name: it.product_name,
+          warranty: it.warranty || '',
+          qty: Number(it.quantity || 1),
+          unit_price: Number(it.unit_price || 0),
+          total_price: Number(it.total_price || (Number(it.unit_price || 0) * Number(it.quantity || 1)))
+        })));
+      } else {
+        setQuotationItems([{ id: 1, name: '', warranty: '1 Year', qty: 1, unit_price: '', total_price: '' }]);
+      }
+      setQuotationSubTab('create');
+    } catch (err) {
+      alert(txt('কোটেশন তথ্য লোড করতে ব্যর্থ: ', 'Failed to load quotation: ') + err.message);
+    }
+  };
+
+  const handleResetQuotationForm = () => {
+    setEditingQuotationId(null);
+    setEditingQuotationNo('');
+    setQuotationCustomer('');
+    setQuotationMobile('');
+    setQuotationAddress('');
+    setQuotationSubject('QUOTATION / মূল্য প্রস্তাবনা');
+    setQuotationValid(() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 7);
+      return d.toISOString().slice(0, 10);
+    });
+    setQuotationNote('');
+    setQuotationTerms(
+`১. এই কোটেশনটি জমা দেওয়ার তারিখ থেকে এক (১) সপ্তাহ পর্যন্ত কার্যকর থাকবে।
+২. পণ্য সরবরাহের সময় ৫০ শতাংশ এবং সরবরাহ ও ইনস্টলেশন সম্পন্ন হওয়ার পর সম্পূর্ণ অর্থ নগদে অথবা চেকের মাধ্যমে পরিশোধ করতে হবে।
+৩. উপরোক্ত মূল্যসমূহ VAT এবং প্রযোজ্য সকল কর ব্যতীত।`
+    );
+    setQuotationItems([
+      { id: 1, name: '', warranty: '1 Year', qty: 1, unit_price: '', total_price: '' }
+    ]);
+  };
+
   const handleSaveAndPrintQuotation = async () => {
     if (!quotationCustomer.trim()) return alert(txt('কাস্টমার বা প্রতিষ্ঠানের নাম প্রদান করুন!', 'Please enter customer or company name!'));
     const validItems = quotationItems.filter(it => it.name && it.name.trim() !== '');
@@ -2201,21 +2264,28 @@ function App() {
     };
 
     try {
-      const res = await fetch(`${API_BASE}/quotations`, {
-        method: 'POST',
+      const url = editingQuotationId ? `${API_BASE}/quotations/${editingQuotationId}` : `${API_BASE}/quotations`;
+      const method = editingQuotationId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || txt('কোটেশন সেভ ব্যর্থ হয়েছে', 'Failed to save quotation'));
+      if (!res.ok) throw new Error(data.error || txt('কোটেশন সেভ বা আপডেট ব্যর্থ হয়েছে', 'Failed to save or update quotation'));
+
+      alert(editingQuotationId ? txt('✅ কোটেশন সফলভাবে আপডেট করা হয়েছে!', '✅ Quotation updated successfully!') : txt('✅ কোটেশন সফলভাবে সংরক্ষিত হয়েছে!', '✅ Quotation saved successfully!'));
 
       setActiveQuotationPrint({
-        quotation_no: data.quotation_no,
+        quotation_no: editingQuotationNo || data.quotation_no,
         date: formatDateDMY(new Date()),
         ...payload,
         total_amount: quotationCalculatedTotal
       });
       fetchQuotations();
+      setEditingQuotationId(null);
+      setEditingQuotationNo('');
     } catch (err) {
       alert(txt('এরর: ', 'Error: ') + err.message);
     }
@@ -4417,12 +4487,12 @@ function App() {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setQuotationSubTab('create')}
+                  onClick={() => { handleResetQuotationForm(); setQuotationSubTab('create'); }}
                   className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition ${
                     quotationSubTab === 'create' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/20' : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
                   }`}
                 >
-                  <Plus size={14} /> {txt('নতুন কোটেশন তৈরি', 'Create New Quotation')}
+                  <Plus size={14} /> {editingQuotationId ? txt('কোটেশন এডিট মোড', 'Edit Quotation Mode') : txt('নতুন কোটেশন তৈরি', 'Create New Quotation')}
                 </button>
                 <button
                   type="button"
@@ -4436,9 +4506,26 @@ function App() {
               </div>
             </div>
 
-            {/* ১. নতুন কোটেশন তৈরির ফর্ম */}
+            {/* ১. নতুন বা এডিট কোটেশন তৈরির ফর্ম */}
             {quotationSubTab === 'create' && (
               <div className="bg-white text-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 space-y-5">
+                {editingQuotationId && (
+                  <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 flex justify-between items-center text-xs">
+                    <div className="flex items-center gap-2">
+                      <Edit3 className="text-amber-700" size={16} />
+                      <span className="font-bold text-amber-900">
+                        {txt(`কোটেশন এডিট মোড: ${editingQuotationNo}`, `Editing Quotation: ${editingQuotationNo}`)}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleResetQuotationForm}
+                      className="px-3 py-1 bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg font-bold cursor-pointer"
+                    >
+                      ✕ {txt('এডিট বাতিল (নতুন কোটেশন)', 'Cancel Edit (New Quotation)')}
+                    </button>
+                  </div>
+                )}
                 {/* কাস্টমার ও মেটা তথ্য */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
@@ -4676,7 +4763,7 @@ function App() {
                       onClick={handleSaveAndPrintQuotation}
                       className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md shadow-amber-500/20 hover:shadow-lg transition cursor-pointer"
                     >
-                      <Printer size={16} /> 💾 {txt('কোটেশন সংরক্ষণ ও A4 প্রিন্ট প্রিভিউ', 'Save Quotation & A4 Print Preview')}
+                      <Printer size={16} /> 💾 {editingQuotationId ? txt('কোটেশন আপডেট ও A4 প্রিন্ট প্রিভিউ', 'Update Quotation & A4 Print Preview') : txt('কোটেশন সংরক্ষণ ও A4 প্রিন্ট প্রিভিউ', 'Save Quotation & A4 Print Preview')}
                     </button>
                   </div>
                 </div>
@@ -4748,10 +4835,18 @@ function App() {
                                 <button
                                   type="button"
                                   onClick={() => handleViewSavedQuotation(q.id)}
-                                  className="px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded font-bold text-xs flex items-center gap-1 cursor-pointer"
+                                  className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded font-bold text-xs flex items-center gap-1 cursor-pointer"
                                   title={txt("A4 ফরমাল প্যাডে কোটেশন প্রিন্ট প্রিভিউ দেখুন", "View A4 formal quotation print preview")}
                                 >
-                                  <Printer size={13} /> {txt('প্রিন্ট / দেখুন', 'Print / View')}
+                                  <Printer size={13} /> {txt('প্রিন্ট', 'Print')}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditQuotation(q.id)}
+                                  className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded font-bold text-xs flex items-center gap-1 cursor-pointer"
+                                  title={txt("কোটেশন এডিট ও সংশোধন করুন", "Edit quotation")}
+                                >
+                                  <Edit size={13} /> {txt('এডিট', 'Edit')}
                                 </button>
                                 {currentUser.role === 'admin' && (
                                   <button
@@ -4897,7 +4992,14 @@ function App() {
                     <button onClick={() => setShowSupplierPurchaseModal(true)} className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shadow-md shadow-emerald-500/20">
                       <Camera size={14} /> {txt('+ ক্রয় বিল সংযোজন', '+ Add Purchase Bill')}
                     </button>
-                    <button onClick={() => setShowSupplierModal(true)} className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shadow-md shadow-cyan-500/20">
+                    <button 
+                      onClick={() => {
+                        setEditingSupplierId(null);
+                        setSupplierForm({ name: '', company: '', mobile: '', address: '' });
+                        setShowSupplierModal(true);
+                      }} 
+                      className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shadow-md shadow-cyan-500/20"
+                    >
                       <Plus size={14} /> {txt('নতুন সাপ্লায়ার', 'New Supplier')}
                     </button>
                   </>
@@ -4922,7 +5024,7 @@ function App() {
                     <td className="p-3 text-gray-700 font-medium">{s.company || '-'}</td>
                     <td className="p-3 text-gray-700 font-medium">{s.mobile || '-'}</td>
                     <td className="p-3 font-bold text-red-600">৳ {Number(s.total_payable).toLocaleString()}</td>
-                    <td className="p-3 text-center flex justify-center gap-2">
+                    <td className="p-3 text-center flex justify-center items-center gap-2">
                       <button
                         onClick={() => {
                           setSupplierLedger(s);
@@ -4930,10 +5032,29 @@ function App() {
                           fetch(`${API_BASE}/suppliers/${s.id}/ledger`).then(r => r.json()).then(d => setSupplierTransactions(d || []));
                           fetchDeletedPayments(s.id);
                         }}
-                        className="px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded font-bold cursor-pointer transition shadow-2xs"
+                        className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded font-bold cursor-pointer transition shadow-2xs"
                       >
-                        {txt('লেনদেন খতিয়ান', 'Transaction Ledger')}
+                        {txt('লেনদেন খতিয়ান', 'Ledger')}
                       </button>
+                      {currentUser.role === 'admin' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingSupplierId(s.id);
+                            setSupplierForm({
+                              name: s.name || '',
+                              company: s.company || '',
+                              mobile: s.mobile || '',
+                              address: s.address || ''
+                            });
+                            setShowSupplierModal(true);
+                          }}
+                          className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded font-bold cursor-pointer transition shadow-2xs flex items-center gap-1"
+                          title={txt("সাপ্লায়ারের তথ্য এডিট ও সংশোধন করুন", "Edit supplier info")}
+                        >
+                          <Edit size={12} /> {txt('এডিট', 'Edit')}
+                        </button>
+                      )}
                       {currentUser.role === 'admin' && Number(s.total_payable) > 0 && (
                         <button onClick={() => { 
                           setSupplierPayModal(s); 
@@ -4941,12 +5062,12 @@ function App() {
                           setSupplierPayDate(new Date().toISOString().slice(0, 10));
                           setSupplierPayMethod('Cash');
                           setSupplierPayNote('');
-                        }} className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded font-bold cursor-pointer transition shadow-xs">
-                          {txt('পেমেন্ট পরিশোধ', 'Make Payment')}
+                        }} className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded font-bold cursor-pointer transition shadow-xs">
+                          {txt('পরিশোধ', 'Pay')}
                         </button>
                       )}
                       {currentUser.role === 'admin' && (
-                        <button onClick={() => handleDeleteSupplier(s.id, s.name)} className="px-2 py-1 text-red-600 hover:bg-red-50 rounded">
+                        <button onClick={() => handleDeleteSupplier(s.id, s.name)} className="px-2 py-1 text-red-600 hover:bg-red-50 rounded" title={txt("মুছে ফেলুন", "Delete")}>
                           <Trash2 size={14} />
                         </button>
                       )}
@@ -6388,8 +6509,8 @@ function App() {
       {showSupplierModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white text-gray-800 rounded-xl shadow-xl w-full max-w-md p-6 relative">
-            <button onClick={() => setShowSupplierModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer"><X size={20} /></button>
-            <h3 className="text-lg font-bold text-gray-800 mb-3">{txt("নতুন সাপ্লায়ার এন্ট্রি", "Add New Supplier")}</h3>
+            <button onClick={() => { setShowSupplierModal(false); setEditingSupplierId(null); setSupplierForm({ name: '', company: '', mobile: '', address: '' }); }} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer"><X size={20} /></button>
+            <h3 className="text-lg font-bold text-gray-800 mb-3">{editingSupplierId ? txt("সাপ্লায়ারের তথ্য এডিট ও সংশোধন", "Edit Supplier Info") : txt("নতুন সাপ্লায়ার এন্ট্রি", "Add New Supplier")}</h3>
             <form onSubmit={handleSupplierSubmit} className="space-y-3 text-xs text-gray-800">
               <div>
                 <label className="font-bold text-gray-700 block mb-1">{txt("সাপ্লায়ারের নাম *", "Supplier Name *")}</label>
@@ -6408,7 +6529,7 @@ function App() {
                 <textarea placeholder={txt("ঠিকানা", "Address")} value={supplierForm.address} onChange={e => setSupplierForm({ ...supplierForm, address: e.target.value })} className="w-full border border-gray-300 p-2 rounded mt-1 bg-white text-gray-900 outline-none focus:border-blue-500" />
               </div>
               <button type="submit" className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg cursor-pointer">
-                {txt("সংরক্ষণ করুন", "Save Supplier")}
+                {editingSupplierId ? txt("আপডেট সংরক্ষণ করুন", "Update Supplier") : txt("সংরক্ষণ করুন", "Save Supplier")}
               </button>
             </form>
           </div>
