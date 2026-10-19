@@ -250,9 +250,13 @@ export default function IspManagementModule({
     ledger: [],
     total_inflow: 0,
     total_outflow: 0,
-    net_balance: 0
+    total_billed: 0,
+    total_collected: 0,
+    net_balance: 0,
+    customer_due: 0
   });
   const [ledgerTypeFilter, setLedgerTypeFilter] = useState('all');
+  const [ledgerCustomerFilter, setLedgerCustomerFilter] = useState('');
   const [ledgerStartDate, setLedgerStartDate] = useState('');
   const [ledgerEndDate, setLedgerEndDate] = useState('');
 
@@ -318,10 +322,11 @@ export default function IspManagementModule({
     }
   };
 
-  // ৪. আইএসপি পৃথক লেজার ফেচ
+  // ৪. আইএসপি পৃথক ও সমন্বিত লেজার ফেচ
   const fetchLedger = async () => {
     try {
       let url = `${API_BASE}/isp/ledger?type=${ledgerTypeFilter}`;
+      if (ledgerCustomerFilter) url += `&customer_id=${ledgerCustomerFilter}`;
       if (ledgerStartDate) url += `&start_date=${ledgerStartDate}`;
       if (ledgerEndDate) url += `&end_date=${ledgerEndDate}`;
       const res = await fetch(url);
@@ -408,7 +413,7 @@ export default function IspManagementModule({
       fetchProfitLoss();
       fetchExpenses();
     }
-  }, [activeSubTab, savedPaymentsSearch, ledgerTypeFilter, ledgerStartDate, ledgerEndDate, plStartDate, plEndDate]);
+  }, [activeSubTab, savedPaymentsSearch, ledgerTypeFilter, ledgerCustomerFilter, ledgerStartDate, ledgerEndDate, plStartDate, plEndDate]);
 
   // ফিল্টার্ড কাস্টমার লিস্ট (স্পিড ইত্যাদি ক্লায়েন্ট সাইড ফিল্টার)
   const filteredCustomers = customers.filter(c => {
@@ -777,24 +782,80 @@ ${timingNotice}
     window.open(url, '_blank');
   };
 
+  // মাসের সংখ্যা পরিবর্তন ও স্বয়ংক্রিয় পরিমাণ ও সাইকেল হিসাব
+  const handleSelectMonthCount = (count, currentDocType = payFormData.doc_type) => {
+    if (!payingCustomer) return;
+    const numMonths = Math.max(1, parseInt(count) || 1);
+    const mFee = parseFloat(payingCustomer.monthly_fee) || 0;
+    const dues = calculateCustomerDues(payingCustomer);
+    const unpaidLc = dues.unpaid_line_charge || 0;
+    const isBoth = (payFormData.payment_type === 'both' || payFormData.payment_type === 'line_charge');
+    const lineChargeToAdd = isBoth ? unpaidLc : 0;
+    const totalAmt = (numMonths * mFee) + lineChargeToAdd;
+
+    const today = new Date();
+    let baseCycle = payingCustomer.billing_cycle_end ? new Date(payingCustomer.billing_cycle_end) : today;
+    if (isNaN(baseCycle.getTime()) || baseCycle < today) {
+      baseCycle = today;
+    }
+    const connDay = payingCustomer.connection_date ? new Date(payingCustomer.connection_date).getDate() : baseCycle.getDate();
+    const nextEndObj = new Date(baseCycle.getFullYear(), baseCycle.getMonth() + numMonths, connDay);
+    const nextEndDate = nextEndObj.toISOString().slice(0, 10);
+
+    const startMonth = getMonthYearName(baseCycle, false, lang);
+    const endMonthObj = new Date(baseCycle.getFullYear(), baseCycle.getMonth() + numMonths - 1, 1);
+    const endMonth = getMonthYearName(endMonthObj, false, lang);
+
+    let rangeStr = '';
+    if (numMonths === 1) {
+      rangeStr = (payFormData.billing_type === 'prepaid') 
+        ? getMonthYearName(baseCycle, true, lang) 
+        : getMonthYearName(baseCycle, false, lang);
+    } else {
+      rangeStr = `${startMonth} হতে ${endMonth} (${numMonths} মাস)`;
+    }
+
+    setPayFormData(prev => ({
+      ...prev,
+      months_count: numMonths,
+      amount: totalAmt,
+      billing_month: rangeStr,
+      next_billing_cycle_end: nextEndDate,
+      note: currentDocType === 'bill'
+        ? (numMonths > 1 ? `ইন্টারনেট বকেয়া বিল চালান (${numMonths} মাস - ${rangeStr})` : txt('মাসিক ইন্টারনেট বিল চালান', 'Monthly internet bill invoice'))
+        : (numMonths > 1 ? `ইন্টারনেট সাবস্ক্রিপশন ফি পরিশোধ (${numMonths} মাস - ${rangeStr})` : txt('মাসিক ইন্টারনেট সাবস্ক্রিপশন ফি পরিশোধ', 'Monthly internet subscription fee paid'))
+    }));
+  };
+
   // কুইক বিল ও মানি রিসিপ্ট পেমেন্ট মোডাল ওপেন
   const handleOpenPayModal = (c, initialDocType = 'receipt') => {
     setPayingCustomer(c);
     const billingType = c.billing_type || 'prepaid';
     const dues = calculateCustomerDues(c);
 
-    // পরবর্তী মাস পূর্ণের তারিখ (+১ মাস স্বয়ংক্রিয় - একই তারিখ বজায় রাখা)
+    const initialMonths = (initialDocType === 'bill' && dues.unpaid_months > 1) ? dues.unpaid_months : 1;
+
+    // পরবর্তী মাস পূর্ণের তারিখ (+মাস সংখ্যা স্বয়ংক্রিয় - একই তারিখ বজায় রাখা)
     const today = new Date();
+    let baseCycle = c.billing_cycle_end ? new Date(c.billing_cycle_end) : today;
+    if (isNaN(baseCycle.getTime()) || baseCycle < today) {
+      baseCycle = today;
+    }
     const connDay = c.connection_date ? new Date(c.connection_date).getDate() : today.getDate();
-    const futureEnd = new Date(today.getFullYear(), today.getMonth() + 1, connDay);
+    const futureEnd = new Date(baseCycle.getFullYear(), baseCycle.getMonth() + initialMonths, connDay);
     const nextEndDate = futureEnd.toISOString().slice(0, 10);
 
-    const initialMonth = (dues.unpaid_months > 1)
+    const initialMonth = (initialDocType === 'bill' && dues.unpaid_months > 1)
       ? dues.billing_month_range
       : (billingType === 'prepaid' ? getMonthYearName(today, true, lang) : getMonthYearName(today, false, lang));
 
+    const initialAmount = (initialDocType === 'bill' && dues.unpaid_months > 1)
+      ? dues.total_due
+      : ((parseFloat(c.monthly_fee) || 0) + (dues.unpaid_line_charge > 0 ? dues.unpaid_line_charge : 0));
+
     setPayFormData({
-      amount: dues.total_due || c.monthly_fee || '',
+      amount: initialAmount,
+      months_count: initialMonths,
       payment_type: dues.unpaid_line_charge > 0 ? 'both' : 'monthly_fee',
       billing_type: billingType,
       doc_type: initialDocType,
@@ -808,8 +869,8 @@ ${timingNotice}
       unpaid_line_charge: dues.unpaid_line_charge,
       total_due: dues.total_due,
       note: initialDocType === 'bill' 
-        ? (dues.unpaid_months > 1 ? `ইন্টারনেট বকেয়া বিল চালান (${dues.billing_month_range})` : txt('মাসিক ইন্টারনেট বিল চালান', 'Monthly internet bill invoice'))
-        : (dues.unpaid_months > 1 ? `ইন্টারনেট বকেয়া সাবস্ক্রিপশন ফি পরিশোধ (${dues.billing_month_range})` : txt('মাসিক ইন্টারনেট সাবস্ক্রিপশন ফি পরিশোধ', 'Monthly internet subscription fee paid'))
+        ? (initialMonths > 1 ? `ইন্টারনেট বকেয়া বিল চালান (${initialMonths} মাস - ${initialMonth})` : txt('মাসিক ইন্টারনেট বিল চালান', 'Monthly internet bill invoice'))
+        : (initialMonths > 1 ? `ইন্টারনেট সাবস্ক্রিপশন ফি পরিশোধ (${initialMonths} মাস - ${initialMonth})` : txt('মাসিক ইন্টারনেট সাবস্ক্রিপশন ফি পরিশোধ', 'Monthly internet subscription fee paid'))
     });
   };
 
@@ -825,6 +886,7 @@ ${timingNotice}
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...payFormData,
+          months_count: payFormData.months_count || 1,
           speed: payingCustomer.speed,
           monthly_fee: payingCustomer.monthly_fee,
           line_charge: payingCustomer.line_charge,
@@ -844,7 +906,8 @@ ${timingNotice}
           customer_address: payingCustomer.address,
           speed: payingCustomer.speed,
           monthly_fee: payingCustomer.monthly_fee,
-          unpaid_months: payFormData.unpaid_months || 1,
+          months_count: payFormData.months_count || 1,
+          unpaid_months: payFormData.months_count || payFormData.unpaid_months || 1,
           monthly_due: payFormData.monthly_due || payFormData.amount,
           unpaid_line_charge: payFormData.unpaid_line_charge || 0,
           total_due: payFormData.total_due || payFormData.amount,
@@ -2118,6 +2181,14 @@ ${timingNotice}
                 {txt('সকল লেনদেন', 'All Transactions')}
               </button>
               <button
+                onClick={() => setLedgerTypeFilter('bills')}
+                className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
+                  ledgerTypeFilter === 'bills' ? 'bg-purple-700 text-white shadow-sm' : 'bg-purple-50 text-purple-900 hover:bg-purple-100'
+                }`}
+              >
+                📄 {txt('গ্রাহক বিল ধার্য (ডেবিট)', 'Customer Bills (Debit)')}
+              </button>
+              <button
                 onClick={() => setLedgerTypeFilter('income')}
                 className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
                   ledgerTypeFilter === 'income' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
@@ -2128,10 +2199,10 @@ ${timingNotice}
               <button
                 onClick={() => setLedgerTypeFilter('supplier')}
                 className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
-                  ledgerTypeFilter === 'supplier' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-800 hover:bg-purple-100'
+                  ledgerTypeFilter === 'supplier' ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-800 hover:bg-indigo-100'
                 }`}
               >
-                📤 {txt('সাপ্লায়ার পেমেন্ট (খরচ)', 'Supplier Payment (Debit)')}
+                📤 {txt('সাপ্লায়ার পেমেন্ট', 'Supplier Payment')}
               </button>
               <button
                 onClick={() => setLedgerTypeFilter('expense')}
@@ -2139,12 +2210,40 @@ ${timingNotice}
                   ledgerTypeFilter === 'expense' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-800 hover:bg-rose-100'
                 }`}
               >
-                🛠️ {txt('রক্ষণাবেক্ষণ খরচ (খরচ)', 'Maintenance Expenses (Debit)')}
+                🛠️ {txt('রক্ষণাবেক্ষণ খরচ', 'Maintenance Expenses')}
               </button>
             </div>
 
-            {/* তারিখ রেঞ্জ */}
-            <div className="flex items-center gap-2">
+            {/* গ্রাহক ফিল্টার ও তারিখ রেঞ্জ */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* গ্রাহক সিলেকশন ড্রপডাউন (সমন্বিত গ্রাহক খতিয়ান) */}
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1">
+                <Users size={14} className="text-slate-500 shrink-0" />
+                <select
+                  value={ledgerCustomerFilter}
+                  onChange={(e) => setLedgerCustomerFilter(e.target.value)}
+                  className="bg-transparent font-bold text-slate-800 text-xs focus:outline-none max-w-[180px] sm:max-w-xs truncate cursor-pointer"
+                  title={txt('গ্রাহক ভিত্তিক সমন্বিত বিল ও কালেকশন খতিয়ান', 'Customer integrated ledger')}
+                >
+                  <option value="">{txt('সকল গ্রাহক ও সাধারণ খতিয়ান', 'All Customers & General Ledger')}</option>
+                  {customers.map(c => (
+                    <option key={c.id} value={c.id}>
+                      👤 {c.customer_name} ({c.customer_user_id || c.pppoe_username || c.mobile})
+                    </option>
+                  ))}
+                </select>
+                {ledgerCustomerFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setLedgerCustomerFilter('')}
+                    className="text-slate-400 hover:text-slate-700 text-xs font-black cursor-pointer ml-1"
+                    title={txt('গ্রাহক ফিল্টার বাতিল করুন', 'Clear customer filter')}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
               <input
                 type="date"
                 value={ledgerStartDate}
@@ -2168,50 +2267,97 @@ ${timingNotice}
           </div>
 
           {/* লেজার সারাংশ বক্স */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl flex justify-between items-center">
-              <div>
-                <p className="text-[11px] font-bold text-emerald-700 uppercase">{txt('মোট আইএসপি আয় (জমা / ক্রেডিট)', 'Total ISP Income (Credit)')}</p>
-                <h3 className="text-xl font-black text-emerald-950 font-mono mt-0.5">
-                  ৳ {Number(ledgerData.total_inflow || 0).toLocaleString()}
-                </h3>
+          {ledgerCustomerFilter ? (
+            /* গ্রাহকভিত্তিক সমন্বিত খতিয়ান সারাংশ (Customer Integrated Ledger Summary) */
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="bg-purple-50 border border-purple-200 p-3.5 rounded-2xl flex justify-between items-center">
+                <div>
+                  <p className="text-[11px] font-bold text-purple-700 uppercase">{txt('মোট বিল ধার্য (দেনা / ডেবিট)', 'Total Billed (Debit)')}</p>
+                  <h3 className="text-xl font-black text-purple-950 font-mono mt-0.5">
+                    ৳ {Number(ledgerData.total_billed || 0).toLocaleString()}
+                  </h3>
+                </div>
+                <FileText size={24} className="text-purple-600" />
               </div>
-              <ArrowDownRight size={24} className="text-emerald-600" />
-            </div>
 
-            <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-2xl flex justify-between items-center">
-              <div>
-                <p className="text-[11px] font-bold text-rose-700 uppercase">{txt('মোট আইএসপি ব্যয় (খরচ / ডেবিট)', 'Total ISP Expenses (Debit)')}</p>
-                <h3 className="text-xl font-black text-rose-950 font-mono mt-0.5">
-                  ৳ {Number(ledgerData.total_outflow || 0).toLocaleString()}
-                </h3>
+              <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl flex justify-between items-center">
+                <div>
+                  <p className="text-[11px] font-bold text-emerald-700 uppercase">{txt('মোট কালেকশন / জমা (পরিশোধ / ক্রেডিট)', 'Total Collected (Credit)')}</p>
+                  <h3 className="text-xl font-black text-emerald-950 font-mono mt-0.5">
+                    ৳ {Number(ledgerData.total_collected || ledgerData.total_inflow || 0).toLocaleString()}
+                  </h3>
+                </div>
+                <CheckCircle2 size={24} className="text-emerald-600" />
               </div>
-              <ArrowUpRight size={24} className="text-rose-600" />
-            </div>
 
-            <div className="bg-blue-50 border border-blue-200 p-3.5 rounded-2xl flex justify-between items-center">
-              <div>
-                <p className="text-[11px] font-bold text-blue-700 uppercase">{txt('নিট আইএসপি ব্যালেন্স (ক্যাশ ইন হ্যান্ড)', 'Net ISP Balance (Cash in Hand)')}</p>
-                <h3 className="text-xl font-black text-blue-950 font-mono mt-0.5">
-                  ৳ {Number(ledgerData.net_balance || 0).toLocaleString()}
-                </h3>
+              <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-2xl flex justify-between items-center">
+                <div>
+                  <p className="text-[11px] font-bold text-rose-700 uppercase">{txt('গ্রাহকের বর্তমান বকেয়া (Customer Due)', 'Customer Current Due')}</p>
+                  <h3 className="text-xl font-black text-rose-950 font-mono mt-0.5">
+                    ৳ {Number(ledgerData.customer_due !== undefined ? ledgerData.customer_due : Math.max(0, (ledgerData.total_billed || 0) - (ledgerData.total_collected || 0))).toLocaleString()}
+                  </h3>
+                </div>
+                <DollarSign size={24} className="text-rose-600" />
               </div>
-              <DollarSign size={24} className="text-blue-600" />
             </div>
-          </div>
+          ) : (
+            /* সার্বিক আইএসপি লেজার সারাংশ */
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-purple-50 border border-purple-200 p-3 rounded-2xl flex justify-between items-center">
+                <div>
+                  <p className="text-[10px] font-bold text-purple-700 uppercase">{txt('মোট গ্রাহক বিল ধার্য', 'Total Bills Issued')}</p>
+                  <h3 className="text-lg font-black text-purple-950 font-mono mt-0.5">
+                    ৳ {Number(ledgerData.total_billed || 0).toLocaleString()}
+                  </h3>
+                </div>
+                <FileText size={20} className="text-purple-600" />
+              </div>
+
+              <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-2xl flex justify-between items-center">
+                <div>
+                  <p className="text-[10px] font-bold text-emerald-700 uppercase">{txt('মোট গ্রাহক কালেকশন (জমা)', 'Total Inflow (Collections)')}</p>
+                  <h3 className="text-lg font-black text-emerald-950 font-mono mt-0.5">
+                    ৳ {Number(ledgerData.total_collected || ledgerData.total_inflow || 0).toLocaleString()}
+                  </h3>
+                </div>
+                <ArrowDownRight size={20} className="text-emerald-600" />
+              </div>
+
+              <div className="bg-rose-50 border border-rose-200 p-3 rounded-2xl flex justify-between items-center">
+                <div>
+                  <p className="text-[10px] font-bold text-rose-700 uppercase">{txt('মোট আইএসপি ব্যয় (আউটফ্লো)', 'Total Expenses & Outflow')}</p>
+                  <h3 className="text-lg font-black text-rose-950 font-mono mt-0.5">
+                    ৳ {Number(ledgerData.total_outflow || 0).toLocaleString()}
+                  </h3>
+                </div>
+                <ArrowUpRight size={20} className="text-rose-600" />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 p-3 rounded-2xl flex justify-between items-center">
+                <div>
+                  <p className="text-[10px] font-bold text-blue-700 uppercase">{txt('নিট ব্যালেন্স (ক্যাশ ইন হ্যান্ড)', 'Net Cash Balance')}</p>
+                  <h3 className="text-lg font-black text-blue-950 font-mono mt-0.5">
+                    ৳ {Number(ledgerData.net_balance || 0).toLocaleString()}
+                  </h3>
+                </div>
+                <DollarSign size={20} className="text-blue-600" />
+              </div>
+            </div>
+          )}
 
           {/* লেজার টেবিল */}
           <div className="overflow-x-auto border border-slate-200 rounded-2xl">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-slate-900 text-white text-[11px] uppercase tracking-wider">
+                <tr className="bg-gray-700 text-white text-[11px] uppercase tracking-wider print:bg-gray-700 print:text-white">
                   <th className="py-2.5 px-3">{txt('তারিখ', 'Date')}</th>
                   <th className="py-2.5 px-3">{txt('ভাউচার / রিসিট নং', 'Voucher / Receipt No')}</th>
+                  <th className="py-2.5 px-3">{txt('লেনদেনের ধরন', 'Type')}</th>
                   <th className="py-2.5 px-3">{txt('বিবরণ', 'Particulars')}</th>
                   <th className="py-2.5 px-3">{txt('গ্রাহক / পার্টি', 'Customer / Party')}</th>
-                  <th className="py-2.5 px-3 text-right text-emerald-300">{txt('জমা (ক্রেডিট)', 'Credit (Inflow)')}</th>
-                  <th className="py-2.5 px-3 text-right text-rose-300">{txt('খরচ (ডেবিট)', 'Debit (Expense)')}</th>
-                  <th className="py-2.5 px-3 text-right">{txt('ব্যালেন্স', 'Balance')}</th>
+                  <th className="py-2.5 px-3 text-right text-rose-200">{txt('দেনা / বিল ধার্য (৳)', 'Debit / Bill (৳)')}</th>
+                  <th className="py-2.5 px-3 text-right text-emerald-200">{txt('পরিশোধ / কালেকশন (৳)', 'Credit / Paid (৳)')}</th>
+                  <th className="py-2.5 px-3 text-right text-blue-200">{txt('ব্যালেন্স (৳)', 'Balance (৳)')}</th>
                   <th className="py-2.5 px-3">{txt('মাধ্যম', 'Method')}</th>
                   {isAdmin && <th className="py-2.5 px-3 text-center">{txt('অ্যাকশন', 'Action')}</th>}
                 </tr>
@@ -2219,28 +2365,47 @@ ${timingNotice}
               <tbody className="divide-y divide-slate-200 text-slate-800">
                 {ledgerData.ledger.length === 0 ? (
                   <tr>
-                    <td colSpan={isAdmin ? 9 : 8} className="py-8 text-center text-slate-500">
-                      {txt('কোনো লেজার এন্ট্রি নেই।', 'No ledger entries.')}
+                    <td colSpan={isAdmin ? 10 : 9} className="py-8 text-center text-slate-500">
+                      {txt('কোনো লেজার লেনদেন এন্ট্রি নেই।', 'No ledger entries.')}
                     </td>
                   </tr>
                 ) : (
                   ledgerData.ledger.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50 transition">
-                      <td className="py-2.5 px-3 font-mono text-[11px] whitespace-nowrap">
+                    <tr key={idx} className="hover:bg-slate-50 transition border-b border-slate-100">
+                      <td className="py-2.5 px-3 font-mono text-[11px] whitespace-nowrap text-slate-600">
                         {row.trans_date ? row.trans_date.slice(0, 10) : '-'}
                       </td>
                       <td className="py-2.5 px-3 font-mono font-bold text-slate-900 whitespace-nowrap">
                         {row.ref_no}
                       </td>
-                      <td className="py-2.5 px-3 font-medium">{row.particulars}</td>
-                      <td className="py-2.5 px-3 font-semibold text-slate-900">{row.party_name}</td>
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
-                        {row.credit_amount > 0 ? `৳ ${Number(row.credit_amount).toLocaleString()}` : '-'}
+                      <td className="py-2.5 px-3 whitespace-nowrap font-bold text-[11px]">
+                        {row.trans_type === 'CUSTOMER_BILL' ? (
+                          <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">
+                            📄 {txt('বিল ধার্য', 'Customer Bill')}
+                          </span>
+                        ) : row.trans_type === 'CUSTOMER_INCOME' ? (
+                          <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            📥 {txt('কালেকশন জমা', 'Collection')}
+                          </span>
+                        ) : row.trans_type === 'SUPPLIER_PAYMENT' ? (
+                          <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 border border-indigo-200">
+                            📤 {txt('ব্যান্ডউইথ বিল', 'Bandwidth')}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">
+                            🛠️ {txt('মেইনটেন্যান্স', 'Expense')}
+                          </span>
+                        )}
                       </td>
+                      <td className="py-2.5 px-3 font-medium text-slate-800">{row.particulars}</td>
+                      <td className="py-2.5 px-3 font-semibold text-slate-900">{row.party_name}</td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-rose-700 whitespace-nowrap">
                         {row.debit_amount > 0 ? `৳ ${Number(row.debit_amount).toLocaleString()}` : '-'}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                        {row.credit_amount > 0 ? `৳ ${Number(row.credit_amount).toLocaleString()}` : '-'}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-black text-blue-700 bg-blue-50/50 whitespace-nowrap">
                         ৳ {Number(row.balance).toLocaleString()}
                       </td>
                       <td className="py-2.5 px-3 text-[11px] text-slate-600">{row.payment_method || 'Cash'}</td>
@@ -2248,7 +2413,7 @@ ${timingNotice}
                         <td className="py-2.5 px-3 text-center whitespace-nowrap">
                           <button
                             onClick={() => {
-                              if (row.trans_type === 'CUSTOMER_INCOME') {
+                              if (row.trans_type === 'CUSTOMER_INCOME' || row.trans_type === 'CUSTOMER_BILL') {
                                 handleDeleteCustomerPayment(row.id);
                               } else if (row.trans_type === 'SUPPLIER_PAYMENT') {
                                 handleDeleteSupplierPayment(row.id);
@@ -2267,6 +2432,27 @@ ${timingNotice}
                   ))
                 )}
               </tbody>
+              {ledgerData.ledger.length > 0 && (
+                <tfoot className="border-t-2 border-gray-700 bg-slate-50 font-bold text-xs print:bg-white">
+                  <tr>
+                    <td colSpan={5} className="py-2.5 px-3 text-right font-black">
+                      {ledgerCustomerFilter 
+                        ? txt('গ্রাহক খতিয়ানের সর্বমোট হিসাব:', 'Customer Ledger Grand Total:') 
+                        : txt('লেজারের সর্বমোট হিসাব:', 'Ledger Grand Total:')}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-black text-rose-700">
+                      ৳ {ledgerData.ledger.reduce((acc, r) => acc + (parseFloat(r.debit_amount) || 0), 0).toLocaleString()}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-700">
+                      ৳ {ledgerData.ledger.reduce((acc, r) => acc + (parseFloat(r.credit_amount) || 0), 0).toLocaleString()}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-black text-blue-800 bg-blue-100/60">
+                      ৳ {Number(ledgerData.ledger[ledgerData.ledger.length - 1].balance).toLocaleString()}
+                    </td>
+                    <td colSpan={isAdmin ? 2 : 1}></td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
 
@@ -2970,83 +3156,167 @@ ${timingNotice}
                 </div>
               </div>
 
-              {/* সঞ্চিত বকেয়া হিসাব সারাংশ বক্স */}
+              {/* মাসের সংখ্যা ও বিল/পেমেন্ট নির্ধারণ (১ মাস, নির্ধারিত ২ মাস, ৩ মাস, পূর্ণ বকেয়া ইত্যাদি) */}
               {(() => {
                 const dues = calculateCustomerDues(payingCustomer);
-                if (dues.unpaid_months > 1 || dues.unpaid_line_charge > 0) {
-                  return (
-                    <div className="bg-amber-50/90 border border-amber-300 rounded-2xl p-3 text-amber-950">
-                      <div className="flex items-center justify-between font-bold text-xs pb-2 border-b border-amber-200">
-                        <span className="flex items-center gap-1.5 text-amber-900">
-                          <AlertTriangle size={15} className="text-amber-600 shrink-0" />
-                          {txt('সংযোগ তারিখ হতে সঞ্চিত মোট বকেয়া সারাংশ', 'Accumulated Due Summary')}
+                const currentMonths = payFormData.months_count || 1;
+                return (
+                  <div className="bg-amber-50/90 border border-amber-300 rounded-2xl p-3 text-amber-950 space-y-2.5">
+                    <div className="flex items-center justify-between font-bold text-xs pb-1.5 border-b border-amber-200">
+                      <span className="flex items-center gap-1.5 text-amber-900">
+                        <Calendar size={15} className="text-amber-600 shrink-0" />
+                        {payFormData.doc_type === 'bill'
+                          ? txt('বিলিং মাসের সংখ্যা ও হিসাব নির্ধারণ:', 'Select Billing Months & Dues:')
+                          : txt('কালেকশন / পেমেন্ট গ্রহণের মাসের সংখ্যা:', 'Select Months for Payment Collection:')}
+                      </span>
+                      {dues.unpaid_months > 1 && (
+                        <span className="font-mono text-rose-700 font-black bg-rose-50 px-2 py-0.5 rounded border border-rose-200 text-[11px]">
+                          {dues.unpaid_months} {txt('মাসের বকেয়া জমা আছে', 'months accumulated due')}
                         </span>
-                        <span className="font-mono text-rose-700 font-black">
-                          {dues.unpaid_months} {txt('মাসের বকেয়া', 'months due')}
-                        </span>
+                      )}
+                    </div>
+
+                    {/* বকেয়া ও মাসিক ফি সারাংশ */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] font-mono bg-white/70 p-2 rounded-xl border border-amber-200/70">
+                      <div>
+                        <span className="text-slate-600 text-[10px] block font-sans">{txt('প্রতি মাসের ফি:', 'Monthly Fee:')}</span>
+                        <span className="font-bold text-slate-800">৳ {Number(payingCustomer.monthly_fee).toLocaleString()}</span>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 pt-2 text-[11px] font-mono">
-                        <div>
-                          <span className="text-slate-600 text-[10px] block font-sans">{txt('মাসিক ফি:', 'Monthly Fee:')}</span>
-                          <span className="font-bold">৳ {Number(payingCustomer.monthly_fee).toLocaleString()}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-600 text-[10px] block font-sans">{txt('মাসিক সাবস্ক্রিপশন ডিউ:', 'Monthly Due:')}</span>
-                          <span className="font-bold">৳ {dues.monthly_due.toLocaleString()} ({dues.unpaid_months} মাস)</span>
-                        </div>
-                        {dues.unpaid_line_charge > 0 && (
-                          <div>
-                            <span className="text-slate-600 text-[10px] block font-sans">{txt('লাইন চার্জ বকেয়া:', 'Line Charge Due:')}</span>
-                            <span className="font-bold">৳ {dues.unpaid_line_charge.toLocaleString()}</span>
-                          </div>
-                        )}
-                        <div className="col-span-2 md:col-span-3 pt-1 border-t border-amber-200 flex items-center justify-between font-sans">
-                          <span className="font-bold text-amber-950">{txt('এক বিলে সর্বমোট বকেয়া (Total Due):', 'Total Due (One Bill):')}</span>
-                          <span className="font-black font-mono text-base text-rose-700">৳ {dues.total_due.toLocaleString()}</span>
-                        </div>
+                      <div>
+                        <span className="text-slate-600 text-[10px] block font-sans">{txt('নির্ধারিত মাস:', 'Selected Months:')}</span>
+                        <span className="font-black text-indigo-700">{currentMonths} {txt('মাস', 'Month(s)')}</span>
                       </div>
-                      
-                      {/* কুইক সিলেকশন বাটন: এক বিলে সম্পূর্ণ বকেয়া vs ১ মাসের ফি */}
-                      <div className="flex gap-2 mt-2.5 pt-2 border-t border-amber-200">
+                      {dues.unpaid_line_charge > 0 && (
+                        <div>
+                          <span className="text-slate-600 text-[10px] block font-sans">{txt('বকেয়া লাইন চার্জ:', 'Unpaid Line Charge:')}</span>
+                          <span className="font-bold text-amber-700">৳ {dues.unpaid_line_charge.toLocaleString()}</span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-slate-600 text-[10px] block font-sans">{txt('মোট হিসাব (Total):', 'Total Calculated:')}</span>
+                        <span className="font-black text-rose-700 text-xs">৳ {Number(payFormData.amount || 0).toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    {/* দ্রুত মাস সিলেকশন বাটন: ১ মাস, নির্ধারিত ২ মাস, ৩ মাস, সম্পূর্ণ বকেয়া */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-amber-950 mb-1.5">
+                        {payFormData.doc_type === 'bill'
+                          ? txt('কয় মাসের বিল তৈরি করতে চান নির্বাচন করুন (নির্ধারিত ২ মাস অপশন সহ):', 'Select billing duration (including fixed 2 months option):')
+                          : txt('কয় মাসের পেমেন্ট গ্রহণ করতে চান নির্বাচন করুন:', 'Select payment duration:')}
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {/* ১ মাস */}
                         <button
                           type="button"
-                          onClick={() => {
-                            setPayFormData({
-                              ...payFormData,
-                              amount: dues.total_due,
-                              billing_month: dues.billing_month_range
-                            });
-                          }}
-                          className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 ${
-                            Number(payFormData.amount) === dues.total_due
-                              ? 'bg-rose-600 text-white shadow-sm'
-                              : 'bg-white border border-amber-300 text-amber-900 hover:bg-amber-100'
+                          onClick={() => handleSelectMonthCount(1)}
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex flex-col items-center justify-center gap-0.5 border ${
+                            Number(currentMonths) === 1
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                           }`}
                         >
-                          ⚡ {txt(`এক বিলে সম্পূর্ণ বকেয়া (৳ ${dues.total_due.toLocaleString()})`, `Full Due in One Bill (৳ ${dues.total_due.toLocaleString()})`)}
+                          <span>📅 {txt('১ মাস', '1 Month')}</span>
+                          <span className="text-[10px] opacity-90 font-mono">৳ {Number(payingCustomer.monthly_fee).toLocaleString()}</span>
                         </button>
+
+                        {/* নির্ধারিত ২ মাসের বিল / পেমেন্ট */}
                         <button
                           type="button"
-                          onClick={() => {
-                            setPayFormData({
-                              ...payFormData,
-                              amount: payingCustomer.monthly_fee,
-                              billing_month: getMonthYearName(new Date(), false, lang)
-                            });
-                          }}
-                          className={`py-1.5 px-3 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 ${
-                            Number(payFormData.amount) === Number(payingCustomer.monthly_fee)
-                              ? 'bg-slate-900 text-white shadow-sm'
-                              : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
+                          onClick={() => handleSelectMonthCount(2)}
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex flex-col items-center justify-center gap-0.5 border relative ${
+                            Number(currentMonths) === 2
+                              ? 'bg-purple-700 text-white border-purple-700 shadow-sm ring-2 ring-purple-300'
+                              : 'bg-purple-50 text-purple-900 border-purple-300 hover:bg-purple-100'
+                          }`}
+                          title={txt('নির্ধারিত ২ মাসের বিল বা কালেকশন তৈরি করুন', 'Bill or collect exactly 2 months')}
+                        >
+                          <span className="flex items-center gap-1 font-black">
+                            ⚡ {txt('নির্ধারিত ২ মাস', 'Fixed 2 Months')}
+                          </span>
+                          <span className="text-[10px] opacity-90 font-mono font-bold">
+                            ৳ {(Number(payingCustomer.monthly_fee) * 2).toLocaleString()}
+                          </span>
+                        </button>
+
+                        {/* ৩ মাস */}
+                        <button
+                          type="button"
+                          onClick={() => handleSelectMonthCount(3)}
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex flex-col items-center justify-center gap-0.5 border ${
+                            Number(currentMonths) === 3
+                              ? 'bg-indigo-700 text-white border-indigo-700 shadow-sm'
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                           }`}
                         >
-                          📅 {txt(`শুধুমাত্র ১ মাস (৳ ${Number(payingCustomer.monthly_fee).toLocaleString()})`, `Only 1 Month (৳ ${Number(payingCustomer.monthly_fee).toLocaleString()})`)}
+                          <span>📅 {txt('৩ মাস', '3 Months')}</span>
+                          <span className="text-[10px] opacity-90 font-mono">৳ {(Number(payingCustomer.monthly_fee) * 3).toLocaleString()}</span>
+                        </button>
+
+                        {/* সম্পূর্ণ বকেয়া অথবা ৬ মাস */}
+                        {dues.unpaid_months > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleSelectMonthCount(dues.unpaid_months)}
+                            className={`py-2 px-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex flex-col items-center justify-center gap-0.5 border ${
+                              Number(currentMonths) === dues.unpaid_months
+                                ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                                : 'bg-rose-50 text-rose-900 border-rose-300 hover:bg-rose-100'
+                            }`}
+                          >
+                            <span>🔥 {txt(`পূর্ণ বকেয়া (${dues.unpaid_months} মাস)`, `Full Due (${dues.unpaid_months}M)`)}</span>
+                            <span className="text-[10px] opacity-90 font-mono">৳ {dues.total_due.toLocaleString()}</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleSelectMonthCount(6)}
+                            className={`py-2 px-2.5 rounded-xl text-xs font-bold transition cursor-pointer flex flex-col items-center justify-center gap-0.5 border ${
+                              Number(currentMonths) === 6
+                                ? 'bg-emerald-700 text-white border-emerald-700 shadow-sm'
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                            }`}
+                          >
+                            <span>📅 {txt('৬ মাস', '6 Months')}</span>
+                            <span className="text-[10px] opacity-90 font-mono">৳ {(Number(payingCustomer.monthly_fee) * 6).toLocaleString()}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* কাস্টম মাসের সংখ্যা ইনপুট ও স্টিপার */}
+                    <div className="flex items-center justify-between pt-2 border-t border-amber-200 text-xs">
+                      <span className="text-amber-900 font-bold">
+                        {txt('অথবা কাস্টম কয় মাসের যুক্ত করতে চান:', 'Or enter custom month count:')}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectMonthCount(Math.max(1, currentMonths - 1))}
+                          className="w-7 h-7 bg-white border border-amber-300 rounded-lg font-black text-amber-900 hover:bg-amber-100 flex items-center justify-center cursor-pointer shadow-2xs"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          max="36"
+                          value={currentMonths}
+                          onChange={(e) => handleSelectMonthCount(e.target.value)}
+                          className="w-14 px-2 py-1 text-center bg-white border border-amber-300 rounded-lg font-mono font-black text-indigo-950 focus:outline-none"
+                        />
+                        <span className="font-bold text-amber-900">{txt('মাস', 'Months')}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectMonthCount(currentMonths + 1)}
+                          className="w-7 h-7 bg-white border border-amber-300 rounded-lg font-black text-amber-900 hover:bg-amber-100 flex items-center justify-center cursor-pointer shadow-2xs"
+                        >
+                          +
                         </button>
                       </div>
                     </div>
-                  );
-                }
-                return null;
+                  </div>
+                );
               })()}
 
               {/* ১. ডকুমেন্ট টাইপ ও বিলিং ধরণ সিলেকশন (প্রিপেইড vs পোস্টপেইড) */}

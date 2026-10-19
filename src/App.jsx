@@ -10013,173 +10013,201 @@ function App() {
                     </div>
                   </div>
 
-                  <table className="w-full text-left border-collapse text-xs mb-4">
-                    <thead>
-                      <tr className="bg-gray-900 text-white uppercase print:bg-gray-900 print:text-white">
-                        <th className="p-2.5">{txt("তারিখ", "Date")}</th>
-                        <th className="p-2.5">{txt("লেনদেনের ধরন", "Type")}</th>
-                        <th className="p-2.5">{txt("বিবরণ / ইনভয়েস নং / মানি রিসিপ্ট", "Description / Ref No")}</th>
-                        <th className="p-2.5 text-right">{txt("দেনা / মোট বিল (৳)", "Debit / Bill (৳)")}</th>
-                        <th className="p-2.5 text-right">{txt("পরিশোধিত (৳)", "Credit / Paid (৳)")}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {transactions.map((t, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="p-2.5">{formatDateDMY(t.created_at)}</td>
-                          <td className="p-2.5 font-bold">
-                            {t.type === 'Invoice' ? (
-                              <span className="text-blue-700">{txt("বিক্রয় বিল", "Sales Invoice")}</span>
-                            ) : t.type === 'Service' ? (
-                              <span className="text-purple-700 inline-flex items-center gap-1 font-bold">
-                                🛠️ {txt("সার্ভিসিং বিল", "Service Bill")}
-                              </span>
-                            ) : (
-                              <span className="text-emerald-700">{txt("বকেয়া জমা", "Due Received")}</span>
-                            )}
-                          </td>
-                          <td className="p-2.5">
-                            {t.type === 'Invoice' ? (
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-mono font-bold text-blue-700">{t.invoice_no}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleViewInvoiceDetails(t.id)}
-                                  className="px-2 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1"
-                                  title={txt("এই বিক্রয়ের মেমো ও পণ্যের তালিকা দেখুন", "View invoice memo and items")}
-                                >
-                                  📄 {txt("বিল দেখুন", "View Bill")}
-                                </button>
-                                {currentUser?.role === 'admin' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenEditInvoice(t.id)}
-                                    className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1"
-                                    title={txt("এই ইনভয়েস এডিট করে নতুন পণ্য যোগ করুন", "Edit invoice & add products")}
-                                  >
-                                    ✏️ {txt("এডিট", "Edit")}
-                                  </button>
+                  {/* কাস্টমার লেজার লেনদেন তালিকা (আগের তারিখের লেনদেন উপর উপর থেকে ক্রমানুসারে) */}
+                  {(() => {
+                    const sortedCustomerTransactions = [...transactions].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                    let runningCustBal = 0;
+                    const transactionsWithBalance = sortedCustomerTransactions.map(t => {
+                      const debit = (t.type === 'Invoice' || t.type === 'Service') ? Number(t.total_amount || 0) : 0;
+                      const credit = (t.type === 'Invoice' || t.type === 'Service') 
+                        ? Number(t.paid_amount || 0) 
+                        : (Number(t.amount || 0) + Number(t.discount || 0));
+                      runningCustBal += (debit - credit);
+                      return {
+                        ...t,
+                        debit,
+                        credit,
+                        balance: runningCustBal
+                      };
+                    });
+
+                    return (
+                      <table className="w-full text-left border-collapse text-xs mb-4">
+                        <thead>
+                          <tr className="bg-gray-700 text-white uppercase print:bg-gray-700 print:text-white">
+                            <th className="p-2.5">{txt("তারিখ", "Date")}</th>
+                            <th className="p-2.5">{txt("লেনদেনের ধরন", "Type")}</th>
+                            <th className="p-2.5">{txt("বিবরণ / ইনভয়েস নং / মানি রিসিপ্ট", "Description / Ref No")}</th>
+                            <th className="p-2.5 text-right">{txt("দেনা / মোট বিল (৳)", "Debit / Bill (৳)")}</th>
+                            <th className="p-2.5 text-right">{txt("পরিশোধিত (৳)", "Credit / Paid (৳)")}</th>
+                            <th className="p-2.5 text-right">{txt("ব্যালেন্স (৳)", "Balance (৳)")}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {transactionsWithBalance.map((t, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50 border-b border-gray-100">
+                              <td className="p-2.5 font-mono text-gray-700">{formatDateDMY(t.created_at)}</td>
+                              <td className="p-2.5 font-bold">
+                                {t.type === 'Invoice' ? (
+                                  <span className="text-blue-700">{txt("বিক্রয় বিল", "Sales Invoice")}</span>
+                                ) : t.type === 'Service' ? (
+                                  <span className="text-purple-700 inline-flex items-center gap-1 font-bold">
+                                    🛠️ {txt("সার্ভিসিং বিল", "Service Bill")}
+                                  </span>
+                                ) : (
+                                  <span className="text-emerald-700">{txt("বকেয়া জমা", "Due Received")}</span>
                                 )}
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteInvoice(t.id, t.invoice_no)}
-                                  className="px-2 py-0.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1 shadow-xs transition"
-                                  title={txt("ভুলবশত এক বিল দুইবার হলে ডিলিট করুন (কাস্টমার লেজার ও সেলস রিপোর্ট থেকে মাইনাস হবে)", "Delete duplicate invoice (deducted from customer ledger & sales report)")}
-                                >
-                                  <Trash2 size={11} /> {txt("ডিলিট", "Delete")}
-                                </button>
-                              </div>
-                            ) : t.type === 'Service' ? (
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                                <div>
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-mono font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
-                                      {t.token_no}
-                                    </span>
-                                    <span className="text-[11px] font-bold text-gray-800">
-                                      {t.product_name}
-                                    </span>
-                                    {t.problem_description && (
-                                      <span className="text-[10px] text-gray-500">
-                                        ({t.problem_description})
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleViewServiceSlip(t.id)}
-                                    className="px-2 py-0.5 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1 shrink-0"
-                                    title={txt("এই সার্ভিসিং স্লিপ দেখুন ও প্রিন্ট করুন", "View & print service slip")}
-                                  >
-                                    📄 {txt("সার্ভিস স্লিপ", "Service Slip")}
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                                <div>
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                                      {t.receipt_no || `MR-${t.id}`}
-                                    </span>
-                                    {Number(t.discount || 0) > 0 && (
-                                      <span className="text-[11px] font-bold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">
-                                        {txt("ছাড়: ৳", "Discount: ৳")}{Number(t.discount).toLocaleString()}
-                                      </span>
-                                    )}
-                                    <span className="text-[11px] font-semibold text-gray-700">
-                                      {t.payment_method === 'Cheque' ? (
-                                        <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                                          {txt("চেক:", "Cheque:")} {t.cheque_no || '-'} ({t.bank_name || 'Bank'})
-                                        </span>
-                                      ) : t.payment_method === 'bKash' ? (
-                                        <span className="text-pink-800 bg-pink-50 px-1.5 py-0.5 rounded border border-pink-200">{txt("বিকাশ", "bKash")}</span>
-                                      ) : t.payment_method === 'Bank' ? (
-                                        <span className="text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">{txt("ব্যাংক ট্রান্সফার", "Bank Transfer")}</span>
-                                      ) : (
-                                        <span className="text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">{txt("নগদ গ্রহণ", "Cash")}</span>
-                                      )}
-                                    </span>
-                                  </div>
-                                  {t.note && <p className="text-[11px] text-gray-500 mt-0.5">{t.note}</p>}
-                                </div>
-                                <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleViewMoneyReceipt(t)}
-                                    className="px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1 shrink-0"
-                                    title={txt("এই জমার মানি রিসিপ্ট দেখুন ও প্রিন্ট করুন", "View & print money receipt")}
-                                  >
-                                    <Receipt size={12} /> {txt("মানি রিসিপ্ট", "Receipt")}
-                                  </button>
-                                  {currentUser?.role === 'admin' && (
+                              </td>
+                              <td className="p-2.5">
+                                {t.type === 'Invoice' ? (
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-mono font-bold text-blue-700">{t.invoice_no}</span>
                                     <button
                                       type="button"
-                                      onClick={() => handleOpenEditPayment(t)}
-                                      className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1 shrink-0"
-                                      title={txt("টাকা কম বা বেশি গ্রহণ করা হলে সংশোধন করুন", "Edit received payment")}
+                                      onClick={() => handleViewInvoiceDetails(t.id)}
+                                      className="px-2 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1"
+                                      title={txt("এই বিক্রয়ের মেমো ও পণ্যের তালিকা দেখুন", "View invoice memo and items")}
                                     >
-                                      ✏️ {txt("এডিট", "Edit")}
+                                      📄 {txt("বিল দেখুন", "View Bill")}
                                     </button>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </td>
-                          <td className="p-2.5 text-right font-mono font-bold text-gray-800">
-                            {t.type === 'Invoice' || t.type === 'Service' ? `৳ ${Number(t.total_amount).toLocaleString()}` : '-'}
-                          </td>
-                          <td className="p-2.5 text-right font-mono font-bold text-green-600">
-                            {t.type === 'Invoice' || t.type === 'Service' ? `৳ ${Number(t.paid_amount).toLocaleString()}` : `৳ ${Number(t.amount).toLocaleString()}`}
-                          </td>
-                        </tr>
-                      ))}
-                      {transactions.length === 0 && (
-                        <tr>
-                          <td colSpan="5" className="text-center py-6 text-gray-400">
-                            {txt("নির্বাচিত তারিখের মধ্যে কোনো লেনদেন পাওয়া যায়নি", "No transactions found within selected date range")}
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                    {transactions.length > 0 && (
-                      <tfoot className="border-t-2 border-gray-900 bg-gray-50 font-bold text-xs print:bg-white">
-                        <tr>
-                          <td colSpan={3} className="p-2.5 text-right font-black">
-                            {(custLedgerFromDate || custLedgerToDate) ? txt('নির্বাচিত সময়ের সর্বমোট:', 'Total in Selected Period:') : txt('সর্বমোট হিসাব:', 'Grand Total:')}
-                          </td>
-                          <td className="p-2.5 text-right font-mono font-black text-gray-900">
-                            ৳ {transactions.reduce((acc, t) => acc + (t.type === 'Invoice' || t.type === 'Service' ? Number(t.total_amount || 0) : 0), 0).toLocaleString()}
-                          </td>
-                          <td className="p-2.5 text-right font-mono font-black text-green-700">
-                            ৳ {transactions.reduce((acc, t) => acc + (t.type === 'Invoice' || t.type === 'Service' ? Number(t.paid_amount || 0) : Number(t.amount || 0)), 0).toLocaleString()}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    )}
-                  </table>
+                                    {currentUser?.role === 'admin' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenEditInvoice(t.id)}
+                                        className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1"
+                                        title={txt("এই ইনভয়েস এডিট করে নতুন পণ্য যোগ করুন", "Edit invoice & add products")}
+                                      >
+                                        ✏️ {txt("এডিট", "Edit")}
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteInvoice(t.id, t.invoice_no)}
+                                      className="px-2 py-0.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1 shadow-xs transition"
+                                      title={txt("ভুলবশত এক বিল দুইবার হলে ডিলিট করুন (কাস্টমার লেজার ও সেলস রিপোর্ট থেকে মাইনাস হবে)", "Delete duplicate invoice (deducted from customer ledger & sales report)")}
+                                    >
+                                      <Trash2 size={11} /> {txt("ডিলিট", "Delete")}
+                                    </button>
+                                  </div>
+                                ) : t.type === 'Service' ? (
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                                    <div>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="font-mono font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                                          {t.token_no}
+                                        </span>
+                                        <span className="text-[11px] font-bold text-gray-800">
+                                          {t.product_name}
+                                        </span>
+                                        {t.problem_description && (
+                                          <span className="text-[10px] text-gray-500">
+                                            ({t.problem_description})
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleViewServiceSlip(t.id)}
+                                        className="px-2 py-0.5 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1 shrink-0"
+                                        title={txt("এই সার্ভিসিং স্লিপ দেখুন ও প্রিন্ট করুন", "View & print service slip")}
+                                      >
+                                        📄 {txt("সার্ভিস স্লিপ", "Service Slip")}
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                                    <div>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                          {t.receipt_no || `MR-${t.id}`}
+                                        </span>
+                                        {Number(t.discount || 0) > 0 && (
+                                          <span className="text-[11px] font-bold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">
+                                            {txt("ছাড়: ৳", "Discount: ৳")}{Number(t.discount).toLocaleString()}
+                                          </span>
+                                        )}
+                                        <span className="text-[11px] font-semibold text-gray-700">
+                                          {t.payment_method === 'Cheque' ? (
+                                            <span className="text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                              {txt("চেক:", "Cheque:")} {t.cheque_no || '-'} ({t.bank_name || 'Bank'})
+                                            </span>
+                                          ) : t.payment_method === 'bKash' ? (
+                                            <span className="text-pink-800 bg-pink-50 px-1.5 py-0.5 rounded border border-pink-200">{txt("বিকাশ", "bKash")}</span>
+                                          ) : t.payment_method === 'Bank' ? (
+                                            <span className="text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">{txt("ব্যাংক ট্রান্সফার", "Bank Transfer")}</span>
+                                          ) : (
+                                            <span className="text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">{txt("নগদ গ্রহণ", "Cash")}</span>
+                                          )}
+                                        </span>
+                                      </div>
+                                      {t.note && <p className="text-[11px] text-gray-500 mt-0.5">{t.note}</p>}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleViewMoneyReceipt(t)}
+                                        className="px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1 shrink-0"
+                                        title={txt("এই জমার মানি রিসিপ্ট দেখুন ও প্রিন্ট করুন", "View & print money receipt")}
+                                      >
+                                        <Receipt size={12} /> {txt("মানি রিসিপ্ট", "Receipt")}
+                                      </button>
+                                      {currentUser?.role === 'admin' && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenEditPayment(t)}
+                                          className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1 shrink-0"
+                                          title={txt("টাকা কম বা বেশি গ্রহণ করা হলে সংশোধন করুন", "Edit received payment")}
+                                        >
+                                          ✏️ {txt("এডিট", "Edit")}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-bold text-gray-800">
+                                {t.debit > 0 ? `৳ ${t.debit.toLocaleString()}` : '-'}
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-bold text-green-600">
+                                {t.credit > 0 ? `৳ ${t.credit.toLocaleString()}` : '-'}
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-bold text-blue-700 bg-blue-50/50">
+                                ৳ {t.balance.toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                          {transactionsWithBalance.length === 0 && (
+                            <tr>
+                              <td colSpan="6" className="text-center py-6 text-gray-400">
+                                {txt("নির্বাচিত তারিখের মধ্যে কোনো লেনদেন পাওয়া যায়নি", "No transactions found within selected date range")}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                        {transactionsWithBalance.length > 0 && (
+                          <tfoot className="border-t-2 border-gray-700 bg-gray-50 font-bold text-xs print:bg-white">
+                            <tr>
+                              <td colSpan={3} className="p-2.5 text-right font-black">
+                                {(custLedgerFromDate || custLedgerToDate) ? txt('নির্বাচিত সময়ের সর্বমোট:', 'Total in Selected Period:') : txt('সর্বমোট হিসাব:', 'Grand Total:')}
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-black text-gray-900">
+                                ৳ {transactionsWithBalance.reduce((acc, t) => acc + t.debit, 0).toLocaleString()}
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-black text-green-700">
+                                ৳ {transactionsWithBalance.reduce((acc, t) => acc + t.credit, 0).toLocaleString()}
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-black text-blue-800 bg-blue-100/60">
+                                ৳ {transactionsWithBalance[transactionsWithBalance.length - 1].balance.toLocaleString()}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    );
+                  })()}
                 </div>
 
                 {/* গ্রাহক লেজার সিগনেচার সেকশন - একদম নিচে */}
@@ -10436,135 +10464,167 @@ function App() {
                         </div>
                       </div>
 
-                      <table className="w-full text-left border-collapse text-xs mb-4">
-                        <thead>
-                          <tr className="bg-gray-900 text-white uppercase print:bg-gray-900 print:text-white">
-                            <th className="p-2.5">{txt("তারিখ", "Date")}</th>
-                            <th className="p-2.5">{txt("লেনদেনের ধরন", "Type")}</th>
-                            <th className="p-2.5">{txt("বিবরণ / নোট", "Description / Note")}</th>
-                            <th className="p-2.5 text-right">{txt("টাকার পরিমাণ (৳)", "Amount (৳)")}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {supplierTransactions.map((st, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50">
-                              <td className="p-2.5">{formatDateDMY(st.created_at)}</td>
-                              <td className="p-2.5 font-bold">
-                                {st.type === 'নতুন পণ্য ওয়ারেন্টি পেন্ডিং' ? (
-                                  <span className="inline-flex items-center gap-1 text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-300 font-bold text-[11px]">
-                                    ⚠️ {txt("নতুন পণ্য ওয়ারেন্টি পেন্ডিং", "Defective Stock Warranty Pending")}
-                                  </span>
-                                ) : st.type === 'সাপ্লায়ার পণ্য পরিবর্তন' ? (
-                                  <span className="inline-flex items-center gap-1 text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-300 font-bold text-[11px]">
-                                    🔄 {txt("সাপ্লায়ার পণ্য পরিবর্তন", "Supplier Warranty Replaced")}
-                                  </span>
-                                ) : st.type === 'Purchase' ? (
-                                  <span className="text-rose-700">{txt("পণ্য ক্রয় (+)", "Purchase (+)")}</span>
-                                ) : st.type === 'Return' ? (
-                                  <span className="text-amber-700 font-bold">↩️ {txt("কোম্পানি রিটার্ন (-)", "Company Return (-)")}</span>
-                                ) : st.type === 'Return_Refund' ? (
-                                  <span className="text-emerald-700 font-bold">💵 {txt("রিটার্ন ক্যাশ রিফান্ড", "Return Cash Refund")}</span>
-                                ) : (
-                                  <span className="text-emerald-700">{txt("পেমেন্ট পরিশোধ (-)", "Payment (-)")}</span>
-                                )}
-                              </td>
-                              <td className="p-2.5 text-gray-700">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span>{st.note || '-'}</span>
-                                  <div className="flex items-center gap-1.5 shrink-0">
-                                    {(st.type === 'Return' || st.type === 'Return_Refund') && (
-                                      <button 
-                                        type="button" 
-                                        onClick={() => {
-                                          setActiveReturnSlip({
-                                            id: st.id,
-                                            return_no: `RET-${st.id}`,
-                                            product_name: st.note?.split('-')[0]?.replace('কোম্পানি রিটার্ন:', '')?.trim() || 'Returned Product',
-                                            supplier_name: supplierLedger.name,
-                                            supplier_mobile: supplierLedger.mobile,
-                                            supplier_address: supplierLedger.address,
-                                            quantity: 1,
-                                            unit_price: Number(st.amount || 0),
-                                            total_amount: Number(st.amount || 0),
-                                            settlement_type: st.type === 'Return_Refund' ? 'Cash_Refund' : 'Deduce_Payable',
-                                            reason: st.note || 'Company Return',
-                                            return_date: st.created_at,
-                                            returned_by: 'Staff'
-                                          });
-                                          setShowReturnSlipModal(true);
-                                        }}
-                                        className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer print:hidden shrink-0 transition"
-                                        title={txt("রিটার্ন চালান ও স্লিপ দেখুন ও প্রিন্ট করুন", "View & print return challan/slip")}
-                                      >
-                                        <Printer size={11} /> {txt("রিটার্ন চালান", "Return Challan")}
-                                      </button>
+                      {/* সাপ্লায়ার লেজার লেনদেন তালিকা (আগের তারিখের লেনদেন উপর উপর থেকে ক্রমানুসারে) */}
+                      {(() => {
+                        const sortedSupplierTransactions = [...supplierTransactions].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                        let runningSuppBal = 0;
+                        const supplierTransactionsWithBalance = sortedSupplierTransactions.map(st => {
+                          let debit = 0;
+                          let credit = 0;
+                          const amt = Number(st.amount || 0);
+
+                          if (st.type === 'Purchase') {
+                            debit = amt;
+                            runningSuppBal += amt;
+                          } else if (st.type === 'Payment') {
+                            credit = amt;
+                            runningSuppBal -= amt;
+                          } else if (st.type === 'Return') {
+                            credit = amt;
+                            runningSuppBal -= amt;
+                          } else if (st.type === 'Return_Refund') {
+                            credit = amt;
+                          }
+
+                          return {
+                            ...st,
+                            debit,
+                            credit,
+                            balance: runningSuppBal
+                          };
+                        });
+
+                        return (
+                          <table className="w-full text-left border-collapse text-xs mb-4">
+                            <thead>
+                              <tr className="bg-gray-700 text-white uppercase print:bg-gray-700 print:text-white">
+                                <th className="p-2.5">{txt("তারিখ", "Date")}</th>
+                                <th className="p-2.5">{txt("লেনদেনের ধরন", "Type")}</th>
+                                <th className="p-2.5">{txt("বিবরণ / নোট", "Description / Note")}</th>
+                                <th className="p-2.5 text-right">{txt("দেনা / ক্রয় (৳)", "Debit / Purchase (৳)")}</th>
+                                <th className="p-2.5 text-right">{txt("পরিশোধ (৳)", "Credit / Paid (৳)")}</th>
+                                <th className="p-2.5 text-right">{txt("ব্যালেন্স (৳)", "Balance (৳)")}</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                              {supplierTransactionsWithBalance.map((st, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50 border-b border-gray-100">
+                                  <td className="p-2.5 font-mono text-gray-700">{formatDateDMY(st.created_at)}</td>
+                                  <td className="p-2.5 font-bold">
+                                    {st.type === 'নতুন পণ্য ওয়ারেন্টি পেন্ডিং' ? (
+                                      <span className="inline-flex items-center gap-1 text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-300 font-bold text-[11px]">
+                                        ⚠️ {txt("নতুন পণ্য ওয়ারেন্টি পেন্ডিং", "Defective Stock Warranty Pending")}
+                                      </span>
+                                    ) : st.type === 'সাপ্লায়ার পণ্য পরিবর্তন' ? (
+                                      <span className="inline-flex items-center gap-1 text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-300 font-bold text-[11px]">
+                                        🔄 {txt("সাপ্লায়ার পণ্য পরিবর্তন", "Supplier Warranty Replaced")}
+                                      </span>
+                                    ) : st.type === 'Purchase' ? (
+                                      <span className="text-rose-700">{txt("পণ্য ক্রয় (+)", "Purchase (+)")}</span>
+                                    ) : st.type === 'Return' ? (
+                                      <span className="text-amber-700 font-bold">↩️ {txt("কোম্পানি রিটার্ন (-)", "Company Return (-)")}</span>
+                                    ) : st.type === 'Return_Refund' ? (
+                                      <span className="text-emerald-700 font-bold">💵 {txt("রিটার্ন ক্যাশ রিফান্ড", "Return Cash Refund")}</span>
+                                    ) : (
+                                      <span className="text-emerald-700">{txt("পেমেন্ট পরিশোধ (-)", "Payment (-)")}</span>
                                     )}
-                                    {st.bill_image && (
-                                      <button 
-                                        type="button" 
-                                        onClick={() => setActiveImageView({ src: st.bill_image, title: `${supplierLedger.name} (${formatDateDMY(st.created_at)})` })}
-                                        className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer print:hidden shrink-0 transition"
-                                        title={txt("বিল বা মেমোর ছবি দেখুন", "View bill or memo image")}
-                                      >
-                                        <Camera size={11} /> {txt("বিল দেখুন", "View Bill")}
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                              <td className={`p-2.5 text-right font-mono font-bold ${
-                                st.type === 'Purchase' ? 'text-red-600' :
-                                st.type === 'Return' ? 'text-amber-700' :
-                                st.type === 'Return_Refund' ? 'text-emerald-700' :
-                                st.type === 'নতুন পণ্য ওয়ারেন্টি পেন্ডিং' ? 'text-amber-700' :
-                                st.type === 'সাপ্লায়ার পণ্য পরিবর্তন' ? 'text-blue-700' :
-                                'text-green-600'
-                              }`}>
-                                <div className="flex items-center justify-end gap-2">
-                                  <span>৳ {Number(st.amount).toLocaleString()}</span>
-                                  {st.type === 'Payment' && currentUser.role === 'admin' && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteSupplierPayment(st)}
-                                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer print:hidden transition"
-                                      title={txt("পেমেন্টটি ডিলিট করুন (সাপ্লায়ার ব্যালেন্স ও খরচের হিসাব সমন্বয় হবে)", "Delete payment (reverts balance & expenses)")}
-                                    >
-                                      <Trash2 size={13} />
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                          {supplierTransactions.length === 0 && (
-                            <tr>
-                              <td colSpan="4" className="text-center py-6 text-gray-400">
-                                {txt("নির্বাচিত তারিখের মধ্যে কোনো লেনদেন পাওয়া যায়নি", "No transactions found within selected date range")}
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                        {supplierTransactions.length > 0 && (
-                          <tfoot className="border-t-2 border-gray-900 bg-gray-50 font-bold text-xs print:bg-white">
-                            <tr>
-                              <td colSpan={3} className="p-2.5 text-right font-black">
-                                {(suppLedgerFromDate || suppLedgerToDate) ? txt('নির্বাচিত সময়ের মোট ক্রয় / প্রাপ্তি:', 'Total Purchase in Period:') : txt('মোট ক্রয়:', 'Total Purchase:')}
-                              </td>
-                              <td className="p-2.5 text-right font-mono font-black text-rose-700">
-                                ৳ {supplierTransactions.reduce((acc, st) => acc + (st.type === 'Purchase' ? Number(st.amount || 0) : 0), 0).toLocaleString()}
-                              </td>
-                            </tr>
-                            <tr>
-                              <td colSpan={3} className="p-2.5 text-right font-black">
-                                {(suppLedgerFromDate || suppLedgerToDate) ? txt('নির্বাচিত সময়ের মোট পরিশোধ:', 'Total Payment in Period:') : txt('মোট পরিশোধ:', 'Total Payment:')}
-                              </td>
-                              <td className="p-2.5 text-right font-mono font-black text-green-700">
-                                ৳ {supplierTransactions.reduce((acc, st) => acc + (st.type === 'Payment' ? Number(st.amount || 0) : 0), 0).toLocaleString()}
-                              </td>
-                            </tr>
-                          </tfoot>
-                        )}
-                      </table>
+                                  </td>
+                                  <td className="p-2.5 text-gray-700">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span>{st.note || '-'}</span>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        {(st.type === 'Return' || st.type === 'Return_Refund') && (
+                                          <button 
+                                            type="button" 
+                                            onClick={() => {
+                                              setActiveReturnSlip({
+                                                id: st.id,
+                                                return_no: `RET-${st.id}`,
+                                                product_name: st.note?.split('-')[0]?.replace('কোম্পানি রিটার্ন:', '')?.trim() || 'Returned Product',
+                                                supplier_name: supplierLedger.name,
+                                                supplier_mobile: supplierLedger.mobile,
+                                                supplier_address: supplierLedger.address,
+                                                quantity: 1,
+                                                unit_price: Number(st.amount || 0),
+                                                total_amount: Number(st.amount || 0),
+                                                settlement_type: st.type === 'Return_Refund' ? 'Cash_Refund' : 'Deduce_Payable',
+                                                reason: st.note || 'Company Return',
+                                                return_date: st.created_at,
+                                                returned_by: 'Staff'
+                                              });
+                                              setShowReturnSlipModal(true);
+                                            }}
+                                            className="px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer print:hidden shrink-0 transition"
+                                            title={txt("রিটার্ন চালান ও স্লিপ দেখুন ও প্রিন্ট করুন", "View & print return challan/slip")}
+                                          >
+                                            <Printer size={11} /> {txt("রিটার্ন চালান", "Return Challan")}
+                                          </button>
+                                        )}
+                                        {st.bill_image && (
+                                          <button 
+                                            type="button" 
+                                            onClick={() => setActiveImageView({ src: st.bill_image, title: `${supplierLedger.name} (${formatDateDMY(st.created_at)})` })}
+                                            className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer print:hidden shrink-0 transition"
+                                            title={txt("বিল বা মেমোর ছবি দেখুন", "View bill or memo image")}
+                                          >
+                                            <Camera size={11} /> {txt("বিল দেখুন", "View Bill")}
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="p-2.5 text-right font-mono font-bold text-rose-700">
+                                    {st.debit > 0 ? `৳ ${st.debit.toLocaleString()}` : '-'}
+                                  </td>
+                                  <td className="p-2.5 text-right font-mono font-bold text-green-600">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <span>{st.credit > 0 ? `৳ ${st.credit.toLocaleString()}` : '-'}</span>
+                                      {st.type === 'Payment' && currentUser.role === 'admin' && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteSupplierPayment(st)}
+                                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer print:hidden transition"
+                                          title={txt("পেমেন্টটি ডিলিট করুন (সাপ্লায়ার ব্যালেন্স ও খরচের হিসাব সমন্বয় হবে)", "Delete payment (reverts balance & expenses)")}
+                                        >
+                                          <Trash2 size={13} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="p-2.5 text-right font-mono font-bold text-blue-700 bg-blue-50/50">
+                                    ৳ {st.balance.toLocaleString()}
+                                  </td>
+                                </tr>
+                              ))}
+                              {supplierTransactionsWithBalance.length === 0 && (
+                                <tr>
+                                  <td colSpan="6" className="text-center py-6 text-gray-400">
+                                    {txt("নির্বাচিত তারিখের মধ্যে কোনো লেনদেন পাওয়া যায়নি", "No transactions found within selected date range")}
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                            {supplierTransactionsWithBalance.length > 0 && (
+                              <tfoot className="border-t-2 border-gray-700 bg-gray-50 font-bold text-xs print:bg-white">
+                                <tr>
+                                  <td colSpan={3} className="p-2.5 text-right font-black">
+                                    {(suppLedgerFromDate || suppLedgerToDate) ? txt('নির্বাচিত সময়ের সর্বমোট:', 'Total in Selected Period:') : txt('সর্বমোট হিসাব:', 'Grand Total:')}
+                                  </td>
+                                  <td className="p-2.5 text-right font-mono font-black text-rose-700">
+                                    ৳ {supplierTransactionsWithBalance.reduce((acc, st) => acc + st.debit, 0).toLocaleString()}
+                                  </td>
+                                  <td className="p-2.5 text-right font-mono font-black text-green-700">
+                                    ৳ {supplierTransactionsWithBalance.reduce((acc, st) => acc + st.credit, 0).toLocaleString()}
+                                  </td>
+                                  <td className="p-2.5 text-right font-mono font-black text-blue-800 bg-blue-100/60">
+                                    ৳ {supplierTransactionsWithBalance[supplierTransactionsWithBalance.length - 1].balance.toLocaleString()}
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            )}
+                          </table>
+                        );
+                      })()}
                     </div>
 
                     {/* সাপ্লায়ার লেজার সিগনেচার সেকশন - একদম নিচে */}

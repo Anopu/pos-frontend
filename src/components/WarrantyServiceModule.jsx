@@ -99,7 +99,7 @@ export default function WarrantyServiceModule({
     final_cost: '',
     paid_amount: '',
     due_amount: '',
-    payment_status: 'নগদ',
+    payment_status: 'অপেক্ষমান',
     payment_method: 'Cash',
     status: 'গ্রহণকৃত',
     delivery_date: '',
@@ -260,7 +260,7 @@ export default function WarrantyServiceModule({
       final_cost: '',
       paid_amount: '',
       due_amount: '',
-      payment_status: 'নগদ',
+      payment_status: 'অপেক্ষমান',
       payment_method: 'Cash',
       status: 'গ্রহণকৃত',
       delivery_date: '',
@@ -321,12 +321,22 @@ export default function WarrantyServiceModule({
     }
 
     try {
+      const isDelivered = customerForm.status === 'ডেলিভারি সম্পন্ন' || customerForm.status === 'সম্পন্ন';
+      const submitPayload = {
+        ...customerForm,
+        final_cost: isDelivered ? (customerForm.final_cost || customerForm.estimated_cost || 0) : 0,
+        paid_amount: isDelivered ? (customerForm.payment_status === 'নগদ' ? (customerForm.final_cost || customerForm.estimated_cost || 0) : (customerForm.paid_amount || 0)) : 0,
+        due_amount: isDelivered ? (customerForm.due_amount || 0) : 0,
+        delivery_date: isDelivered ? (customerForm.delivery_date || new Date().toISOString().slice(0, 10)) : '',
+        payment_status: isDelivered ? customerForm.payment_status : 'অপেক্ষমান'
+      };
+
       if (editingSlip) {
         // এডিট মোড (PUT)
         const res = await fetch(`${API_BASE}/warranty-services/${editingSlip.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(customerForm)
+          body: JSON.stringify(submitPayload)
         });
         const data = await res.json();
         if (res.ok) {
@@ -343,7 +353,7 @@ export default function WarrantyServiceModule({
         const res = await fetch(`${API_BASE}/warranty-services`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(customerForm)
+          body: JSON.stringify(submitPayload)
         });
         const data = await res.json();
         if (res.ok) {
