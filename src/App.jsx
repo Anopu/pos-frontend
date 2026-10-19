@@ -4,7 +4,7 @@ import {
   Edit, Edit3, History, ArrowDownRight, ArrowUpRight, LogOut, Shield, Truck, FileText, CheckCircle, 
   UserPlus, Calendar, RotateCcw, Wrench, Bell, AlertTriangle, CheckSquare, Clock, Filter, Eye, 
   AlertCircle, Receipt, Globe, Camera, Image as ImageIcon, Share2, Languages,
-  RefreshCw, PackageMinus, CheckCircle2, Wifi, Database, Package 
+  RefreshCw, PackageMinus, CheckCircle2, Wifi, Database, Package, Building2 
 } from 'lucide-react';
 import LoginPage from './components/LoginPage';
 import { translations } from './translations';
@@ -273,11 +273,13 @@ function App() {
     cheque_status: 'Pending'
   });
 
-  // POS কার্ট ও ইনভয়েস স্টেট (কাস্টমার অটো-সাজেশন সহ)
+  // POS কার্ট ও ইনভয়েস স্টেট (কাস্টমার ও সাপ্লায়ার অটো-সাজেশন এবং ঠিকানা সহ)
   const [cart, setCart] = useState([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+  const [selectedSupplierId, setSelectedSupplierId] = useState(null);
   const [customerName, setCustomerName] = useState('');
   const [customerMobile, setCustomerMobile] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [paidAmount, setPaidAmount] = useState('');
   const [discountAmount, setDiscountAmount] = useState('');
@@ -563,17 +565,40 @@ function App() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [activeCartDropdown]);
 
-  // কাস্টমার নাম টাইপ করার সাথে সাথে অটো-সাজেশন ফিল্টার
+  // কাস্টমার ও সাপ্লায়ার নাম/কোম্পানি টাইপ করার সাথে সাথে অটো-সাজেশন ফিল্টার
   const customerSuggestions = customers.filter(c => {
     if (!customerName.trim()) return false;
     const q = customerName.toLowerCase();
-    return (c.name && c.name.toLowerCase().includes(q)) || (c.mobile && c.mobile.includes(q));
+    return (c.name && c.name.toLowerCase().includes(q)) || 
+           (c.mobile && c.mobile.includes(q)) ||
+           (c.address && c.address.toLowerCase().includes(q));
+  });
+
+  const supplierSuggestions = suppliers.filter(s => {
+    if (!customerName.trim()) return false;
+    const q = customerName.toLowerCase();
+    return (s.company && s.company.toLowerCase().includes(q)) || 
+           (s.name && s.name.toLowerCase().includes(q)) || 
+           (s.mobile && s.mobile.includes(q)) ||
+           (s.address && s.address.toLowerCase().includes(q));
   });
 
   const selectSuggestedCustomer = (c) => {
     setSelectedCustomerId(c.id);
+    setSelectedSupplierId(null);
     setCustomerName(c.name);
     setCustomerMobile(c.mobile || '');
+    setCustomerAddress(c.address || '');
+    setShowSuggestions(false);
+  };
+
+  const selectSuggestedSupplier = (s) => {
+    setSelectedSupplierId(s.id);
+    setSelectedCustomerId(null);
+    const displayName = s.company ? (s.name ? `${s.company} (${s.name})` : s.company) : s.name;
+    setCustomerName(displayName);
+    setCustomerMobile(s.mobile || '');
+    setCustomerAddress(s.address || '');
     setShowSuggestions(false);
   };
 
@@ -1596,6 +1621,8 @@ function App() {
       invoice_no: 'DRAFT-' + Date.now().toString().slice(-4),
       customer_name: customerName.trim() || txt('নগদ ক্রেতা', 'Cash Customer'),
       customer_mobile: customerMobile.trim() || '',
+      customer_address: customerAddress.trim() || '',
+      supplier_id: selectedSupplierId,
       payment_type: paymentType || 'Cash',
       items: validItems.map(item => {
         let serials = [];
@@ -1699,6 +1726,8 @@ function App() {
       customer_id: selectedCustomerId,
       customer_name: customerName.trim() || txt('নগদ ক্রেতা', 'Cash Customer'),
       customer_mobile: customerMobile.trim() || '',
+      customer_address: customerAddress.trim() || '',
+      supplier_id: selectedSupplierId,
       payment_type: paymentType || 'Cash',
       paid_amount: actualPaidAmount,
       discount_amount: netDiscount,
@@ -1742,6 +1771,8 @@ function App() {
         invoice_no: data.invoice_no,
         customer_name: payload.customer_name,
         customer_mobile: payload.customer_mobile,
+        customer_address: payload.customer_address,
+        supplier_id: payload.supplier_id,
         payment_type: payload.payment_type,
         items: payload.items,
         sub_total: subTotal,
@@ -1757,17 +1788,24 @@ function App() {
         date: formatDateDMY(new Date())
       });
 
-      alert(txt(`✅ বিক্রি সম্পন্ন হয়েছে ও "${payload.customer_name}" এর লেজারে বিল যুক্ত হয়েছে!`, `✅ Sale completed & bill added to "${payload.customer_name}" ledger!`));
+      if (payload.supplier_id) {
+        alert(txt(`✅ বিক্রি সম্পন্ন হয়েছে ও "${payload.customer_name}" এর সাপ্লায়ার লেজারে বিল সমন্বয় হয়েছে!`, `✅ Sale completed & bill adjusted in "${payload.customer_name}" supplier ledger!`));
+      } else {
+        alert(txt(`✅ বিক্রি সম্পন্ন হয়েছে ও "${payload.customer_name}" এর লেজারে বিল যুক্ত হয়েছে!`, `✅ Sale completed & bill added to "${payload.customer_name}" ledger!`));
+      }
       setCart([]);
       setSelectedCustomerId(null);
+      setSelectedSupplierId(null);
       setCustomerName('');
       setCustomerMobile('');
+      setCustomerAddress('');
       setPaidAmount('');
       setDiscountAmount('');
       setBillNote('');
 
       fetchProducts();
       fetchCustomers();
+      fetchSuppliers();
       fetchReports();
       fetchDailySummary(selectedDate);
 
@@ -2904,42 +2942,82 @@ function App() {
                 </div>
               </div>
 
-              {/* কাস্টমার ইনফরমেশন বার (পাশাপাশি / Horizontal Layout) */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-gray-50/80 rounded-xl border border-gray-200 mb-4 text-xs">
-                {/* কাস্টমার নাম ও অটো-সাজেশন */}
+              {/* কাস্টমার ও সাপ্লায়ার ইনফরমেশন বার (৪ কলাম লেআউট - নাম, মোবাইল, ঠিকানা ও লেজার স্ট্যাটাস) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3 bg-gray-50/80 rounded-xl border border-gray-200 mb-4 text-xs">
+                {/* কাস্টমার / কোম্পানির নাম ও অটো-সাজেশন */}
                 <div className="relative">
                   <label className="font-bold text-gray-700 block mb-1">
-                    {txt('কাস্টমারের নাম:', 'Customer Name:')}
+                    {txt('কাস্টমার / কোম্পানির নাম:', 'Customer / Company:')}
                   </label>
                   <input
                     type="text"
-                    placeholder={txt("কাস্টমারের নাম লিখুন (পূর্বে থাকলে তালিকা আসবে)...", "Enter customer name (auto-suggests existing)...")}
+                    placeholder={txt("নাম বা কোম্পানি লিখুন (সাপ্লায়ার/কাস্টমার সাজেস্ট হবে)...", "Enter name or company (auto-suggests)...")}
                     value={customerName}
                     onChange={e => {
                       setCustomerName(e.target.value);
                       setSelectedCustomerId(null);
+                      setSelectedSupplierId(null);
                       setShowSuggestions(true);
                     }}
                     onFocus={() => setShowSuggestions(true)}
                     className="w-full border border-gray-300 p-2 rounded-lg outline-none focus:border-blue-500 font-medium bg-white"
                   />
-                  {showSuggestions && customerSuggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 top-14 bg-white border border-blue-300 shadow-xl rounded-lg max-h-48 overflow-y-auto z-50 divide-y">
-                      {customerSuggestions.map(c => (
-                        <div
-                          key={c.id}
-                          onClick={() => selectSuggestedCustomer(c)}
-                          className="p-2.5 hover:bg-blue-50 cursor-pointer flex justify-between items-center text-xs"
-                        >
-                          <div>
-                            <p className="font-bold text-gray-800">{c.name}</p>
-                            <p className="text-[10px] text-gray-500">{txt('মোবাইল: ', 'Mobile: ')}{c.mobile || txt('নেই', 'None')}</p>
+                  {showSuggestions && (customerSuggestions.length > 0 || supplierSuggestions.length > 0) && (
+                    <div className="absolute left-0 right-0 top-14 bg-white border border-blue-300 shadow-xl rounded-lg max-h-56 overflow-y-auto z-50 divide-y">
+                      {supplierSuggestions.length > 0 && (
+                        <div>
+                          <div className="px-2.5 py-1 bg-indigo-50 text-[10px] font-bold text-indigo-800 flex items-center gap-1">
+                            <Building2 size={12} /> {txt('সাপ্লায়ার কোম্পানি (লেজার সমন্বয়)', 'Suppliers (Ledger Adjustment)')}
                           </div>
-                          <span className="text-[11px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">
-                            {txt('পূর্বের বকেয়া: ৳', 'Previous Due: ৳')}{c.total_due}
-                          </span>
+                          {supplierSuggestions.map(s => (
+                            <div
+                              key={`supp-${s.id}`}
+                              onClick={() => selectSuggestedSupplier(s)}
+                              className="p-2.5 hover:bg-indigo-50/70 cursor-pointer flex justify-between items-center text-xs"
+                            >
+                              <div>
+                                <p className="font-bold text-gray-900 flex items-center gap-1">
+                                  <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-1 rounded">সাপ্লায়ার</span>
+                                  {s.company || s.name}
+                                </p>
+                                <p className="text-[10px] text-gray-500">
+                                  {s.company && s.name && `${s.name} | `}{txt('মোবাইল: ', 'Mobile: ')}{s.mobile || txt('নেই', 'None')}
+                                  {s.address && ` | ${s.address}`}
+                                </p>
+                              </div>
+                              <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                                {txt('পাওনা: ৳', 'Payable: ৳')}{Number(s.total_payable || 0).toLocaleString()}
+                              </span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
+
+                      {customerSuggestions.length > 0 && (
+                        <div>
+                          <div className="px-2.5 py-1 bg-blue-50 text-[10px] font-bold text-blue-800 flex items-center gap-1">
+                            <User size={12} /> {txt('কাস্টমার তালিকা', 'Customers List')}
+                          </div>
+                          {customerSuggestions.map(c => (
+                            <div
+                              key={`cust-${c.id}`}
+                              onClick={() => selectSuggestedCustomer(c)}
+                              className="p-2.5 hover:bg-blue-50 cursor-pointer flex justify-between items-center text-xs"
+                            >
+                              <div>
+                                <p className="font-bold text-gray-800">{c.name}</p>
+                                <p className="text-[10px] text-gray-500">
+                                  {txt('মোবাইল: ', 'Mobile: ')}{c.mobile || txt('নেই', 'None')}
+                                  {c.address && ` | ${c.address}`}
+                                </p>
+                              </div>
+                              <span className="text-[11px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">
+                                {txt('বকেয়া: ৳', 'Due: ৳')}{Number(c.total_due || 0).toLocaleString()}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2958,21 +3036,81 @@ function App() {
                   />
                 </div>
 
-                {/* কাস্টমার স্ট্যাটাস ও পূর্বের বাকি */}
+                {/* ঠিকানা (Address) */}
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">
+                    {txt('ঠিকানা:', 'Address:')}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={txt("গ্রাহক বা প্রতিষ্ঠানের ঠিকানা", "Customer / Company address")}
+                    value={customerAddress}
+                    onChange={e => setCustomerAddress(e.target.value)}
+                    className="w-full border border-gray-300 p-2 rounded-lg outline-none focus:border-blue-500 bg-white"
+                  />
+                </div>
+
+                {/* স্ট্যাটাস ও পূর্বের হিসাব */}
                 <div className="flex flex-col justify-end">
-                  {selectedCustomerId ? (
+                  {selectedSupplierId ? (
+                    <div className="text-xs text-indigo-800 font-bold bg-indigo-50 p-2 rounded-lg border border-indigo-200 flex justify-between items-center">
+                      <div className="truncate">
+                        <span className="bg-indigo-600 text-white text-[9px] px-1.5 py-0.5 rounded mr-1">🏢 {txt('সাপ্লায়ার', 'Supplier')}</span>
+                        <span className="font-semibold">{customerName}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                        <span className="text-indigo-700 font-mono text-[11px]">
+                          {txt('পাওনা: ৳', 'Payable: ৳')}{Number(suppliers.find(s => s.id === selectedSupplierId)?.total_payable || 0).toLocaleString()}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSupplierId(null);
+                            setCustomerName('');
+                            setCustomerMobile('');
+                            setCustomerAddress('');
+                          }}
+                          className="text-gray-400 hover:text-red-600 font-bold ml-1 text-sm leading-none cursor-pointer"
+                          title={txt("সংযোগ মুছুন", "Clear")}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ) : selectedCustomerId ? (
                     <div className="text-xs text-green-700 font-bold bg-green-50 p-2 rounded-lg border border-green-200 flex justify-between items-center">
                       <span className="truncate">✓ {txt('কাস্টমার: ', 'Customer: ')}{customerName}</span>
-                      <span className="text-red-600 shrink-0 ml-1">
-                        {txt('পূর্বের বাকি: ৳', 'Previous Due: ৳')}{customerPreviousDue.toLocaleString()}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                        <span className="text-red-600">
+                          {txt('বাকি: ৳', 'Due: ৳')}{customerPreviousDue.toLocaleString()}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCustomerId(null);
+                            setCustomerName('');
+                            setCustomerMobile('');
+                            setCustomerAddress('');
+                          }}
+                          className="text-gray-400 hover:text-red-600 font-bold ml-1 text-sm leading-none cursor-pointer"
+                          title={txt("সংযোগ মুছুন", "Clear")}
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="text-xs text-gray-500 bg-gray-100 p-2 rounded-lg border border-gray-200 flex justify-between items-center">
                       <span>{txt('ডিফল্ট: নগদ ক্রেতা', 'Default: Cash Customer')}</span>
                       <button
                         type="button"
-                        onClick={() => { setCustomerName(txt('নগদ ক্রেতা', 'Cash Customer')); setCustomerMobile(''); setSelectedCustomerId(null); }}
+                        onClick={() => { 
+                          setCustomerName(txt('নগদ ক্রেতা', 'Cash Customer')); 
+                          setCustomerMobile(''); 
+                          setCustomerAddress('');
+                          setSelectedCustomerId(null); 
+                          setSelectedSupplierId(null);
+                        }}
                         className="text-blue-600 hover:underline font-bold text-[11px] cursor-pointer"
                       >
                         {txt('রিসেট', 'Reset')}
@@ -5201,8 +5339,7 @@ function App() {
                         ৳ {Number(ib.collected || 0).toLocaleString()}
                       </div>
                       <span className="text-[9px] text-gray-500 block">
-                        {ib.count} {txt("টি এন্ট্রি", "entries")}
-                        {Number(ib.due || 0) > 0 && ` | বকেয়া ৳${Number(ib.due).toLocaleString()}`}
+                        {ib.count} {txt("টি নগদ এন্ট্রি", "cash entries")}
                       </span>
                     </div>
                   ))}
@@ -5217,8 +5354,7 @@ function App() {
                         <th className="p-2.5">{txt("বিল/ভাউচার নং", "Ref / Slip No")}</th>
                         <th className="p-2.5">{txt("ক্রেতা / গ্রাহক", "Customer")}</th>
                         <th className="p-2.5">{txt("মাধ্যম", "Method")}</th>
-                        <th className="p-2.5 text-right">{txt("মোট বিল", "Total")}</th>
-                        <th className="p-2.5 text-right">{txt("আদায় (৳)", "Paid (৳)")}</th>
+                        <th className="p-2.5 text-right">{txt("প্রাপ্ত নগদ টাকা (৳)", "Collected Cash (৳)")}</th>
                         <th className="p-2.5 text-center print:hidden">{txt("অ্যাকশন", "Action")}</th>
                       </tr>
                     </thead>
@@ -5228,11 +5364,11 @@ function App() {
                           <td className="p-2.5 font-bold">
                             {entry.type === 'invoice' ? (
                               <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded text-[10px] border border-blue-200">
-                                📦 {txt("পণ্য বিক্রয়", "Sales")}
+                                📦 {txt("নগদ বিক্রয়", "Cash Sale")}
                               </span>
                             ) : entry.type === 'service' ? (
                               <span className="text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded text-[10px] border border-purple-200">
-                                🛠️ {txt("সার্ভিস বিল", "Service")}
+                                🛠️ {txt("সার্ভিস নগদ", "Service Cash")}
                               </span>
                             ) : entry.type === 'isp' ? (
                               <span className="text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded text-[10px] border border-cyan-200">
@@ -5254,8 +5390,7 @@ function App() {
                               {entry.payment_method || 'Cash'}
                             </span>
                           </td>
-                          <td className="p-2.5 text-right font-mono text-gray-700">৳ {Number(entry.total_amount).toLocaleString()}</td>
-                          <td className="p-2.5 text-right font-mono font-bold text-emerald-700">৳ {Number(entry.paid_amount).toLocaleString()}</td>
+                          <td className="p-2.5 text-right font-mono font-bold text-emerald-700">৳ {Number(entry.paid_amount || entry.total_amount).toLocaleString()}</td>
                           <td className="p-2.5 text-center print:hidden">
                             {entry.type === 'invoice' ? (
                               <button
@@ -8113,6 +8248,7 @@ function App() {
                     <span className="text-[10px] font-bold text-gray-500">{txt("ক্রেতার তথ্য:", "Customer Info:")}</span>
                     <h3 className="text-sm font-bold text-gray-900 leading-tight">{completedInvoice.customer_name}</h3>
                     {completedInvoice.customer_mobile && <p className="text-[11px] text-gray-600">{txt("মোবাইল:", "Mobile:")} {completedInvoice.customer_mobile}</p>}
+                    {completedInvoice.customer_address && <p className="text-[11px] text-gray-600">{txt("ঠিকানা:", "Address:")} {completedInvoice.customer_address}</p>}
                   </div>
                   <div className="text-right">
                     <span className="text-[10px] text-gray-500">{txt("পেমেন্ট মেথড:", "Payment Method:")}</span>
@@ -10484,6 +10620,9 @@ function App() {
                             runningSuppBal -= amt;
                           } else if (st.type === 'Return_Refund') {
                             credit = amt;
+                          } else if (st.type === 'Sale' || st.type === 'Supplier_Sale') {
+                            credit = amt;
+                            runningSuppBal -= amt;
                           }
 
                           return {
@@ -10519,6 +10658,10 @@ function App() {
                                       <span className="inline-flex items-center gap-1 text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-300 font-bold text-[11px]">
                                         🔄 {txt("সাপ্লায়ার পণ্য পরিবর্তন", "Supplier Warranty Replaced")}
                                       </span>
+                                    ) : (st.type === 'Sale' || st.type === 'Supplier_Sale') ? (
+                                      <span className="inline-flex items-center gap-1 text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300 font-bold text-[11px]">
+                                        🛒 {txt("পণ্য বিক্রয় (লেজার সমন্বয় -)", "Sale (Ledger Deduce -)")}
+                                      </span>
                                     ) : st.type === 'Purchase' ? (
                                       <span className="text-rose-700">{txt("পণ্য ক্রয় (+)", "Purchase (+)")}</span>
                                     ) : st.type === 'Return' ? (
@@ -10533,6 +10676,16 @@ function App() {
                                     <div className="flex items-center justify-between gap-2">
                                       <span>{st.note || '-'}</span>
                                       <div className="flex items-center gap-1.5 shrink-0">
+                                        {st.invoice_id && (
+                                          <button 
+                                            type="button" 
+                                            onClick={() => handleViewInvoiceDetails(st.invoice_id)}
+                                            className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer print:hidden shrink-0 transition"
+                                            title={txt("বিক্রয় ইনভয়েস বা মেমো দেখুন", "View sale invoice/bill")}
+                                          >
+                                            <FileText size={11} /> {txt("বিক্রয় বিল", "View Bill")}
+                                          </button>
+                                        )}
                                         {(st.type === 'Return' || st.type === 'Return_Refund') && (
                                           <button 
                                             type="button" 
