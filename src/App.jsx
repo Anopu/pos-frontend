@@ -4976,7 +4976,7 @@ function App() {
                   <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
                   <input
                     type="text"
-                    placeholder={txt("সাপ্লায়ার, প্রতিষ্ঠান বা মোবাইল...", "Supplier, company or mobile...")}
+                    placeholder={txt("কোম্পানি, অনুমোদিত পারসন বা মোবাইল...", "Company, authorized person or mobile...")}
                     value={supplierSearch}
                     onChange={e => setSupplierSearch(e.target.value)}
                     className="w-full pl-9 pr-3 py-1.5 border border-cyan-200 rounded-xl text-xs text-gray-900 bg-white outline-none focus:border-cyan-500"
@@ -5010,18 +5010,18 @@ function App() {
             <table className="w-full text-left border-collapse text-sm text-gray-800">
               <thead>
                 <tr className="bg-gray-100/90 text-xs border-b text-gray-700">
-                  <th className="p-3 text-gray-700 font-bold">{txt('সাপ্লায়ারের নাম', 'Supplier Name')}</th>
-                  <th className="p-3 text-gray-700 font-bold">{txt('প্রতিষ্ঠান', 'Company')}</th>
+                  <th className="p-3 text-gray-700 font-bold">{txt('কোম্পানি', 'Company')}</th>
+                  <th className="p-3 text-gray-700 font-bold">{txt('অনুমোদিত পারসন', 'Authorized Person')}</th>
                   <th className="p-3 text-gray-700 font-bold">{txt('মোবাইল', 'Mobile')}</th>
-                  <th className="p-3 text-gray-700 font-bold">{txt('পাওনা ব্যালেন্স', 'Payable Balance')}</th>
-                  <th className="p-3 text-center text-gray-700 font-bold">{txt('অ্যাকশন', 'Action')}</th>
+                  <th className="p-3 text-gray-700 font-bold">{txt('পেয়েবল ব্যালেন্স', 'Payable Balance')}</th>
+                  <th className="p-3 text-center text-gray-700 font-bold">{txt('একশন', 'Action')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y text-xs text-gray-800">
                 {filteredSuppliers.map(s => (
                   <tr key={s.id} className="hover:bg-slate-50 transition">
-                    <td className="p-3 font-bold text-gray-900">{s.name}</td>
-                    <td className="p-3 text-gray-700 font-medium">{s.company || '-'}</td>
+                    <td className="p-3 font-bold text-gray-900">{s.company || '-'}</td>
+                    <td className="p-3 text-gray-700 font-medium">{s.name || '-'}</td>
                     <td className="p-3 text-gray-700 font-medium">{s.mobile || '-'}</td>
                     <td className="p-3 font-bold text-red-600">৳ {Number(s.total_payable).toLocaleString()}</td>
                     <td className="p-3 text-center flex justify-center items-center gap-2">
@@ -6513,12 +6513,12 @@ function App() {
             <h3 className="text-lg font-bold text-gray-800 mb-3">{editingSupplierId ? txt("সাপ্লায়ারের তথ্য এডিট ও সংশোধন", "Edit Supplier Info") : txt("নতুন সাপ্লায়ার এন্ট্রি", "Add New Supplier")}</h3>
             <form onSubmit={handleSupplierSubmit} className="space-y-3 text-xs text-gray-800">
               <div>
-                <label className="font-bold text-gray-700 block mb-1">{txt("সাপ্লায়ারের নাম *", "Supplier Name *")}</label>
-                <input type="text" required placeholder={txt("নাম লিখুন", "Enter name")} value={supplierForm.name} onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })} className="w-full border border-gray-300 p-2 rounded mt-1 bg-white text-gray-900 outline-none focus:border-blue-500" />
+                <label className="font-bold text-gray-700 block mb-1">{txt("কোম্পানি", "Company")}</label>
+                <input type="text" placeholder={txt("কোম্পানির নাম লিখুন", "Company name")} value={supplierForm.company} onChange={e => setSupplierForm({ ...supplierForm, company: e.target.value })} className="w-full border border-gray-300 p-2 rounded mt-1 bg-white text-gray-900 outline-none focus:border-blue-500" />
               </div>
               <div>
-                <label className="font-bold text-gray-700 block mb-1">{txt("কোম্পানি / প্রতিষ্ঠান", "Company / Organization")}</label>
-                <input type="text" placeholder={txt("প্রতিষ্ঠানের নাম", "Company name")} value={supplierForm.company} onChange={e => setSupplierForm({ ...supplierForm, company: e.target.value })} className="w-full border border-gray-300 p-2 rounded mt-1 bg-white text-gray-900 outline-none focus:border-blue-500" />
+                <label className="font-bold text-gray-700 block mb-1">{txt("অনুমোদিত পারসন *", "Authorized Person *")}</label>
+                <input type="text" required placeholder={txt("অনুমোদিত ব্যক্তির নাম লিখুন", "Enter authorized person name")} value={supplierForm.name} onChange={e => setSupplierForm({ ...supplierForm, name: e.target.value })} className="w-full border border-gray-300 p-2 rounded mt-1 bg-white text-gray-900 outline-none focus:border-blue-500" />
               </div>
               <div>
                 <label className="font-bold text-gray-700 block mb-1">{txt("মোবাইল নম্বর", "Mobile Number")}</label>
@@ -8257,9 +8257,9 @@ function App() {
                       />
                       <div>
                         <h1 className="text-3xl md:text-4xl font-black text-gray-950 uppercase tracking-tight">FC Technology</h1>
-                        <p className="text-gray-600 text-[11px] mt-0.5 font-medium">{txt("কম্পিউটার(ডেস্কটপ, ল্যাপটপ), সিসি ক্যামেরা ও আইটি পণ্যের বিশ্বস্ত প্রতিষ্ঠান", "Computer (Desktop, Laptop), CC Camera & Trusted IT Products Shop")}</p>
-                        <p className="text-[11px] text-gray-500">{txt("দোকান নং #১৮, আর এফ জোহরা টাওয়ার, নীচ তলা, চৌমুহনী, আগ্রাবাদ, চট্টগ্রাম।", "Shop #18, RF Zohura Tower, Ground Floor, Chowmuhani, Agrabad, Chattogram.")}</p>
-                        <p className="text-[11px] text-gray-500">{txt("হটলাইন: 09613-181920, 01812-091939", "Hotline: 09613-181920, 01812-091939")}</p>
+                        <p className="text-gray-600 text-xs mt-0.5 font-medium">{txt("কম্পিউটার(ডেস্কটপ, ল্যাপটপ), সিসি ক্যামেরা ও আইটি পণ্যের বিশ্বস্ত প্রতিষ্ঠান", "Computer (Desktop, Laptop), CC Camera & Trusted IT Products Shop")}</p>
+                        <p className="text-xs text-gray-500">{txt("দোকান নং #১৮, আর এফ জোহরা টাওয়ার, নীচ তলা, চৌমুহনী, আগ্রাবাদ, চট্টগ্রাম।", "Shop #18, RF Zohura Tower, Ground Floor, Chowmuhani, Agrabad, Chattogram.")}</p>
+                        <p className="text-xs text-gray-500">{txt("হটলাইন: 09613-181920, 01812-091939", "Hotline: 09613-181920, 01812-091939")}</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -8280,7 +8280,7 @@ function App() {
                               }
                             }}
                             title={txt("ক্লিক করে শিরোনাম পরিবর্তন করুন", "Click to edit title")}
-                            className="inline-block bg-slate-800 text-white font-bold text-[11px] px-2.5 py-0.5 uppercase rounded cursor-text hover:bg-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-400 transition"
+                            className="inline-block bg-slate-800 text-white font-bold text-xs px-2.5 py-0.5 uppercase rounded cursor-text hover:bg-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-400 transition"
                           >
                             {invoiceDocTitle || txt("ইনভয়েস / ক্যাশ মেমো", "INVOICE / CASH MEMO")}
                           </span>
@@ -8356,8 +8356,8 @@ function App() {
                           </span>
                         )}
                       </p>
-                      <p className="text-[11px] text-gray-600">{txt("তারিখ:", "Date:")} {formatDateDMY(completedInvoice.date || completedInvoice.created_at)}</p>
-                      <p className="text-[11px] font-bold text-gray-700 mt-0.5">
+                      <p className="text-xs text-gray-600">{txt("তারিখ:", "Date:")} {formatDateDMY(completedInvoice.date || completedInvoice.created_at)}</p>
+                      <p className="text-xs font-bold text-gray-700 mt-0.5">
                         {txt("সেলসম্যান:", "Salesman:")} {completedInvoice.salesman_name || 'Admin'} {completedInvoice.user_id ? `(ID: #${completedInvoice.user_id})` : ''}
                       </p>
                     </div>
@@ -8366,13 +8366,13 @@ function App() {
                 {/* ক্রেতার তথ্য ও পেমেন্ট মেথড */}
                 <div className="invoice-transparent-box bg-gray-50/60 p-2.5 rounded-lg border border-gray-200 mb-2 flex justify-between items-center print:bg-transparent">
                   <div>
-                    <span className="text-[10px] font-bold text-gray-500">{txt("ক্রেতার তথ্য:", "Customer Info:")}</span>
+                    <span className="text-xs font-bold text-gray-500">{txt("ক্রেতার তথ্য:", "Customer Info:")}</span>
                     <h3 className="text-sm font-bold text-gray-900 leading-tight">{completedInvoice.customer_name}</h3>
-                    {completedInvoice.customer_mobile && <p className="text-[11px] text-gray-600">{txt("মোবাইল:", "Mobile:")} {completedInvoice.customer_mobile}</p>}
-                    {completedInvoice.customer_address && <p className="text-[11px] text-gray-600">{txt("ঠিকানা:", "Address:")} {completedInvoice.customer_address}</p>}
+                    {completedInvoice.customer_mobile && <p className="text-xs text-gray-600">{txt("মোবাইল:", "Mobile:")} {completedInvoice.customer_mobile}</p>}
+                    {completedInvoice.customer_address && <p className="text-xs text-gray-600">{txt("ঠিকানা:", "Address:")} {completedInvoice.customer_address}</p>}
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] text-gray-500">{txt("পেমেন্ট মেথড:", "Payment Method:")}</span>
+                    <span className="text-xs text-gray-500">{txt("পেমেন্ট মেথড:", "Payment Method:")}</span>
                     <p className="text-xs font-bold text-gray-800">
                       {completedInvoice.payment_type === 'Due' ? txt('বাকি বিক্রয় (Due)', 'Credit / Due') : (completedInvoice.payment_type || 'Cash')}
                     </p>
@@ -8382,7 +8382,7 @@ function App() {
                 {/* আইটেম টেবিল (ঝাপসা কালো হেডার ও প্রতিটি রোতে লেখাগুলো মাঝ বরাবর) */}
                 <table className="w-full text-left border-collapse mb-2 text-xs">
                   <thead>
-                    <tr className="bg-slate-700 text-white text-[11px] uppercase align-middle print:bg-slate-700 print:text-white">
+                    <tr className="bg-slate-700 text-white text-xs uppercase align-middle print:bg-slate-700 print:text-white">
                       <th className="py-1.5 px-2 text-center w-9 align-middle"><div className="flex items-center justify-center min-h-[22px]">{txt("নং", "SL")}</div></th>
                       <th className="py-1.5 px-2 align-middle"><div className="flex items-center min-h-[22px]">{txt("পণ্যের বিবরণ, মডেল, ওয়ারেন্টি ও সিরিয়াল", "Product Description, Model, Warranty & Serial")}</div></th>
                       <th className="py-1.5 px-2 text-center w-14 align-middle"><div className="flex items-center justify-center min-h-[22px]">{txt("পরিমাণ", "Qty")}</div></th>
@@ -8393,7 +8393,7 @@ function App() {
                   <tbody className="divide-y divide-gray-200 border-b">
                     {(!completedInvoice.items || completedInvoice.items.length === 0) ? (
                       <tr>
-                        <td colSpan={5} className="py-3 px-2 text-center text-rose-600 font-bold bg-rose-50/50 text-[11px]">
+                        <td colSpan={5} className="py-3 px-2 text-center text-rose-600 font-bold bg-rose-50/50 text-xs">
                           {txt("অত্র ইনভয়েসের বিক্রয়কৃত পণ্য ফেরত নেওয়া হয়েছে (নিচে রিটার্ন হিস্টরি দ্রষ্টব্য)", "All items from this invoice have been returned (see return history below)")}
                         </td>
                       </tr>
@@ -8401,28 +8401,28 @@ function App() {
                       completedInvoice.items.map((it, idx) => (
                       <tr key={idx} className="align-middle">
                         <td className="py-1.5 px-2 text-center align-middle">
-                          <div className="flex items-center justify-center min-h-[24px] text-[11px] font-medium leading-none">
+                          <div className="flex items-center justify-center min-h-[24px] text-xs font-medium leading-none">
                             {idx + 1}
                           </div>
                         </td>
                         <td className="py-1.5 px-2 align-middle">
                           <div className="flex flex-col justify-center min-h-[24px]">
-                            <div className="font-bold leading-snug">
+                            <div className="font-bold leading-snug text-xs">
                               {it.name || it.product_name}
-                              {it.model && <span className="ml-1 text-[11px] text-gray-600 font-mono font-normal">[{it.model}]</span>}
+                              {it.model && <span className="ml-1 text-xs text-gray-600 font-mono font-normal">[{it.model}]</span>}
                               {it.warranty ? (
-                                <span className="ml-1 text-[11px] font-normal text-blue-600">({it.warranty})</span>
+                                <span className="ml-1 text-xs font-normal text-blue-600">({it.warranty})</span>
                               ) : (
-                                <span className="ml-1 text-[11px] font-normal text-gray-400">({txt("নন-ওয়ারেন্টি", "Non-warranty")})</span>
+                                <span className="ml-1 text-xs font-normal text-gray-400">({txt("নন-ওয়ারেন্টি", "Non-warranty")})</span>
                               )}
                               {Number(it.discount || 0) > 0 && (
-                                <span className="ml-1.5 text-[10px] font-bold text-orange-600 bg-orange-50 px-1 py-0.2 rounded border border-orange-200">
+                                <span className="ml-1.5 text-xs font-bold text-orange-600 bg-orange-50 px-1 py-0.2 rounded border border-orange-200">
                                   {txt("ছাড়:", "Disc:")} -{Number(it.discount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
                               )}
                             </div>
                             {((it.selected_serials && it.selected_serials.length > 0) || it.serial_numbers) && (
-                              <div className="text-[10px] font-mono text-gray-700 mt-0.5 leading-snug">
+                              <div className="text-xs font-mono text-gray-700 mt-0.5 leading-snug">
                                 <strong>S/N: </strong>
                                 {Array.isArray(it.selected_serials) 
                                   ? it.selected_serials.join(', ') 
@@ -8432,17 +8432,17 @@ function App() {
                           </div>
                         </td>
                         <td className="py-1.5 px-2 text-center align-middle">
-                          <div className="flex items-center justify-center min-h-[24px] font-bold text-[11px] leading-none">
+                          <div className="flex items-center justify-center min-h-[24px] font-bold text-xs leading-none">
                             {it.qty || it.quantity}
                           </div>
                         </td>
                         <td className="py-1.5 px-2 text-right align-middle">
-                          <div className="flex items-center justify-end min-h-[24px] font-mono text-[11px] leading-none">
+                          <div className="flex items-center justify-end min-h-[24px] font-mono text-xs leading-none">
                             {Number(it.selling_price || it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
                         </td>
                         <td className="py-1.5 px-2 text-right align-middle">
-                          <div className="flex items-center justify-end min-h-[24px] font-mono font-bold text-[11px] leading-none">
+                          <div className="flex items-center justify-end min-h-[24px] font-mono font-bold text-xs leading-none">
                             {((it.selling_price || it.unit_price) * (it.qty || it.quantity)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
                         </td>
@@ -8455,7 +8455,7 @@ function App() {
                 {completedInvoice.returns && completedInvoice.returns.length > 0 && (
                   <div className="mb-2.5 rounded-lg border border-rose-300 bg-rose-50/40 p-2.5 print:bg-transparent print:border-rose-400">
                     <div className="flex justify-between items-center mb-1.5 pb-1 border-b border-rose-200">
-                      <span className="font-bold text-rose-900 text-[11px] flex items-center gap-1.5">
+                      <span className="font-bold text-rose-900 text-xs flex items-center gap-1.5">
                         🔄 {txt("অত্র বিলে পণ্য ফেরতের হিস্টরি (Sales Return History)", "Sales Return History for this Bill")}
                       </span>
                       <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded border border-rose-200">
@@ -8510,11 +8510,11 @@ function App() {
                   {/* বাম পাশে: বিক্রয়ের শর্তাবলী ও ইনভয়েস নোট */}
                   <div className="flex-1 space-y-1.5 pr-2">
                     {completedInvoice.note && (
-                      <div className="bg-yellow-50 border border-yellow-200 p-2 rounded text-[11px] text-gray-800">
+                      <div className="bg-yellow-50 border border-yellow-200 p-2 rounded text-xs text-gray-800">
                         <strong>{txt("ইনভয়েস বিশেষ নোট:", "Invoice Note:")}</strong> {completedInvoice.note}
                       </div>
                     )}
-                    <div className="invoice-transparent-box border border-gray-200 rounded-lg p-2 text-[10px] text-gray-600 bg-gray-50/40 print:bg-transparent space-y-0.5">
+                    <div className="invoice-transparent-box border border-gray-200 rounded-lg p-2 text-xs text-gray-600 bg-gray-50/40 print:bg-transparent space-y-0.5">
                       <p className="font-bold text-gray-800 underline">{txt("বিক্রয়ের শর্তাবলী (Terms & Conditions):", "Terms & Conditions:")}</p>
                       <ul className="list-disc list-inside space-y-0.5 text-gray-600">
                         <li>{txt("উপযুক্ত কারণ প্রদর্শনপূর্বক বিক্রয়কৃত মাল ফেরত নেয়া হয় (শর্ত সাপেক্ষে ৩ দিনের মধ্যে)।", "Sold items may be returned within 3 days subject to valid reasons and condition.")}</li>
@@ -8584,7 +8584,13 @@ function App() {
                 <div className="text-center w-44">
                   <div className="border-t border-gray-400 pt-1.5 font-semibold text-gray-800">{txt("গ্রাহকের স্বাক্ষর", "Customer's Signature")}</div>
                 </div>
-                <div className="text-center w-48">
+                <div className="text-center w-52">
+                  <img 
+                    src="/authority_seal_signature.png" 
+                    alt="Authorized Seal & Signature" 
+                    className="h-14 object-contain mx-auto mb-1 select-none"
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
                   <div className="border-t border-gray-400 pt-1.5 font-semibold text-gray-800">{txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}</div>
                 </div>
               </div>
@@ -9614,22 +9620,22 @@ function App() {
                       />
                       <div>
                         <h1 className="text-2xl md:text-3xl font-black text-gray-950 uppercase tracking-tight">FC Technology</h1>
-                        <p className="text-gray-600 text-[10px] font-medium">{txt("কম্পিউটার (ডেস্কটপ, ল্যাপটপ), সিসি ক্যামেরা ও আইটি পণ্যের পাইকারি ও খুচরা বিক্রেতা", "Wholesale & Retail Seller of Computers (Desktop, Laptop), CCTV & IT Products")}</p>
-                        <p className="text-[10px] text-gray-500">{txt("দোকান নং #১৮, আর এফ জোহরা টাওয়ার, নীচ তলা, চৌমুহনী, আগ্রাবাদ, চট্টগ্রাম।", "Shop #18, RF Zohura Tower, Ground Floor, Chowmuhani, Agrabad, Chattogram.")}</p>
-                        <p className="text-[10px] text-gray-500 font-medium">{txt("হটলাইন: 09613-181920, 01812-091939", "Hotline: 09613-181920, 01812-091939")}</p>
+                        <p className="text-gray-600 text-xs font-medium">{txt("কম্পিউটার (ডেস্কটপ, ল্যাপটপ), সিসি ক্যামেরা ও আইটি পণ্যের পাইকারি ও খুচরা বিক্রেতা", "Wholesale & Retail Seller of Computers (Desktop, Laptop), CCTV & IT Products")}</p>
+                        <p className="text-xs text-gray-500">{txt("দোকান নং #১৮, আর এফ জোহরা টাওয়ার, নীচ তলা, চৌমুহনী, আগ্রাবাদ, চট্টগ্রাম।", "Shop #18, RF Zohura Tower, Ground Floor, Chowmuhani, Agrabad, Chattogram.")}</p>
+                        <p className="text-xs text-gray-500 font-medium">{txt("হটলাইন: 09613-181920, 01812-091939", "Hotline: 09613-181920, 01812-091939")}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="inline-block bg-emerald-800 text-white font-black text-[11px] px-3 py-1 uppercase rounded-md tracking-wider mb-1">
+                      <span className="inline-block bg-emerald-800 text-white font-black text-xs px-3 py-1 uppercase rounded-md tracking-wider mb-1">
                         {txt("মানি রিসিপ্ট / MONEY RECEIPT", "MONEY RECEIPT")}
                       </span>
                       <p className="text-xs font-bold text-gray-800 mt-1">
                         {txt("রিসিপ্ট নং:", "Receipt No:")} <span className="font-mono text-emerald-700 font-black">{activeMoneyReceipt.receipt_no || `MR-${activeMoneyReceipt.id}`}</span>
                       </p>
-                      <p className="text-[11px] text-gray-600">
+                      <p className="text-xs text-gray-600">
                         {txt("তারিখ ও সময়:", "Date & Time:")} {formatDateTimeDMY(activeMoneyReceipt.created_at)}
                       </p>
-                      <p className="text-[11px] text-gray-700 font-semibold">
+                      <p className="text-xs text-gray-700 font-semibold">
                         {txt("আদায়কারী:", "Received By:")} {activeMoneyReceipt.received_by || 'Admin'}
                       </p>
                     </div>
@@ -9638,17 +9644,17 @@ function App() {
                   {/* ২. গ্রাহকের তথ্য বক্স */}
                   <div className="invoice-transparent-box mt-3 bg-slate-50/60 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 print:bg-transparent print:border-gray-300">
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">{txt("গ্রাহকের বিবরণ:", "Customer Details:")}</span>
+                      <span className="text-xs uppercase font-bold text-gray-500 tracking-wider">{txt("গ্রাহকের বিবরণ:", "Customer Details:")}</span>
                       <h2 className="text-base font-black text-gray-900">{activeMoneyReceipt.customer_name}</h2>
                       {activeMoneyReceipt.customer_mobile && (
                         <p className="text-xs text-gray-600 font-medium">{txt("মোবাইল:", "Mobile:")} {activeMoneyReceipt.customer_mobile}</p>
                       )}
                       {activeMoneyReceipt.customer_address && (
-                        <p className="text-[11px] text-gray-500">{txt("ঠিকানা:", "Address:")} {activeMoneyReceipt.customer_address}</p>
+                        <p className="text-xs text-gray-500">{txt("ঠিকানা:", "Address:")} {activeMoneyReceipt.customer_address}</p>
                       )}
                     </div>
                     <div className="sm:text-right bg-white/70 p-2 rounded-lg border border-slate-200 print:bg-transparent print:border-none">
-                      <span className="text-[10px] uppercase font-bold text-gray-500">{txt("পরিশোধের মাধ্যম:", "Payment Method:")}</span>
+                      <span className="text-xs uppercase font-bold text-gray-500">{txt("পরিশোধের মাধ্যম:", "Payment Method:")}</span>
                       <p className="text-xs font-black text-emerald-800 flex items-center sm:justify-end gap-1">
                         {activeMoneyReceipt.payment_method === 'Cheque' ? txt('🏦 ব্যাংক চেক (Cheque)', '🏦 Bank Cheque') : 
                          activeMoneyReceipt.payment_method === 'bKash' ? txt('📱 বিকাশ (bKash)', '📱 bKash') : 
@@ -9662,25 +9668,25 @@ function App() {
                     <div className="invoice-transparent-box mt-2.5 bg-amber-50/60 border border-amber-300 rounded-xl p-3 text-xs print:bg-transparent print:border-amber-400">
                       <div className="font-bold text-amber-900 border-b border-amber-200 pb-1 mb-2 flex items-center justify-between">
                         <span>{txt("🏦 চেকের বিবরণী (Bank Cheque Details)", "🏦 Bank Cheque Details")}</span>
-                        <span className="text-[10px] px-2 py-0.5 bg-amber-200 text-amber-900 rounded font-semibold">
+                        <span className="text-xs px-2 py-0.5 bg-amber-200 text-amber-900 rounded font-semibold">
                           {txt("স্ট্যাটাস:", "Status:")} {activeMoneyReceipt.cheque_status === 'Deposited' ? txt('জমা সম্পন্ন', 'Deposited') : activeMoneyReceipt.cheque_status === 'Bounced' ? txt('বাউন্সড', 'Bounced') : txt('গৃহীত / জমাপ্রক্রিয়াধীন', 'Pending / Under Process')}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                         <div>
-                          <span className="text-gray-500 block text-[10px]">{txt("ব্যাংকের নাম:", "Bank Name:")}</span>
+                          <span className="text-gray-500 block text-xs">{txt("ব্যাংকের নাম:", "Bank Name:")}</span>
                           <span className="font-bold text-gray-900">{activeMoneyReceipt.bank_name || '-'}</span>
                         </div>
                         <div>
-                          <span className="text-gray-500 block text-[10px]">{txt("চেক নম্বর:", "Cheque No:")}</span>
+                          <span className="text-gray-500 block text-xs">{txt("চেক নম্বর:", "Cheque No:")}</span>
                           <span className="font-mono font-bold text-blue-700">{activeMoneyReceipt.cheque_no || '-'}</span>
                         </div>
                         <div>
-                          <span className="text-gray-500 block text-[10px]">{txt("চেকের ইস্যু তারিখ:", "Cheque Issue Date:")}</span>
+                          <span className="text-gray-500 block text-xs">{txt("চেকের ইস্যু তারিখ:", "Cheque Issue Date:")}</span>
                           <span className="font-bold text-gray-800">{formatDateDMY(activeMoneyReceipt.cheque_date)}</span>
                         </div>
                         <div>
-                          <span className="text-gray-500 block text-[10px]">{txt("ব্যাংকে জমার নির্ধারিত তারিখ:", "Deposit Date:")}</span>
+                          <span className="text-gray-500 block text-xs">{txt("ব্যাংকে জমার নির্ধারিত তারিখ:", "Deposit Date:")}</span>
                           <span className="font-bold text-amber-900">{formatDateDMY(activeMoneyReceipt.deposit_date)}</span>
                         </div>
                       </div>
@@ -9704,7 +9710,7 @@ function App() {
                             <p className="font-bold text-gray-900">
                               {activeMoneyReceipt.note || (activeMoneyReceipt.payment_method === 'Cheque' ? txt(`চেক নং: ${activeMoneyReceipt.cheque_no || ''} বাবদ গ্রহণ`, `Received against Cheque No: ${activeMoneyReceipt.cheque_no || ''}`) : txt('পূর্বের বকেয়া হিসাব সমন্বয় বাবদ নগদ/চেক জমা গ্রহণ', 'Received against previous due balance adjustment'))}
                             </p>
-                            <p className="text-[11px] text-gray-500">{txt("সরাসরি গ্রাহকের মূল খতিয়ান / খাতা থেকে সমন্বয়কৃত", "Adjusted directly from customer general ledger")}</p>
+                            <p className="text-xs text-gray-500">{txt("সরাসরি গ্রাহকের মূল খতিয়ান / খাতা থেকে সমন্বয়কৃত", "Adjusted directly from customer general ledger")}</p>
                           </td>
                           <td className="p-2.5 text-right font-mono font-black text-sm text-emerald-700">
                             {Number(activeMoneyReceipt.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -9717,27 +9723,27 @@ function App() {
                   {/* ৫. পূর্বের বকেয়া, জমাকৃত টাকা, বিশেষ ছাড় ও বর্তমান অবশিষ্ট বকেয়া বিশ্লেষণ */}
                   <div className={`mt-3 grid ${Number(activeMoneyReceipt.discount || 0) > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-2.5 text-center`}>
                     <div className="invoice-transparent-box p-2.5 rounded-xl border border-gray-200 bg-gray-50/60 print:bg-transparent">
-                      <span className="text-[10px] text-gray-500 font-semibold block uppercase">{txt("১. পূর্বের মোট বকেয়া", "1. Previous Total Due")}</span>
+                      <span className="text-xs text-gray-500 font-semibold block uppercase">{txt("১. পূর্বের মোট বকেয়া", "1. Previous Total Due")}</span>
                       <span className="text-sm md:text-base font-black font-mono text-gray-800">
                         ৳ {Number(activeMoneyReceipt.previous_due || 0).toLocaleString()}
                       </span>
                     </div>
                     <div className="invoice-transparent-box p-2.5 rounded-xl border-2 border-emerald-500 bg-emerald-50/60 print:bg-transparent shadow-xs">
-                      <span className="text-[10px] text-emerald-800 font-bold block uppercase">{txt("২. অত্র রসিদে জমাকৃত নগদ", "2. Amount Received")}</span>
+                      <span className="text-xs text-emerald-800 font-bold block uppercase">{txt("২. অত্র রসিদে জমাকৃত নগদ", "2. Amount Received")}</span>
                       <span className="text-base md:text-lg font-black font-mono text-emerald-700">
                         ৳ {Number(activeMoneyReceipt.amount).toLocaleString()}
                       </span>
                     </div>
                     {Number(activeMoneyReceipt.discount || 0) > 0 && (
                       <div className="invoice-transparent-box p-2.5 rounded-xl border-2 border-amber-500 bg-amber-50/60 print:bg-transparent shadow-xs">
-                        <span className="text-[10px] text-amber-900 font-bold block uppercase">{txt("৩. বিশেষ ছাড় (মাফ)", "3. Special Discount")}</span>
+                        <span className="text-xs text-amber-900 font-bold block uppercase">{txt("৩. বিশেষ ছাড় (মাফ)", "3. Special Discount")}</span>
                         <span className="text-base md:text-lg font-black font-mono text-amber-800">
                           - ৳ {Number(activeMoneyReceipt.discount).toLocaleString()}
                         </span>
                       </div>
                     )}
                     <div className="invoice-transparent-box p-2.5 rounded-xl border border-rose-300 bg-rose-50/60 print:bg-transparent">
-                      <span className="text-[10px] text-rose-800 font-bold block uppercase">
+                      <span className="text-xs text-rose-800 font-bold block uppercase">
                         {Number(activeMoneyReceipt.discount || 0) > 0 ? txt("৪. বর্তমান অবশিষ্ট বকেয়া", "4. Remaining Due") : txt("৩. বর্তমান অবশিষ্ট বকেয়া", "3. Current Remaining Due")}
                       </span>
                       <span className="text-sm md:text-base font-black font-mono text-rose-700">
@@ -9754,13 +9760,13 @@ function App() {
                         {lang === 'en' ? numberToWords(activeMoneyReceipt.amount) : numberToWordsBn(activeMoneyReceipt.amount)}
                       </span>
                     </p>
-                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold uppercase print:hidden">
+                    <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold uppercase print:hidden">
                       {txt("পরিশোধিত", "PAID")}
                     </span>
                   </div>
 
                   {/* নোট / শর্তাবলী */}
-                  <div className="mt-2.5 p-2 bg-yellow-50/60 border border-yellow-200 rounded-lg text-[10px] text-gray-600 print:bg-white print:border-none">
+                  <div className="mt-2.5 p-2 bg-yellow-50/60 border border-yellow-200 rounded-lg text-xs text-gray-600 print:bg-white print:border-none">
                     <p>
                       <strong>{txt("বিশেষ জ্ঞাতব্য:", "Special Note:")}</strong> {txt("চেক প্রদান করা হয়ে থাকলে, ব্যাংকে চেক পাস বা ক্লিয়ারিং সাপেক্ষে সমন্বয় চূড়ান্ত বলে গণ্য হবে। কম্পিউটার দ্বারা প্রস্তুতকৃত রশিদ।", "If paid via cheque, settlement is subject to cheque realization/clearing in bank. This is a computer generated receipt.")}
                     </p>
@@ -9875,8 +9881,8 @@ function App() {
                       <div>
                         <h1 className="text-3xl font-black text-gray-950 uppercase tracking-tight">FC TECHNOLOGY</h1>
                         <p className="text-xs text-blue-700 font-bold mt-0.5">{txt("কম্পিউটার, সিসিটিভি ক্যামেরা ও পূর্ণাঙ্গ আইটি সলিউশন", "Computers, CCTV Camera & Complete IT Solutions")}</p>
-                        <p className="text-[11px] text-gray-600 mt-0.5">{txt("দোকান নং #১৮, আর এফ জোহরা টাওয়ার, নীচ তলা, চৌমুহনী, আগ্রাবাদ, চট্টগ্রাম।", "Shop #18, RF Zohura Tower, Ground Floor, Chowmuhani, Agrabad, Chattogram.")}</p>
-                        <p className="text-[11px] text-gray-600 font-medium">{txt("হটলাইন: 09613-181920, 01812-091939 | fctechnologist@gmail.com | www.fctechbd.com", "Hotline: 09613-181920, 01812-091939 | info@fctechbd.com | www.fctechbd.com")}</p>
+                        <p className="text-xs text-gray-600 mt-0.5">{txt("দোকান নং #১৮, আর এফ জোহরা টাওয়ার, নীচ তলা, চৌমুহনী, আগ্রাবাদ, চট্টগ্রাম।", "Shop #18, RF Zohura Tower, Ground Floor, Chowmuhani, Agrabad, Chattogram.")}</p>
+                        <p className="text-xs text-gray-600 font-medium">{txt("হটলাইন: 09613-181920, 01812-091939 | fctechnologist@gmail.com | www.fctechbd.com", "Hotline: 09613-181920, 01812-091939 | info@fctechbd.com | www.fctechbd.com")}</p>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
@@ -9886,8 +9892,8 @@ function App() {
                       <p className="text-xs font-bold text-gray-800">
                         {txt("কোটেশন নং:", "Quotation No:")} <span className="font-mono text-blue-700">{activeQuotationPrint.quotation_no}</span>
                       </p>
-                      <p className="text-[11px] text-gray-600">{txt("তারিখ:", "Date:")} {activeQuotationPrint.date}</p>
-                      <p className="text-[11px] font-bold text-rose-600">
+                      <p className="text-xs text-gray-600">{txt("তারিখ:", "Date:")} {activeQuotationPrint.date}</p>
+                      <p className="text-xs font-bold text-rose-600">
                         {txt("মেয়াদ:", "Validity:")} {activeQuotationPrint.valid_until ? formatDateDMY(activeQuotationPrint.valid_until) : txt('জমা থেকে ১ সপ্তাহ', '1 Week from Issue')}
                       </p>
                     </div>
@@ -9897,17 +9903,17 @@ function App() {
                   <div className="quotation-transparent-box bg-transparent p-3 rounded-lg border border-gray-300 mb-2.5 print:bg-transparent">
                     <div className="flex flex-row justify-between items-start gap-4 text-xs">
                       <div className="flex-1">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">{txt("কোটেশন প্রাপক:", "Quotation For:")}</span>
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">{txt("কোটেশন প্রাপক:", "Quotation For:")}</span>
                         <h3 className="text-sm font-bold text-gray-950 mt-0.5">{activeQuotationPrint.customer_name}</h3>
                         {activeQuotationPrint.customer_address && (
-                          <p className="text-[11px] text-gray-600 mt-0.5">{activeQuotationPrint.customer_address}</p>
+                          <p className="text-xs text-gray-600 mt-0.5">{activeQuotationPrint.customer_address}</p>
                         )}
                         {activeQuotationPrint.customer_mobile && (
-                          <p className="text-[11px] text-gray-600 font-medium mt-0.5">{txt("মোবাইল:", "Mobile:")} {activeQuotationPrint.customer_mobile}</p>
+                          <p className="text-xs text-gray-600 font-medium mt-0.5">{txt("মোবাইল:", "Mobile:")} {activeQuotationPrint.customer_mobile}</p>
                         )}
                       </div>
                       <div className="flex-1 text-right flex flex-col justify-start items-end">
-                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">{txt("বিষয় (Subject):", "Subject:")}</span>
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">{txt("বিষয় (Subject):", "Subject:")}</span>
                         <p className="text-xs font-bold text-gray-900 mt-0.5 max-w-md">
                           {activeQuotationPrint.subject || txt('পণ্য সরবরাহ ও সার্ভিসিং সংক্রান্ত আনুষ্ঠানিক মূল্য প্রস্তাবনা', 'Official price quotation for IT products supply & services')}
                         </p>
@@ -9918,7 +9924,7 @@ function App() {
                 {/* আইটেম টেবিল (প্রতিটি রোতে লেখাগুলো মাঝ বরাবর) */}
                 <table className="w-full text-left border-collapse border border-gray-300 mb-2 text-xs bg-transparent">
                   <thead>
-                    <tr className="bg-slate-800 text-white text-[11px] uppercase align-middle print:bg-slate-800 print:text-white">
+                    <tr className="bg-slate-800 text-white text-xs uppercase align-middle print:bg-slate-800 print:text-white">
                       <th className="py-1.5 px-2 text-center w-10 border border-slate-700 align-middle"><div className="flex items-center justify-center min-h-[22px]">{txt("নং", "SL")}</div></th>
                       <th className="py-1.5 px-3 border border-slate-700 align-middle"><div className="flex items-center min-h-[22px]">{txt("পণ্যের বিবরণ ও স্পেসিফিকেশন", "Product Description & Specification")}</div></th>
                       <th className="py-1.5 px-2 text-center w-24 border border-slate-700 align-middle"><div className="flex items-center justify-center min-h-[22px]">{txt("ওয়ারেন্টি", "Warranty")}</div></th>
@@ -9931,28 +9937,28 @@ function App() {
                     {activeQuotationPrint.items.map((it, idx) => (
                       <tr key={idx} className="bg-transparent hover:bg-transparent align-middle">
                         <td className="py-1.5 px-2 text-center align-middle border-r border-gray-200">
-                          <div className="flex items-center justify-center min-h-[24px] font-mono text-[11px] leading-none">{idx + 1}</div>
+                          <div className="flex items-center justify-center min-h-[24px] font-mono text-xs leading-none">{idx + 1}</div>
                         </td>
                         <td className="py-1.5 px-3 align-middle border-r border-gray-200">
-                          <div className="flex items-center min-h-[24px] font-bold text-gray-900 leading-snug">{it.name}</div>
+                          <div className="flex items-center min-h-[24px] font-bold text-gray-900 leading-snug text-xs">{it.name}</div>
                         </td>
                         <td className="py-1.5 px-2 text-center align-middle border-r border-gray-200">
                           <div className="flex items-center justify-center min-h-[24px]">
                             {it.warranty ? (
-                              <span className="text-blue-700 font-semibold text-[11px]">{it.warranty}</span>
+                              <span className="text-blue-700 font-semibold text-xs">{it.warranty}</span>
                             ) : (
-                              <span className="text-gray-400 text-[11px]">{txt("নন-ওয়ারেন্টি", "Non-warranty")}</span>
+                              <span className="text-gray-400 text-xs">{txt("নন-ওয়ারেন্টি", "Non-warranty")}</span>
                             )}
                           </div>
                         </td>
                         <td className="py-1.5 px-2 text-center align-middle border-r border-gray-200">
-                          <div className="flex items-center justify-center min-h-[24px] font-bold font-mono text-[11px] leading-none">{it.qty}</div>
+                          <div className="flex items-center justify-center min-h-[24px] font-bold font-mono text-xs leading-none">{it.qty}</div>
                         </td>
                         <td className="py-1.5 px-3 text-right align-middle border-r border-gray-200">
-                          <div className="flex items-center justify-end min-h-[24px] font-mono text-[11px] leading-none">{Number(it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div className="flex items-center justify-end min-h-[24px] font-mono text-xs leading-none">{Number(it.unit_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         </td>
                         <td className="py-1.5 px-3 text-right align-middle border-r border-gray-200">
-                          <div className="flex items-center justify-end min-h-[24px] font-mono font-bold text-gray-950 text-[11px] leading-none">{Number(it.total_price || (it.unit_price * it.qty)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div className="flex items-center justify-end min-h-[24px] font-mono font-bold text-gray-950 text-xs leading-none">{Number(it.total_price || (it.unit_price * it.qty)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         </td>
                       </tr>
                     ))}
@@ -10474,7 +10480,13 @@ function App() {
                       {txt("গ্রাহকের স্বাক্ষর", "Customer's Signature")}
                     </div>
                   </div>
-                  <div className="text-center w-48">
+                  <div className="text-center w-52">
+                    <img 
+                      src="/authority_seal_signature.png" 
+                      alt="Authorized Seal & Signature" 
+                      className="h-14 object-contain mx-auto mb-1 select-none"
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
                     <div className="border-t border-gray-400 pt-1 font-semibold text-gray-800">
                       {txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}
                     </div>
@@ -10908,7 +10920,13 @@ function App() {
                           {txt("সাপ্লায়ারের স্বাক্ষর", "Supplier's Signature")}
                         </div>
                       </div>
-                      <div className="text-center w-48">
+                      <div className="text-center w-52">
+                        <img 
+                          src="/authority_seal_signature.png" 
+                          alt="Authorized Seal & Signature" 
+                          className="h-14 object-contain mx-auto mb-1 select-none"
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
                         <div className="border-t border-gray-400 pt-1 font-semibold text-gray-800">
                           {txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}
                         </div>

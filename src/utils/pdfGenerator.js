@@ -142,6 +142,19 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
     }
   }
 
+  // Preload all images (logo, watermark, authority seal/signature) inside printable element before capture
+  const printableImages = Array.from(element.querySelectorAll('img'));
+  await Promise.all(
+    printableImages.map((img) => {
+      if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
+      return new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
+        setTimeout(resolve, 800);
+      });
+    })
+  );
+
   const canvas = await html2canvas(element, {
     scale: 2, // 2x crispness
     useCORS: true,
@@ -213,11 +226,35 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
           align-items: center !important;
           line-height: 1.35 !important;
         }
+        /* Bill, Quotation and Money Receipt size 12 font styling */
+        .invoice-printable,
+        .quotation-printable,
+        .money-receipt-printable {
+          font-size: 12px !important;
+        }
+        .invoice-printable table,
+        .invoice-printable table th,
+        .invoice-printable table td,
+        .quotation-printable table,
+        .quotation-printable table th,
+        .quotation-printable table td,
+        .money-receipt-printable table,
+        .money-receipt-printable table th,
+        .money-receipt-printable table td {
+          font-size: 12px !important;
+        }
+        .invoice-printable .invoice-transparent-box,
+        .invoice-printable .invoice-subtotal-box,
+        .quotation-printable .quotation-transparent-box,
+        .money-receipt-printable .invoice-transparent-box {
+          font-size: 12px !important;
+        }
         /* Pinned signatures at very bottom of page */
         .invoice-signatures,
         .quotation-signatures,
         .money-receipt-signatures,
-        .warranty-signatures {
+        .warranty-signatures,
+        .statement-signatures {
           margin-top: auto !important;
           padding-top: 14px !important;
           padding-bottom: 10px !important;
@@ -293,6 +330,36 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
         const toHide = clonedEl.querySelectorAll('.print\\:hidden, button, [data-pdf-hide="true"]');
         toHide.forEach((node) => {
           node.style.display = 'none';
+        });
+
+        // Auto-ensure authority seal & signature image is present in any printable document
+        const sigBlocks = clonedDoc.querySelectorAll(
+          '.invoice-signatures, .quotation-signatures, .money-receipt-signatures, .statement-signatures, .warranty-signatures, [class*="-signatures"]'
+        );
+        sigBlocks.forEach((sigBlock) => {
+          const cols = Array.from(sigBlock.children);
+          const authCol = cols.find((c) => 
+            c.textContent.includes('কর্তৃপক্ষ') || 
+            c.textContent.includes('Authorized') ||
+            c.textContent.includes('Authority')
+          ) || (cols.length > 1 ? cols[cols.length - 1] : null);
+
+          if (authCol && !authCol.querySelector('img')) {
+            const borderLine = authCol.querySelector('.border-t, [style*="border-top"]') || authCol.firstElementChild;
+            const sigImg = clonedDoc.createElement('img');
+            sigImg.src = '/authority_seal_signature.png';
+            sigImg.alt = 'Authorized Seal & Signature';
+            sigImg.className = 'h-14 object-contain mx-auto mb-1 select-none';
+            sigImg.style.height = '54px';
+            sigImg.style.objectFit = 'contain';
+            sigImg.style.display = 'block';
+            sigImg.style.margin = '0 auto 4px auto';
+            if (borderLine) {
+              authCol.insertBefore(sigImg, borderLine);
+            } else {
+              authCol.prepend(sigImg);
+            }
+          }
         });
 
         // Ensure quotation and warranty transparent boxes stay transparent
@@ -421,12 +488,15 @@ export function createFallbackPrintableElement(data, lang = 'bn') {
       <pre style="font-family: inherit; font-size: 11px; color: #475569; white-space: pre-wrap; margin: 0; line-height: 1.6;">${details}</pre>
     </div>` : ''}
 
-    <div style="margin-top: 60px; padding-top: 20px; display: flex; justify-content: space-between; font-size: 11px;">
+    <div style="margin-top: 60px; padding-top: 20px; display: flex; justify-content: space-between; font-size: 12px;">
       <div style="border-top: 1px solid #94a3b8; width: 160px; text-align: center; padding-top: 6px; font-weight: 600; color: #334155;">
         গ্রাহকের স্বাক্ষর
       </div>
-      <div style="border-top: 1px solid #94a3b8; width: 180px; text-align: center; padding-top: 6px; font-weight: 600; color: #334155;">
-        কর্তৃপক্ষের স্বাক্ষর ও সিল
+      <div style="width: 180px; text-align: center;">
+        <img src="/authority_seal_signature.png" alt="Authorized Seal & Signature" style="height: 52px; display: block; margin: 0 auto 4px auto; object-fit: contain;" />
+        <div style="border-top: 1px solid #94a3b8; padding-top: 6px; font-weight: 600; color: #334155;">
+          কর্তৃপক্ষের স্বাক্ষর ও সিল
+        </div>
       </div>
     </div>
   `;

@@ -279,3 +279,30 @@ html, body {
     border-collapse: collapse !important;
   }
 }
+
+
+/* ইনভয়েস, কোটেশন ও মানি রিসিপ্ট ফন্ট সাইজ ১২ (12px) অপটিমাইজেশন */
+.invoice-printable,
+.quotation-printable,
+.money-receipt-printable {
+  font-size: 12px !important;
+}
+
+.invoice-printable table,
+.invoice-printable table th,
+.invoice-printable table td,
+.quotation-printable table,
+.quotation-printable table th,
+.quotation-printable table td,
+.money-receipt-printable table,
+.money-receipt-printable table th,
+.money-receipt-printable table td {
+  font-size: 12px !important;
+}
+
+.invoice-printable .invoice-transparent-box,
+.invoice-printable .invoice-subtotal-box,
+.quotation-printable .quotation-transparent-box,
+.money-receipt-printable .invoice-transparent-box {
+  font-size: 12px !important;
+}
