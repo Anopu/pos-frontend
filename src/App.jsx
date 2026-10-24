@@ -10776,12 +10776,22 @@ function App() {
                   {/* কাস্টমার লেজার লেনদেন তালিকা (আগের তারিখের লেনদেন উপর উপর থেকে ক্রমানুসারে) */}
                   {(() => {
                     const sortedCustomerTransactions = [...transactions].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-                    let runningCustBal = 0;
+                    let runningCustBal = Number(ledgerCustomer.opening_balance || 0);
+                    const hasCustomerPayments = sortedCustomerTransactions.some(x => x.type === 'Payment');
                     const transactionsWithBalance = sortedCustomerTransactions.map(t => {
                       const debit = (t.type === 'Invoice' || t.type === 'Service') ? Number(t.total_amount || 0) : 0;
-                      const credit = (t.type === 'Invoice' || t.type === 'Service') 
-                        ? Number(t.paid_amount || 0) 
-                        : (Number(t.amount || 0) + Number(t.discount || 0));
+                      let credit = 0;
+                      if (t.type === 'Invoice') {
+                        if (t.payment_type === 'Due' && hasCustomerPayments) {
+                          credit = 0; // চালানের সময় পরিশোধ ০ ছিল, বাকি খাতার আদায় নিচে আলাদা Payment লাইনে প্রদর্শিত হবে
+                        } else {
+                          credit = Number(t.paid_amount || 0);
+                        }
+                      } else if (t.type === 'Service') {
+                        credit = Number(t.paid_amount || 0);
+                      } else {
+                        credit = Number(t.amount || 0) + Number(t.discount || 0);
+                      }
                       runningCustBal += (debit - credit);
                       return {
                         ...t,
