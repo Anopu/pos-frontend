@@ -18,7 +18,24 @@ import IspManagementModule from './components/IspManagementModule';
 import DatabaseBackupModal from './components/DatabaseBackupModal';
 import FcTechnologyWebsite from './components/FcTechnologyWebsite';
 import { API_BASE } from './utils/apiConfig';
+import { formatWarranty } from './utils/formatWarranty';
 import { buildDocumentPdfFilename, triggerPrintWithFilename } from './utils/pdfGenerator';
+
+
+export const ALL_MODULES = [
+  { id: 'pos', bn: 'POS বিক্রয় ও বিলিং', en: 'POS Billing & Sales', icon: '🛒' },
+  { id: 'warranty_service', bn: 'ওয়ারেন্টি ও সার্ভিসিং', en: 'Warranty & Servicing', icon: '🛠️' },
+  { id: 'inventory', bn: 'ইনভেন্টরি ও স্টক ভিউ', en: 'Inventory & Stock View', icon: '📦' },
+  { id: 'barcode_search', bn: 'বারকোড সার্চ ও হিস্ট্রি', en: 'Barcode Search & History', icon: '🔍' },
+  { id: 'returns', bn: 'বিক্রয় ফেরত (Sales Returns)', en: 'Sales Returns', icon: '🔄' },
+  { id: 'quotation', bn: 'কোটেশন ও মেমো', en: 'Quotation', icon: '📝' },
+  { id: 'customers', bn: 'কাস্টমার লেজার ও বাকি খাতা', en: 'Customer Ledger & Due Khata', icon: '👥' },
+  { id: 'suppliers', bn: 'সাপ্লায়ার হিসাব ও ক্রয় খাতা', en: 'Supplier Khata', icon: '🚚' },
+  { id: 'expenses', bn: 'দৈনিক লাভ-ক্ষতি ও ব্যয়', en: 'Daily Profit-Loss & Expense', icon: '💰' },
+  { id: 'reports', bn: 'বিক্রয় ও ব্যবসায়িক রিপোর্ট', en: 'Sales & Business Reports', icon: '📈' },
+  { id: 'isp_management', bn: 'আইএসপি ইন্টারনেট বিলিং', en: 'ISP Management', icon: '📶' },
+  { id: 'dashboard', bn: 'অ্যাডমিন ড্যাশবোর্ড', en: 'Admin Dashboard', icon: '📊' }
+];
 
 const MASTER_CATEGORIES = [
   "General", "CC Camera", "Router", "Motherboard", "Keyboard", "Mouse", "Laptop", "Cable",
@@ -157,7 +174,7 @@ function App() {
   const [usersList, setUsersList] = useState([]);
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
-  const [newUserForm, setNewUserForm] = useState({ username: '', password: '', fullname: '', role: 'sales', email: '' });
+  const [newUserForm, setNewUserForm] = useState({ username: '', password: '', fullname: '', role: 'sales', email: '', permissions: ['pos', 'returns', 'barcode_search'] });
 
   // সার্ভিসিং স্টেট (ল্যাপটপ ও ডেস্কটপ সার্ভিসিং বিলের জন্য)
   const [showServiceModal, setShowServiceModal] = useState(false);
@@ -169,7 +186,55 @@ function App() {
     warranty: '1 month'
   });
 
-  const [activeTab, setActiveTab] = useState('pos'); // pos, dashboard, warranty_service, isp_management, inventory, returns, barcode_search, quotation, customers, suppliers, expenses, reports
+  // অপশন পারমিশন ও অ্যাক্সেস নিয়ন্ত্রণ হেল্পার
+  const hasAccess = (moduleId) => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'admin') return true;
+    if (!currentUser.permissions) {
+      return ['pos', 'returns', 'barcode_search'].includes(moduleId);
+    }
+    try {
+      const perms = Array.isArray(currentUser.permissions)
+        ? currentUser.permissions
+        : (typeof currentUser.permissions === 'string' ? JSON.parse(currentUser.permissions) : []);
+      return perms.includes(moduleId);
+    } catch {
+      return ['pos', 'returns', 'barcode_search'].includes(moduleId);
+    }
+  };
+
+  // দৈনিক কাজের লগ ও পণ্য এন্ট্রি-বিক্রয় বিবরণী স্টেট
+  const [showDailyWorkLog, setShowDailyWorkLog] = useState(false);
+  const [dailyWorkLogDate, setDailyWorkLogDate] = useState(new Date().toISOString().slice(0, 10));
+  const [dailyWorkLogData, setDailyWorkLogData] = useState(null);
+  const [loadingWorkLog, setLoadingWorkLog] = useState(false);
+
+  const fetchDailyWorkLog = async (targetDate) => {
+    const d = targetDate || dailyWorkLogDate || new Date().toISOString().slice(0, 10);
+    setLoadingWorkLog(true);
+    try {
+      const res = await fetch(`${API_BASE}/reports/daily-work-log?date=${d}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDailyWorkLogData(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch daily work log:', err);
+    } finally {
+      setLoadingWorkLog(false);
+    }
+  };
+
+  const [activeTab, setActiveTab] = useState('pos');
+  // ব্যবহারকারীর অনুমোদিত ট্যাব যাচাই ও অননুমোদিত হলে অনুমোদিত ট্যাবে স্থানান্তর
+  useEffect(() => {
+    if (currentUser && currentUser.role !== 'admin') {
+      if (!hasAccess(activeTab)) {
+        const firstAllowed = ALL_MODULES.find(m => hasAccess(m.id))?.id || 'pos';
+        setActiveTab(firstAllowed);
+      }
+    }
+  }, [currentUser, activeTab]); // pos, dashboard, warranty_service, isp_management, inventory, returns, barcode_search, quotation, customers, suppliers, expenses, reports
   const [ispAlertCount, setIspAlertCount] = useState(0);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -819,6 +884,10 @@ function App() {
 
   // ইনভয়েস এডিট ও নতুন পণ্য সংযোজন হ্যান্ডলার
   const handleOpenEditInvoice = async (invoiceId) => {
+    if (currentUser?.role !== 'admin') {
+      alert(txt("অননুমোদিত অ্যাক্সেস! শুধুমাত্র শপ অ্যাডমিন ইনভয়েস এডিট করতে পারবেন।", "Unauthorized! Only Shop Admin can edit invoices."));
+      return;
+    }
     try {
       const res = await fetch(`${API_BASE}/invoices/${invoiceId}`);
       const data = await res.json();
@@ -1069,6 +1138,10 @@ function App() {
 
   // বিক্রয় বিল ডিলিট করার হ্যান্ডলার (কাস্টমার লেজারে ভুলবশত এক বিল দুইবার তৈরি হলে ডিলিট এবং সেলস রিপোর্ট থেকে মাইনাস)
   const handleDeleteInvoice = async (invoiceId, invoiceNo) => {
+    if (currentUser?.role !== 'admin') {
+      alert(txt("অননুমোদিত অ্যাক্সেস! শুধুমাত্র শপ অ্যাডমিন ইনভয়েস ডিলিট করতে পারবেন।", "Unauthorized! Only Shop Admin can delete invoices."));
+      return;
+    }
     const confirmMsg = txt(
       `⚠️ আপনি কি নিশ্চিতভাবে বিক্রয় বিল (${invoiceNo || `ID: ${invoiceId}`}) ডিলিট করতে চান?\n\n` +
       `ভুলবশত এক বিল দুইবার তৈরি হয়ে থাকলে এটি ডিলিট করলে:\n` +
@@ -1226,10 +1299,12 @@ function App() {
     e.preventDefault();
     try {
       if (editingUserId) {
+        const permsToSend = newUserForm.role === 'admin' ? ALL_MODULES.map(m => m.id) : (newUserForm.permissions || []);
+        const savePayload = { ...newUserForm, permissions: permsToSend };
         const res = await fetch(`${API_BASE}/users/${editingUserId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newUserForm)
+          body: JSON.stringify(savePayload)
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || txt('ইউজার আপডেটে সমস্যা হয়েছে', 'User update failed'));
@@ -1251,10 +1326,12 @@ function App() {
         }
         setEditingUserId(null);
       } else {
+        const permsToSend = newUserForm.role === 'admin' ? ALL_MODULES.map(m => m.id) : (newUserForm.permissions || []);
+        const createPayload = { ...newUserForm, permissions: permsToSend };
         const res = await fetch(`${API_BASE}/users`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newUserForm)
+          body: JSON.stringify(createPayload)
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || txt('ইউজার তৈরিতে সমস্যা হয়েছে', 'User creation failed'));
@@ -1745,8 +1822,20 @@ function App() {
           serials = item.selected_serials.map(s => String(s).trim()).filter(Boolean);
         }
 
+        let resolvedProdId = item.is_service ? 0 : (Number(item.id) || 0);
+        if (!resolvedProdId && !item.is_service && item.name) {
+          const match = products.find(p => 
+            (p.name && p.name.trim().toLowerCase() === item.name.trim().toLowerCase()) ||
+            (p.barcode && p.barcode.trim().toLowerCase() === item.name.trim().toLowerCase()) ||
+            (p.model && p.model.trim().toLowerCase() === item.name.trim().toLowerCase())
+          );
+          if (match) {
+            resolvedProdId = match.id;
+          }
+        }
+
         return {
-          id: item.is_service ? 0 : (Number(item.id) || 0),
+          id: resolvedProdId,
           is_service: Boolean(item.is_service),
           name: item.name,
           model: item.model || '',
@@ -1871,6 +1960,10 @@ function App() {
   };
 
   const handleDeleteProduct = async (id, name) => {
+    if (currentUser?.role !== 'admin') {
+      alert(txt("অননুমোদিত অ্যাক্সেস! শুধুমাত্র শপ অ্যাডমিন পণ্য ডিলিট করতে পারবেন।", "Unauthorized! Only Shop Admin can delete products."));
+      return;
+    }
     if (!window.confirm(txt(`আপনি কি নিশ্চিতভাবে "${name}" পণ্যটি মুছে ফেলতে চান?`, `Are you sure you want to delete product "${name}"?`))) return;
     try {
       const res = await fetch(`${API_BASE}/products/${id}`, { 
@@ -1899,6 +1992,10 @@ function App() {
   };
 
   const handleDeleteSupplier = async (id, name) => {
+    if (currentUser?.role !== 'admin') {
+      alert(txt("অননুমোদিত অ্যাক্সেস! শুধুমাত্র শপ অ্যাডমিন সাপ্লায়ার ডিলিট করতে পারবেন।", "Unauthorized! Only Shop Admin can delete suppliers."));
+      return;
+    }
     if (!window.confirm(txt(`আপনি কি "${name}" সাপ্লায়ারের রেকর্ড মুছে ফেলতে চান?`, `Are you sure you want to delete supplier "${name}"?`))) return;
     try {
       const res = await fetch(`${API_BASE}/suppliers/${id}`, { method: 'DELETE' });
@@ -1912,6 +2009,10 @@ function App() {
   };
 
   const handleDeleteCustomer = async (id, name) => {
+    if (currentUser?.role !== 'admin') {
+      alert(txt("অননুমোদিত অ্যাক্সেস! শুধুমাত্র শপ অ্যাডমিন কাস্টমার ডিলিট করতে পারবেন।", "Unauthorized! Only Shop Admin can delete customers."));
+      return;
+    }
     if (!window.confirm(txt(`আপনি কি "${name}" কাস্টমারের রেকর্ড মুছে ফেলতে চান?`, `Are you sure you want to delete customer "${name}"?`))) return;
     try {
       const res = await fetch(`${API_BASE}/customers/${id}`, { method: 'DELETE' });
@@ -2703,6 +2804,7 @@ function App() {
           </button>
 
           {/* ড্যাশবোর্ড ট্যাব */}
+          {hasAccess('dashboard') && (
           <button 
             onClick={() => setActiveTab('dashboard')} 
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
@@ -2713,8 +2815,10 @@ function App() {
           >
             📊 {t('tabDashboard')}
           </button>
+          )}
 
           {/* POS কাউন্টার */}
+          {hasAccess('pos') && (
           <button 
             onClick={() => setActiveTab('pos')} 
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
@@ -2725,8 +2829,10 @@ function App() {
           >
             🛒 {t('tabPos')}
           </button>
+          )}
 
           {/* ওয়ারেন্টি ও সার্ভিসিং ট্যাব */}
+          {hasAccess('warranty_service') && (
           <button 
             onClick={() => setActiveTab('warranty_service')} 
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
@@ -2737,8 +2843,10 @@ function App() {
           >
             <Wrench size={13} /> {t('tabWarrantyService')}
           </button>
+          )}
 
           {/* আইএসপি ইন্টারনেট ম্যানেজমেন্ট ট্যাব */}
+          {hasAccess('isp_management') && (
           <button 
             onClick={() => setActiveTab('isp_management')} 
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 relative ${
@@ -2754,8 +2862,10 @@ function App() {
               </span>
             )}
           </button>
+          )}
 
           {/* ইনভেন্টরি স্টক */}
+          {hasAccess('inventory') && (
           <button 
             onClick={() => setActiveTab('inventory')} 
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
@@ -2766,8 +2876,10 @@ function App() {
           >
             📦 {t('tabInventory')}
           </button>
+          )}
           
           {/* নির্দিষ্ট বারকোড রিটার্ন ট্যাব */}
+          {hasAccess('returns') && (
           <button 
             onClick={() => setActiveTab('returns')} 
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
@@ -2778,7 +2890,9 @@ function App() {
           >
             <RotateCcw size={13} /> {t('tabReturns')}
           </button>
+          )}
 
+          {hasAccess('barcode_search') && (
           <button 
             onClick={() => setActiveTab('barcode_search')} 
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
@@ -2789,7 +2903,9 @@ function App() {
           >
             🔍 {t('tabBarcodeHistory')}
           </button>
+          )}
 
+          {hasAccess('quotation') && (
           <button 
             onClick={() => setActiveTab('quotation')} 
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
@@ -2800,7 +2916,9 @@ function App() {
           >
             📝 {t('tabQuotation')}
           </button>
+          )}
 
+          {hasAccess('customers') && (
           <button 
             onClick={() => setActiveTab('customers')} 
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
@@ -2811,7 +2929,9 @@ function App() {
           >
             👥 {t('tabCustomers')}
           </button>
+          )}
 
+          {hasAccess('suppliers') && (
           <button 
             onClick={() => setActiveTab('suppliers')} 
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
@@ -2822,7 +2942,9 @@ function App() {
           >
             🚚 {t('tabSuppliers')}
           </button>
+          )}
 
+          {hasAccess('expenses') && (
           <button 
             onClick={() => setActiveTab('expenses')} 
             className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
@@ -2833,6 +2955,7 @@ function App() {
           >
             💰 {t('tabExpenses')}
           </button>
+          )}
 
           <button 
             onClick={() => { setShowChequeModal(true); fetchAllCheques(); }} 
@@ -2850,7 +2973,7 @@ function App() {
             )}
           </button>
 
-          {currentUser.role === 'admin' && (
+          {hasAccess('reports') && (
             <button 
               onClick={() => setActiveTab('reports')} 
               className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition flex items-center gap-1.5 ${
@@ -5120,6 +5243,7 @@ function App() {
             onStockUpdated={() => { 
               fetchProducts(); 
               fetchReports(); 
+              fetchCustomers(); 
               if (typeof fetchDailySummary === 'function') fetchDailySummary(selectedDate); 
             }}
             onShareSlip={(slip) => {
@@ -6037,6 +6161,23 @@ function App() {
                     <RefreshCw size={13} className={isSyncingReports ? "animate-spin" : ""} />
                     {isSyncingReports ? txt("সমন্বয় হচ্ছে...", "Syncing...") : txt("লেজার সিঙ্ক", "Sync Ledger")}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !showDailyWorkLog;
+                      setShowDailyWorkLog(next);
+                      if (next) fetchDailyWorkLog(dailyWorkLogDate);
+                    }}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition shadow-2xs ${
+                      showDailyWorkLog
+                        ? 'bg-fuchsia-600 text-white shadow-md shadow-fuchsia-600/30'
+                        : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200'
+                    }`}
+                    title={txt("প্রতিদিনের পণ্য এন্ট্রি, বিক্রয় ও কর্ম বিবরণী লগ দেখুন", "View daily product entries, sales and activity work log")}
+                  >
+                    <History size={13} />
+                    {showDailyWorkLog ? txt("লগ বন্ধ করুন", "Close Log") : txt("📋 দৈনিক কাজের লগ", "Daily Work Log")}
+                  </button>
                 </div>
               </div>
 
@@ -6074,6 +6215,272 @@ function App() {
                   <span className="text-[10px] text-fuchsia-600 block mt-0.5">{txt("বিক্রয় ও সার্ভিসিং লাভ হিসাব", "Sales & Servicing Profit")}</span>
                 </div>
               </div>
+
+              
+              {/* দৈনিক কর্ম বিবরণী ও কাজের লগ সেকশন (Requirement 6) */}
+              {showDailyWorkLog && (
+                <div className="p-4 bg-gradient-to-br from-indigo-50/90 via-purple-50/70 to-pink-50/60 border border-indigo-200 rounded-2xl shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-indigo-200/80 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold shadow-xs">
+                        📋
+                      </div>
+                      <div>
+                        <h3 className="font-black text-sm text-indigo-950">
+                          {txt("দৈনিক কর্ম বিবরণী ও কাজের লগ", "Daily Activity & Work Log")}
+                        </h3>
+                        <p className="text-[11px] text-indigo-700/80">
+                          {txt("প্রতিদিনের নতুন পণ্য এন্ট্রি, বিক্রয়, সার্ভিসিং ও কাজের বিবরণ", "Daily product entries, sales, services and activity breakdown")}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <input
+                        type="date"
+                        value={dailyWorkLogDate}
+                        onChange={(e) => {
+                          setDailyWorkLogDate(e.target.value);
+                          fetchDailyWorkLog(e.target.value);
+                        }}
+                        className="px-2.5 py-1 text-xs border border-indigo-300 rounded-lg bg-white font-bold text-gray-800 outline-none focus:border-indigo-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const today = new Date().toISOString().slice(0, 10);
+                          setDailyWorkLogDate(today);
+                          fetchDailyWorkLog(today);
+                        }}
+                        className="px-2.5 py-1 text-xs font-bold bg-white hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg cursor-pointer transition shadow-2xs"
+                      >
+                        {txt("আজকের দিন", "Today")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fetchDailyWorkLog(dailyWorkLogDate)}
+                        disabled={loadingWorkLog}
+                        className="p-1 text-indigo-700 hover:bg-indigo-100 rounded-lg border border-indigo-200 bg-white cursor-pointer transition shadow-2xs"
+                        title={txt("রিফ্রেশ", "Refresh")}
+                      >
+                        <RefreshCw size={14} className={loadingWorkLog ? "animate-spin" : ""} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {loadingWorkLog ? (
+                    <div className="py-8 text-center text-xs text-indigo-700 font-bold flex items-center justify-center gap-2">
+                      <RefreshCw size={16} className="animate-spin" /> {txt("দৈনিক তথ্য লোড হচ্ছে...", "Loading daily activity log...")}
+                    </div>
+                  ) : !dailyWorkLogData ? (
+                    <div className="py-6 text-center text-xs text-gray-500">
+                      {txt("তারিখ নির্বাচন করে লগ দেখুন", "Select date to view daily activity log")}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* সামারি ব্যাজ ও মেট্রিক্স */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-xs">
+                        <div className="bg-white p-2.5 rounded-xl border border-indigo-100 shadow-2xs">
+                          <span className="text-[10px] text-gray-500 font-medium block">{txt("📦 পণ্য এন্ট্রি", "Products Added")}</span>
+                          <span className="text-sm font-black text-indigo-900 font-mono">
+                            {dailyWorkLogData.summary?.total_products_entered_count || 0} {txt("টি", "")}
+                          </span>
+                          <span className="text-[10px] text-gray-400 block">({dailyWorkLogData.summary?.total_products_entered_qty || 0} {txt("পিস স্টক", "pcs")})</span>
+                        </div>
+
+                        <div className="bg-white p-2.5 rounded-xl border border-blue-100 shadow-2xs">
+                          <span className="text-[10px] text-gray-500 font-medium block">{txt("🛒 পণ্য বিক্রয়", "Products Sold")}</span>
+                          <span className="text-sm font-black text-blue-900 font-mono">
+                            {dailyWorkLogData.summary?.total_items_sold_qty || 0} {txt("পিস", "pcs")}
+                          </span>
+                          <span className="text-[10px] text-gray-400 block">({dailyWorkLogData.products_sold?.length || 0} {txt("টি আইটেম", "items")})</span>
+                        </div>
+
+                        <div className="bg-white p-2.5 rounded-xl border border-emerald-100 shadow-2xs">
+                          <span className="text-[10px] text-gray-500 font-medium block">{txt("💰 বিক্রয় মূল্য", "Total Sales")}</span>
+                          <span className="text-sm font-black text-emerald-800 font-mono">
+                            ৳ {Number(dailyWorkLogData.summary?.total_sales_amount || 0).toLocaleString()}
+                          </span>
+                        </div>
+
+                        <div className="bg-white p-2.5 rounded-xl border border-teal-100 shadow-2xs">
+                          <span className="text-[10px] text-gray-500 font-medium block">{txt("💵 বকেয়া আদায়", "Due Collected")}</span>
+                          <span className="text-sm font-black text-teal-800 font-mono">
+                            ৳ {Number(dailyWorkLogData.summary?.total_due_collected || 0).toLocaleString()}
+                          </span>
+                        </div>
+
+                        <div className="bg-white p-2.5 rounded-xl border border-purple-100 shadow-2xs">
+                          <span className="text-[10px] text-gray-500 font-medium block">{txt("🛠️ সার্ভিসিং", "Services")}</span>
+                          <span className="text-sm font-black text-purple-900 font-mono">
+                            {dailyWorkLogData.summary?.total_services_count || 0} {txt("টি", "slips")}
+                          </span>
+                        </div>
+
+                        <div className="bg-white p-2.5 rounded-xl border border-rose-100 shadow-2xs">
+                          <span className="text-[10px] text-gray-500 font-medium block">{txt("💸 দোকান খরচ", "Shop Expenses")}</span>
+                          <span className="text-sm font-black text-rose-800 font-mono">
+                            ৳ {Number(dailyWorkLogData.summary?.total_expenses || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* দুটি প্রধান সেকশন: ১. কি পরিমাণ প্রোডাক্ট এন্ট্রি করা হয়েছে ২. কি পরিমাণ সেল করা হয়েছে */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
+                        {/* ১. নতুন পণ্য এন্ট্রি ও স্টক ইন */}
+                        <div className="bg-white p-3.5 rounded-xl border border-indigo-200 shadow-2xs">
+                          <div className="flex items-center justify-between border-b pb-2 mb-2">
+                            <span className="font-bold text-indigo-950 flex items-center gap-1.5">
+                              📦 {txt("পণ্য এন্ট্রি ও স্টক ইন তালিকা", "Products Entered Today")} ({dailyWorkLogData.products_entered?.length || 0})
+                            </span>
+                            <span className="text-[11px] text-indigo-600 font-mono font-bold">
+                              {txt("মোট:", "Total:")} {dailyWorkLogData.summary?.total_products_entered_qty || 0} {txt("পিস", "pcs")}
+                            </span>
+                          </div>
+
+                          <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1">
+                            {(!dailyWorkLogData.products_entered || dailyWorkLogData.products_entered.length === 0) ? (
+                              <p className="text-center py-4 text-gray-400 italic">
+                                {txt("অত্র তারিখে কোনো নতুন পণ্য এন্ট্রি করা হয়নি।", "No products entered on this date.")}
+                              </p>
+                            ) : (
+                              dailyWorkLogData.products_entered.map((pe) => (
+                                <div key={pe.id} className="p-2 bg-indigo-50/50 rounded-lg border border-indigo-100 flex justify-between items-center text-[11px]">
+                                  <div>
+                                    <p className="font-bold text-gray-900">{pe.name}</p>
+                                    <div className="flex items-center gap-1.5 text-gray-500 font-mono text-[10px] mt-0.5">
+                                      {pe.model && <span>[{pe.model}]</span>}
+                                      {pe.barcode && <span>SN/Code: {pe.barcode}</span>}
+                                      {pe.supplier_name && <span className="text-indigo-700">({pe.supplier_name})</span>}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="px-2 py-0.5 bg-indigo-600 text-white font-black rounded-md font-mono text-[10px]">
+                                      +{pe.current_stock || 1} {txt("টি", "pcs")}
+                                    </span>
+                                    <p className="text-[10px] text-gray-600 font-mono mt-0.5">
+                                      দর: ৳{Number(pe.purchase_price || 0).toLocaleString()}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        {/* ২. বিক্রিত পণ্যের হিসাব */}
+                        <div className="bg-white p-3.5 rounded-xl border border-blue-200 shadow-2xs">
+                          <div className="flex items-center justify-between border-b pb-2 mb-2">
+                            <span className="font-bold text-blue-950 flex items-center gap-1.5">
+                              🛒 {txt("পণ্য বিক্রয় তালিকা", "Products Sold Today")} ({dailyWorkLogData.products_sold?.length || 0})
+                            </span>
+                            <span className="text-[11px] text-emerald-700 font-mono font-bold">
+                              {txt("মোট বিক্রয়:", "Sold:")} ৳{Number(dailyWorkLogData.summary?.total_sales_amount || 0).toLocaleString()}
+                            </span>
+                          </div>
+
+                          <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1">
+                            {(!dailyWorkLogData.products_sold || dailyWorkLogData.products_sold.length === 0) ? (
+                              <p className="text-center py-4 text-gray-400 italic">
+                                {txt("অত্র তারিখে কোনো পণ্য বিক্রয় হয়নি।", "No products sold on this date.")}
+                              </p>
+                            ) : (
+                              dailyWorkLogData.products_sold.map((ps) => (
+                                <div key={ps.id} className="p-2 bg-blue-50/50 rounded-lg border border-blue-100 flex justify-between items-center text-[11px]">
+                                  <div>
+                                    <p className="font-bold text-gray-900">{ps.product_name}</p>
+                                    <div className="flex items-center gap-1.5 text-gray-500 font-mono text-[10px] mt-0.5">
+                                      <span className="text-blue-700 font-bold">{ps.invoice_no}</span>
+                                      {ps.customer_name && <span>• {ps.customer_name}</span>}
+                                      {ps.warranty && <span className="text-teal-700">({formatWarranty(ps.warranty)})</span>}
+                                    </div>
+                                    {ps.serial_numbers && (
+                                      <p className="text-[10px] font-mono text-purple-700 mt-0.5">S/N: {ps.serial_numbers}</p>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="px-2 py-0.5 bg-emerald-600 text-white font-black rounded-md font-mono text-[10px]">
+                                      {ps.quantity} {txt("টি", "pcs")}
+                                    </span>
+                                    <p className="text-[10px] text-gray-700 font-black font-mono mt-0.5">
+                                      ৳{Number(ps.total_price || 0).toLocaleString()}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* ৩. প্রতিদিন কি কাজ করা হয়েছে তার সমন্বিত অ্যাক্টিভিটি টাইমলাইন লগ */}
+                      <div className="bg-white p-3.5 rounded-xl border border-purple-200 shadow-2xs">
+                        <div className="flex items-center justify-between border-b pb-2 mb-2">
+                          <span className="font-bold text-purple-950 flex items-center gap-1.5">
+                            📝 {txt("দৈনিক পূর্ণাঙ্গ কাজের টাইমলাইন লগ (Day Activity Breakdown)", "Daily Work Activity Timeline")}
+                          </span>
+                        </div>
+
+                        <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 text-[11px]">
+                          {/* সার্ভিসিং কার্যক্রম */}
+                          {dailyWorkLogData.services?.map(srv => (
+                            <div key={`srv-${srv.id}`} className="p-2 bg-purple-50/60 rounded-lg border border-purple-100 flex justify-between items-center">
+                              <span className="font-medium text-purple-900">
+                                🛠️ <strong>সার্ভিসিং:</strong> {srv.token_no} - {srv.product_name} ({srv.status}) | গ্রাহক: {srv.customer_name}
+                              </span>
+                              <span className="font-mono font-bold text-purple-700 text-xs">
+                                বিল: ৳{Number(srv.final_cost || 0).toLocaleString()}
+                              </span>
+                            </div>
+                          ))}
+
+                          {/* বকেয়া আদায় */}
+                          {dailyWorkLogData.payments?.map(pay => (
+                            <div key={`pay-${pay.id}`} className="p-2 bg-teal-50/60 rounded-lg border border-teal-100 flex justify-between items-center">
+                              <span className="font-medium text-teal-900">
+                                💵 <strong>বকেয়া আদায় (মানি রিসিপ্ট):</strong> {pay.receipt_no} | গ্রাহক: {pay.customer_name} | মাধ্যম: {pay.payment_method}
+                              </span>
+                              <span className="font-mono font-bold text-teal-700 text-xs">
+                                +৳{Number(pay.amount || 0).toLocaleString()}
+                              </span>
+                            </div>
+                          ))}
+
+                          {/* খরচ এন্ট্রি */}
+                          {dailyWorkLogData.expenses?.map(exp => (
+                            <div key={`exp-${exp.id}`} className="p-2 bg-rose-50/60 rounded-lg border border-rose-100 flex justify-between items-center">
+                              <span className="font-medium text-rose-900">
+                                💸 <strong>দোকান ব্যয়:</strong> {exp.category} {exp.note ? `(${exp.note})` : ''}
+                              </span>
+                              <span className="font-mono font-bold text-rose-700 text-xs">
+                                -৳{Number(exp.amount || 0).toLocaleString()}
+                              </span>
+                            </div>
+                          ))}
+
+                          {/* পণ্য ফেরত */}
+                          {dailyWorkLogData.returns?.map(ret => (
+                            <div key={`ret-${ret.id}`} className="p-2 bg-amber-50/60 rounded-lg border border-amber-100 flex justify-between items-center">
+                              <span className="font-medium text-amber-900">
+                                🔄 <strong>পণ্য ফেরত:</strong> {ret.product_name} {ret.serial_number ? `(${ret.serial_number})` : ''} | কারণ: {ret.return_reason}
+                              </span>
+                              <span className="font-mono font-bold text-amber-800 text-xs">
+                                ফেরত: ৳{Number(ret.refund_amount || 0).toLocaleString()}
+                              </span>
+                            </div>
+                          ))}
+
+                          {(!dailyWorkLogData.services?.length && !dailyWorkLogData.payments?.length && !dailyWorkLogData.expenses?.length && !dailyWorkLogData.returns?.length && !dailyWorkLogData.products_entered?.length && !dailyWorkLogData.products_sold?.length) && (
+                            <p className="text-center py-3 text-gray-400 italic">
+                              {txt("অত্র তারিখে কোনো কাজের রেকর্ড পাওয়া যায়নি।", "No activity recorded for this date.")}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* ফিল্টার পিলস (সব, বকেয়া, পরিশোধিত) */}
               <div className="flex items-center gap-2 border-b pb-3 overflow-x-auto text-xs">
@@ -6237,22 +6644,26 @@ function App() {
                                     >
                                       <FileText size={13} /> {txt("ইনভয়েস দেখুন", "View Invoice")}
                                     </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenEditInvoice(r.id)}
-                                      className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
-                                      title={txt("এই ইনভয়েস এডিট করে নতুন পণ্য অ্যাড করুন বা সংশোধন করুন", "Edit this invoice and add or update items")}
-                                    >
-                                      <Edit size={13} /> {txt("ইনভয়েস এডিট", "Edit Invoice")}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteInvoice(r.id, r.invoice_no)}
-                                      className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
-                                      title={txt("ভুলবশত ডুপ্লিকেট হওয়া এই ইনভয়েসটি ডিলিট করুন (সেলস রিপোর্ট ও কাস্টমার লেজার থেকে মাইনাস হবে)", "Delete this duplicate invoice")}
-                                    >
-                                      <Trash2 size={13} /> {txt("ডিলিট", "Delete")}
-                                    </button>
+                                    {currentUser?.role === 'admin' && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenEditInvoice(r.id)}
+                                          className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
+                                          title={txt("এই ইনভয়েস এডিট করে নতুন পণ্য অ্যাড করুন বা সংশোধন করুন", "Edit this invoice and add or update items")}
+                                        >
+                                          <Edit size={13} /> {txt("ইনভয়েস এডিট", "Edit Invoice")}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteInvoice(r.id, r.invoice_no)}
+                                          className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition shadow-sm"
+                                          title={txt("ভুলবশত ডুপ্লিকেট হওয়া এই ইনভয়েসটি ডিলিট করুন (সেলস রিপোর্ট ও কাস্টমার লেজার থেকে মাইনাস হবে)", "Delete this duplicate invoice")}
+                                        >
+                                          <Trash2 size={13} /> {txt("ডিলিট", "Delete")}
+                                        </button>
+                                      </>
+                                    )}
                                   </>
                                 )}
                               </div>
@@ -6592,12 +7003,21 @@ function App() {
                             type="button"
                             onClick={() => {
                               setEditingUserId(u.id);
+                              let parsedPerms = ['pos', 'returns', 'barcode_search'];
+                              if (u.permissions) {
+                                try {
+                                  parsedPerms = Array.isArray(u.permissions) ? u.permissions : JSON.parse(u.permissions);
+                                } catch {}
+                              } else if (u.role === 'admin') {
+                                parsedPerms = ALL_MODULES.map(m => m.id);
+                              }
                               setNewUserForm({
                                 username: u.username,
                                 password: '',
                                 fullname: u.fullname,
                                 role: u.role,
-                                email: u.email || ''
+                                email: u.email || '',
+                                permissions: parsedPerms
                               });
                             }}
                             className="px-2 py-1 bg-white hover:bg-purple-100 text-purple-700 border border-purple-200 rounded font-bold text-[11px] cursor-pointer transition flex items-center gap-1"
@@ -6693,15 +7113,99 @@ function App() {
                     />
                   </div>
                   <div>
-                    <label className="font-bold text-gray-700">{txt("পদবী / অ্যাক্সেস রোল", "Designation / Access Role")}</label>
+                    <label className="font-bold text-gray-700">{txt("পদবী / প্রধান রোল", "Designation / Main Role")}</label>
                     <select 
                       value={newUserForm.role} 
-                      onChange={e => setNewUserForm({ ...newUserForm, role: e.target.value })} 
-                      className="w-full border p-2 rounded mt-1 bg-white outline-none"
+                      onChange={e => {
+                        const newR = e.target.value;
+                        setNewUserForm(prev => ({
+                          ...prev,
+                          role: newR,
+                          permissions: newR === 'admin' ? ALL_MODULES.map(m => m.id) : (prev.permissions && prev.permissions.length > 0 ? prev.permissions : ['pos', 'returns', 'barcode_search'])
+                        }));
+                      }} 
+                      className="w-full border p-2 rounded mt-1 bg-white outline-none font-bold"
                     >
-                      <option value="sales">{txt("Sales (বিক্রয় প্রতিনিধি - শুধুমাত্র বিল ও POS)", "Sales (Sales Rep - Billing & POS only)")}</option>
-                      <option value="admin">{txt("Admin (শপ অ্যাডমিন - পূর্ণ নিয়ন্ত্রণ ও রিপোর্ট)", "Admin (Shop Admin - Full Control & Reports)")}</option>
+                      <option value="sales">{txt("Sales / Staff (বিক্রয় প্রতিনিধি / স্টাফ)", "Sales / Staff")}</option>
+                      <option value="admin">{txt("Shop Admin (শপ অ্যাডমিন - পূর্ণ নিয়ন্ত্রণ ও সমস্ত এডিট/ডিলিট)", "Shop Admin (Full Control)")}</option>
                     </select>
+                  </div>
+
+                  {/* অ্যাক্সেস রোল ও অপশন পারমিশন কনফিগারেশন (Requirement 7) */}
+                  <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="font-bold text-purple-950 block text-xs">
+                        🔐 {txt("অ্যাক্সেস রোল ও অপশন পারমিশন", "Access Role & Module Permissions")}
+                      </label>
+                      {newUserForm.role === 'sales' && (
+                        <div className="flex items-center gap-1.5 text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => setNewUserForm(p => ({ ...p, permissions: ALL_MODULES.map(m => m.id) }))}
+                            className="px-1.5 py-0.5 bg-white text-purple-700 border border-purple-200 rounded font-bold hover:bg-purple-100 cursor-pointer"
+                          >
+                            {txt("সব সিলেক্ট", "All")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNewUserForm(p => ({ ...p, permissions: ['pos', 'returns', 'barcode_search'] }))}
+                            className="px-1.5 py-0.5 bg-white text-blue-700 border border-blue-200 rounded font-bold hover:bg-blue-100 cursor-pointer"
+                          >
+                            {txt("শুধুমাত্র POS", "POS Only")}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {newUserForm.role === 'admin' ? (
+                      <div className="p-2 bg-blue-100/70 border border-blue-300 rounded-lg text-blue-900 font-semibold text-[11px] flex items-center gap-1.5">
+                        <span>👑</span>
+                        <span>{txt("শপ অ্যাডমিনের জন্য সমস্ত অপশনে অ্যাক্সেস এবং ইনভয়েস, প্রোডাক্ট, সাপ্লায়ার ও কাস্টমার লেজার এডিট-ডিলিট করার পূর্ণ ক্ষমতা থাকবে।", "Shop Admin has full access to all modules and all edit/delete permissions.")}</span>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-[10px] text-gray-500 mb-2">
+                          {txt("চিহ্নিত অপশনগুলোতে এই ইউজার কাজ করতে এবং দেখতে পারবে।", "Select which options this user can view and work with.")}
+                        </p>
+                        <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
+                          {ALL_MODULES.map(mod => {
+                            const isChecked = Array.isArray(newUserForm.permissions) && newUserForm.permissions.includes(mod.id);
+                            return (
+                              <label
+                                key={mod.id}
+                                className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-[11px] cursor-pointer transition select-none ${
+                                  isChecked
+                                    ? 'bg-purple-100/80 border-purple-300 text-purple-950 font-bold'
+                                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={e => {
+                                    const checked = e.target.checked;
+                                    setNewUserForm(prev => {
+                                      const cur = Array.isArray(prev.permissions) ? [...prev.permissions] : [];
+                                      if (checked && !cur.includes(mod.id)) {
+                                        return { ...prev, permissions: [...cur, mod.id] };
+                                      } else if (!checked && cur.includes(mod.id)) {
+                                        return { ...prev, permissions: cur.filter(id => id !== mod.id) };
+                                      }
+                                      return prev;
+                                    });
+                                  }}
+                                  className="rounded text-purple-600 focus:ring-purple-500"
+                                />
+                                <span>{mod.icon} {lang === 'en' ? mod.en : mod.bn}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <div className="mt-2 p-1.5 bg-amber-50 rounded-lg border border-amber-200 text-[10px] text-amber-900 font-medium">
+                          ⚠️ {txt("নোট: ইনভয়েস, প্রোডাক্ট এন্ট্রি, সাপ্লায়ার ও কাস্টমার লেজারের সমস্ত এডিট এবং ডিলিট সুবিধা শুধুমাত্র শপ অ্যাডমিনের জন্য সংরক্ষিত।", "Note: All Edit and Delete options for invoices, product entry, suppliers and customer ledger are strictly reserved for Shop Admin.")}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <button 
                     type="submit" 
@@ -8410,11 +8914,7 @@ function App() {
                             <div className="font-bold leading-snug text-xs">
                               {it.name || it.product_name}
                               {it.model && <span className="ml-1 text-xs text-gray-600 font-mono font-normal">[{it.model}]</span>}
-                              {it.warranty ? (
-                                <span className="ml-1 text-xs font-normal text-blue-600">({it.warranty})</span>
-                              ) : (
-                                <span className="ml-1 text-xs font-normal text-gray-400">({txt("নন-ওয়ারেন্টি", "Non-warranty")})</span>
-                              )}
+                              <span className="ml-1 text-xs font-semibold text-blue-700">({formatWarranty(it.warranty)})</span>
                               {Number(it.discount || 0) > 0 && (
                                 <span className="ml-1.5 text-xs font-bold text-orange-600 bg-orange-50 px-1 py-0.2 rounded border border-orange-200">
                                   {txt("ছাড়:", "Disc:")} -{Number(it.discount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -8584,14 +9084,15 @@ function App() {
                 <div className="text-center w-44">
                   <div className="border-t border-gray-400 pt-1.5 font-semibold text-gray-800">{txt("গ্রাহকের স্বাক্ষর", "Customer's Signature")}</div>
                 </div>
-                <div className="text-center w-52">
+                <div className="text-center w-64">
                   <img 
                     src="/authority_seal_signature.png" 
                     alt="Authorized Seal & Signature" 
-                    className="h-14 object-contain mx-auto mb-1 select-none"
+                    className="h-20 object-contain mx-auto mb-1.5 select-none"
+                    style={{ maxHeight: '85px', width: 'auto' }}
                     onError={(e) => { e.target.style.display = 'none'; }}
                   />
-                  <div className="border-t border-gray-400 pt-1.5 font-semibold text-gray-800">{txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}</div>
+                  <div className="border-t border-gray-400 pt-1.5 font-bold text-gray-900 text-xs">{txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}</div>
                 </div>
               </div>
             </div>
@@ -8819,7 +9320,7 @@ function App() {
                               </div>
                               <div className="text-[11px] text-gray-500 mt-0.5 flex items-center gap-2 flex-wrap">
                                 {it.model && <span className="font-mono bg-gray-100 px-1.5 py-0.2 rounded text-gray-700">{txt("মডেল:", "Model:")} {it.model}</span>}
-                                {it.warranty && <span className="text-blue-600">{txt("ওয়ারেন্টি:", "Warranty:")} {it.warranty}</span>}
+                                <span className="text-blue-700 font-semibold">{txt("ওয়ারেন্টি:", "Warranty:")} {formatWarranty(it.warranty)}</span>
                               </div>
                               {/* সিরিয়াল প্রদর্শন ও হাইলাইটিং */}
                               {((it.selected_serials && it.selected_serials.length > 0) || it.serial_numbers) && (
@@ -9944,11 +10445,7 @@ function App() {
                         </td>
                         <td className="py-1.5 px-2 text-center align-middle border-r border-gray-200">
                           <div className="flex items-center justify-center min-h-[24px]">
-                            {it.warranty ? (
-                              <span className="text-blue-700 font-semibold text-xs">{it.warranty}</span>
-                            ) : (
-                              <span className="text-gray-400 text-xs">{txt("নন-ওয়ারেন্টি", "Non-warranty")}</span>
-                            )}
+                            <span className="text-blue-700 font-semibold text-xs">{formatWarranty(it.warranty)}</span>
                           </div>
                         </td>
                         <td className="py-1.5 px-2 text-center align-middle border-r border-gray-200">
@@ -10343,14 +10840,16 @@ function App() {
                                         ✏️ {txt("এডিট", "Edit")}
                                       </button>
                                     )}
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteInvoice(t.id, t.invoice_no)}
-                                      className="px-2 py-0.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1 shadow-xs transition"
-                                      title={txt("ভুলবশত এক বিল দুইবার হলে ডিলিট করুন (কাস্টমার লেজার ও সেলস রিপোর্ট থেকে মাইনাস হবে)", "Delete duplicate invoice (deducted from customer ledger & sales report)")}
-                                    >
-                                      <Trash2 size={11} /> {txt("ডিলিট", "Delete")}
-                                    </button>
+                                    {currentUser?.role === 'admin' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteInvoice(t.id, t.invoice_no)}
+                                        className="px-2 py-0.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded text-[11px] font-bold cursor-pointer print:hidden flex items-center gap-1 shadow-xs transition"
+                                        title={txt("ভুলবশত এক বিল দুইবার হলে ডিলিট করুন (কাস্টমার লেজার ও সেলস রিপোর্ট থেকে মাইনাস হবে)", "Delete duplicate invoice (deducted from customer ledger & sales report)")}
+                                      >
+                                        <Trash2 size={11} /> {txt("ডিলিট", "Delete")}
+                                      </button>
+                                    )}
                                   </div>
                                 ) : t.type === 'Service' ? (
                                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">

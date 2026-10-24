@@ -492,9 +492,9 @@ export function createFallbackPrintableElement(data, lang = 'bn') {
       <div style="border-top: 1px solid #94a3b8; width: 160px; text-align: center; padding-top: 6px; font-weight: 600; color: #334155;">
         গ্রাহকের স্বাক্ষর
       </div>
-      <div style="width: 180px; text-align: center;">
-        <img src="/authority_seal_signature.png" alt="Authorized Seal & Signature" style="height: 52px; display: block; margin: 0 auto 4px auto; object-fit: contain;" />
-        <div style="border-top: 1px solid #94a3b8; padding-top: 6px; font-weight: 600; color: #334155;">
+      <div style="width: 220px; text-align: center;">
+        <img src="/authority_seal_signature.png" alt="Authorized Seal & Signature" style="height: 75px; display: block; margin: 0 auto 6px auto; object-fit: contain;" />
+        <div style="border-top: 1px solid #94a3b8; padding-top: 6px; font-weight: 700; color: #1e293b;">
           কর্তৃপক্ষের স্বাক্ষর ও সিল
         </div>
       </div>

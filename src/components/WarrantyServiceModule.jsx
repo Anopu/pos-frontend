@@ -418,6 +418,9 @@ export default function WarrantyServiceModule({
       const due = Math.max(0, cost - paid);
 
       const payload = {
+        customer_name: statusUpdateItem.customer_name,
+        customer_mobile: statusUpdateItem.customer_mobile,
+        customer_address: statusUpdateItem.customer_address,
         status: statusUpdateForm.status,
         delivery_note: statusUpdateForm.delivery_note,
         delivery_date: isDelivered ? statusUpdateForm.delivery_date : null,
