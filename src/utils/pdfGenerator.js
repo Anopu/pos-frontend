@@ -249,6 +249,36 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
         .money-receipt-printable .invoice-transparent-box {
           font-size: 12px !important;
         }
+        /* Terms and Conditions font size 10 */
+        .invoice-printable .invoice-terms-box,
+        .invoice-printable .invoice-terms-box *,
+        .quotation-printable .quotation-terms-box,
+        .quotation-printable .quotation-terms-box * {
+          font-size: 10px !important;
+          line-height: 1.35 !important;
+        }
+        /* Silver headers & title badges for Invoice and Quotation */
+        .silver-title-badge,
+        .invoice-printable .silver-title-badge,
+        .quotation-printable .silver-title-badge {
+          background-color: #e2e8f0 !important;
+          color: #0f172a !important;
+          border: 1px solid #cbd5e1 !important;
+        }
+        .silver-header-row,
+        .invoice-printable thead tr,
+        .quotation-printable thead tr {
+          background-color: #e2e8f0 !important;
+          color: #0f172a !important;
+        }
+        .silver-header-row th,
+        .invoice-printable thead th,
+        .quotation-printable thead th {
+          background-color: #e2e8f0 !important;
+          color: #0f172a !important;
+          font-weight: 700 !important;
+          border-color: #cbd5e1 !important;
+        }
         /* Pinned signatures at very bottom of page */
         .invoice-signatures,
         .quotation-signatures,

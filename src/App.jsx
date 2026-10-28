@@ -8767,7 +8767,7 @@ function App() {
                       </div>
                     </div>
                     <div className="text-right">
-                      {/* কালো কালীর ঘরে ইনভয়েস / ক্যাশ মেমো / ওয়ারেন্টি স্লিপ লেখাটি এডিটেবল */}
+                      {/* সিলভার কালারের ঘরে ইনভয়েস / ক্যাশ মেমো / ওয়ারেন্টি স্লিপ লেখাটি এডিটেবল */}
                       <div className="relative inline-block text-right group mb-1">
                         <div className="flex items-center justify-end gap-1">
                           <span 
@@ -8784,7 +8784,7 @@ function App() {
                               }
                             }}
                             title={txt("ক্লিক করে শিরোনাম পরিবর্তন করুন", "Click to edit title")}
-                            className="inline-block bg-slate-800 text-white font-bold text-xs px-2.5 py-0.5 uppercase rounded cursor-text hover:bg-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-400 transition"
+                            className="inline-block silver-title-badge bg-slate-200 text-slate-900 border border-slate-300 font-bold text-xs px-2.5 py-0.5 uppercase rounded cursor-text hover:bg-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-400 transition print:bg-slate-200 print:text-slate-900"
                           >
                             {invoiceDocTitle || txt("ইনভয়েস / ক্যাশ মেমো", "INVOICE / CASH MEMO")}
                           </span>
@@ -8883,15 +8883,15 @@ function App() {
                   </div>
                 </div>
 
-                {/* আইটেম টেবিল (ঝাপসা কালো হেডার ও প্রতিটি রোতে লেখাগুলো মাঝ বরাবর) */}
+                {/* আইটেম টেবিল (হালকা সিলভার হেডার ও প্রতিটি রোতে লেখাগুলো মাঝ বরাবর) */}
                 <table className="w-full text-left border-collapse mb-2 text-xs">
                   <thead>
-                    <tr className="bg-slate-700 text-white text-xs uppercase align-middle print:bg-slate-700 print:text-white">
-                      <th className="py-1.5 px-2 text-center w-9 align-middle"><div className="flex items-center justify-center min-h-[22px]">{txt("নং", "SL")}</div></th>
-                      <th className="py-1.5 px-2 align-middle"><div className="flex items-center min-h-[22px]">{txt("পণ্যের বিবরণ, মডেল, ওয়ারেন্টি ও সিরিয়াল", "Product Description, Model, Warranty & Serial")}</div></th>
-                      <th className="py-1.5 px-2 text-center w-14 align-middle"><div className="flex items-center justify-center min-h-[22px]">{txt("পরিমাণ", "Qty")}</div></th>
-                      <th className="py-1.5 px-2 text-right w-24 align-middle"><div className="flex items-center justify-end min-h-[22px]">{txt("দর (৳)", "Rate (৳)")}</div></th>
-                      <th className="py-1.5 px-2 text-right w-24 align-middle"><div className="flex items-center justify-end min-h-[22px]">{txt("মোট মূল্য (৳)", "Total (৳)")}</div></th>
+                    <tr className="silver-header-row bg-slate-200 text-slate-900 border-y border-slate-300 text-xs font-bold uppercase align-middle print:bg-slate-200 print:text-slate-900">
+                      <th className="py-1.5 px-2 text-center w-9 align-middle text-slate-900 font-bold border-y border-slate-300"><div className="flex items-center justify-center min-h-[22px]">{txt("নং", "SL")}</div></th>
+                      <th className="py-1.5 px-2 align-middle text-slate-900 font-bold border-y border-slate-300"><div className="flex items-center min-h-[22px]">{txt("পণ্যের বিবরণ, মডেল, ওয়ারেন্টি ও সিরিয়াল", "Product Description, Model, Warranty & Serial")}</div></th>
+                      <th className="py-1.5 px-2 text-center w-14 align-middle text-slate-900 font-bold border-y border-slate-300"><div className="flex items-center justify-center min-h-[22px]">{txt("পরিমাণ", "Qty")}</div></th>
+                      <th className="py-1.5 px-2 text-right w-24 align-middle text-slate-900 font-bold border-y border-slate-300"><div className="flex items-center justify-end min-h-[22px]">{txt("দর (৳)", "Rate (৳)")}</div></th>
+                      <th className="py-1.5 px-2 text-right w-24 align-middle text-slate-900 font-bold border-y border-slate-300"><div className="flex items-center justify-end min-h-[22px]">{txt("মোট মূল্য (৳)", "Total (৳)")}</div></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 border-b">
@@ -9014,12 +9014,12 @@ function App() {
                         <strong>{txt("ইনভয়েস বিশেষ নোট:", "Invoice Note:")}</strong> {completedInvoice.note}
                       </div>
                     )}
-                    <div className="invoice-transparent-box border border-gray-200 rounded-lg p-2 text-xs text-gray-600 bg-gray-50/40 print:bg-transparent space-y-0.5">
-                      <p className="font-bold text-gray-800 underline">{txt("বিক্রয়ের শর্তাবলী (Terms & Conditions):", "Terms & Conditions:")}</p>
-                      <ul className="list-disc list-inside space-y-0.5 text-gray-600">
-                        <li>{txt("উপযুক্ত কারণ প্রদর্শনপূর্বক বিক্রয়কৃত মাল ফেরত নেয়া হয় (শর্ত সাপেক্ষে ৩ দিনের মধ্যে)।", "Sold items may be returned within 3 days subject to valid reasons and condition.")}</li>
-                        <li>{txt("ওয়ারেন্টি সেবার জন্য বিক্রয় ইনভয়েস এবং প্যাকেট অবশ্যই সাথে আনতে হবে।", "Original sales invoice and product packaging must be provided for warranty.")}</li>
-                        <li>{txt("বারকোড বা সিরিয়াল স্টিকার ছেঁড়া, পোড়া, ভাঙ্গা, শর্ট সার্কিটে ক্ষতিগ্রস্ত বা পানিতে ভেজা পণ্যের ওয়ারেন্টি বাতিল বলে গণ্য হবে।", "Warranty is void if barcode/serial is damaged, broken, burnt, or affected by water/short circuit.")}</li>
+                    <div className="invoice-terms-box invoice-transparent-box border border-gray-200 rounded-lg p-2 text-[10px] text-gray-600 bg-gray-50/40 print:bg-transparent space-y-0.5">
+                      <p className="font-bold text-gray-800 underline text-[10px]">{txt("বিক্রয়ের শর্তাবলী (Terms & Conditions):", "Terms & Conditions:")}</p>
+                      <ul className="list-disc list-inside space-y-0.5 text-gray-600 text-[10px] leading-tight">
+                        <li className="text-[10px]">{txt("উপযুক্ত কারণ প্রদর্শনপূর্বক বিক্রয়কৃত মাল ফেরত নেয়া হয় (শর্ত সাপেক্ষে ৩ দিনের মধ্যে)।", "Sold items may be returned within 3 days subject to valid reasons and condition.")}</li>
+                        <li className="text-[10px]">{txt("ওয়ারেন্টি সেবার জন্য বিক্রয় ইনভয়েস এবং প্যাকেট অবশ্যই সাথে আনতে হবে।", "Original sales invoice and product packaging must be provided for warranty.")}</li>
+                        <li className="text-[10px]">{txt("বারকোড বা সিরিয়াল স্টিকার ছেঁড়া, পোড়া, ভাঙ্গা, শর্ট সার্কিটে ক্ষতিগ্রস্ত বা পানিতে ভেজা পণ্যের ওয়ারেন্টি বাতিল বলে গণ্য হবে।", "Warranty is void if barcode/serial is damaged, broken, burnt, or affected by water/short circuit.")}</li>
                       </ul>
                     </div>
 
@@ -10387,7 +10387,7 @@ function App() {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <span className="inline-block bg-slate-900 text-white font-bold text-xs px-3 py-1 uppercase rounded mb-1.5 tracking-wider">
+                      <span className="inline-block silver-title-badge bg-slate-200 text-slate-900 border border-slate-300 font-bold text-xs px-3 py-1 uppercase rounded mb-1.5 tracking-wider print:bg-slate-200 print:text-slate-900">
                         {txt("মূল্য প্রস্তাবনা / QUOTATION", "PRICE QUOTATION")}
                       </span>
                       <p className="text-xs font-bold text-gray-800">
@@ -10422,16 +10422,16 @@ function App() {
                     </div>
                   </div>
 
-                {/* আইটেম টেবিল (প্রতিটি রোতে লেখাগুলো মাঝ বরাবর) */}
+                {/* আইটেম টেবিল (হালকা সিলভার হেডার ও প্রতিটি রোতে লেখাগুলো মাঝ বরাবর) */}
                 <table className="w-full text-left border-collapse border border-gray-300 mb-2 text-xs bg-transparent">
                   <thead>
-                    <tr className="bg-slate-800 text-white text-xs uppercase align-middle print:bg-slate-800 print:text-white">
-                      <th className="py-1.5 px-2 text-center w-10 border border-slate-700 align-middle"><div className="flex items-center justify-center min-h-[22px]">{txt("নং", "SL")}</div></th>
-                      <th className="py-1.5 px-3 border border-slate-700 align-middle"><div className="flex items-center min-h-[22px]">{txt("পণ্যের বিবরণ ও স্পেসিফিকেশন", "Product Description & Specification")}</div></th>
-                      <th className="py-1.5 px-2 text-center w-24 border border-slate-700 align-middle"><div className="flex items-center justify-center min-h-[22px]">{txt("ওয়ারেন্টি", "Warranty")}</div></th>
-                      <th className="py-1.5 px-2 text-center w-16 border border-slate-700 align-middle"><div className="flex items-center justify-center min-h-[22px]">{txt("পরিমাণ", "Qty")}</div></th>
-                      <th className="py-1.5 px-3 text-right w-28 border border-slate-700 align-middle"><div className="flex items-center justify-end min-h-[22px]">{txt("একক দর (৳)", "Unit Price (৳)")}</div></th>
-                      <th className="py-1.5 px-3 text-right w-32 border border-slate-700 align-middle"><div className="flex items-center justify-end min-h-[22px]">{txt("মোট মূল্য (৳)", "Total Price (৳)")}</div></th>
+                    <tr className="silver-header-row bg-slate-200 text-slate-900 text-xs font-bold uppercase align-middle print:bg-slate-200 print:text-slate-900 border-b border-slate-300">
+                      <th className="py-1.5 px-2 text-center w-10 border border-slate-300 align-middle text-slate-900 font-bold"><div className="flex items-center justify-center min-h-[22px]">{txt("নং", "SL")}</div></th>
+                      <th className="py-1.5 px-3 border border-slate-300 align-middle text-slate-900 font-bold"><div className="flex items-center min-h-[22px]">{txt("পণ্যের বিবরণ ও স্পেসিফিকেশন", "Product Description & Specification")}</div></th>
+                      <th className="py-1.5 px-2 text-center w-24 border border-slate-300 align-middle text-slate-900 font-bold"><div className="flex items-center justify-center min-h-[22px]">{txt("ওয়ারেন্টি", "Warranty")}</div></th>
+                      <th className="py-1.5 px-2 text-center w-16 border border-slate-300 align-middle text-slate-900 font-bold"><div className="flex items-center justify-center min-h-[22px]">{txt("পরিমাণ", "Qty")}</div></th>
+                      <th className="py-1.5 px-3 text-right w-28 border border-slate-300 align-middle text-slate-900 font-bold"><div className="flex items-center justify-end min-h-[22px]">{txt("একক দর (৳)", "Unit Price (৳)")}</div></th>
+                      <th className="py-1.5 px-3 text-right w-32 border border-slate-300 align-middle text-slate-900 font-bold"><div className="flex items-center justify-end min-h-[22px]">{txt("মোট মূল্য (৳)", "Total Price (৳)")}</div></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-300 bg-transparent">
@@ -10485,15 +10485,21 @@ function App() {
                 </div>
 
                 {/* ৩টি বাধ্যতামূলক শর্তাবলী (ট্রান্সপারেন্ট বক্স যাতে জলছাপ ঢেকে না যায়) */}
-                <div className="quotation-transparent-box border border-gray-300 rounded-lg p-2.5 bg-transparent print:bg-transparent space-y-1 text-xs">
-                  <p className="font-bold text-gray-900 underline">{txt("শর্তাবলী / Terms & Conditions:", "Terms & Conditions:")}</p>
-                  <ol className="list-decimal list-inside space-y-0.5 text-gray-700 font-medium">
-                    <li>{txt("এই কোটেশনটি জমা দেওয়ার তারিখ থেকে এক (১) সপ্তাহ পর্যন্ত কার্যকর থাকবে।", "This quotation is valid for one (1) week from the date of submission.")}</li>
-                    <li>{txt("পণ্য সরবরাহের সময় ৫০ শতাংশ এবং সরবরাহ ও ইনস্টলেশন সম্পন্ন হওয়ার পর সম্পূর্ণ অর্থ নগদে অথবা চেকের মাধ্যমে পরিশোধ করতে হবে।", "50% advance payment upon work order, remaining 50% payable in cash or cheque upon delivery & installation completion.")}</li>
-                    <li>{txt("উপরোক্ত মূল্যসমূহ VAT এবং প্রযোজ্য সকল কর ব্যতীত।", "The above prices exclude VAT and applicable government taxes.")}</li>
-                  </ol>
+                <div className="quotation-terms-box quotation-transparent-box border border-gray-300 rounded-lg p-2.5 bg-transparent print:bg-transparent space-y-1 text-[10px]">
+                  <p className="font-bold text-gray-900 underline text-[10px]">{txt("শর্তাবলী / Terms & Conditions:", "Terms & Conditions:")}</p>
+                  {activeQuotationPrint.terms ? (
+                    <div className="whitespace-pre-line text-gray-700 font-medium text-[10px] leading-snug">
+                      {activeQuotationPrint.terms}
+                    </div>
+                  ) : (
+                    <ol className="list-decimal list-inside space-y-0.5 text-gray-700 font-medium text-[10px] leading-snug">
+                      <li className="text-[10px]">{txt("এই কোটেশনটি জমা দেওয়ার তারিখ থেকে এক (১) সপ্তাহ পর্যন্ত কার্যকর থাকবে।", "This quotation is valid for one (1) week from the date of submission.")}</li>
+                      <li className="text-[10px]">{txt("পণ্য সরবরাহের সময় ৫০ শতাংশ এবং সরবরাহ ও ইনস্টলেশন সম্পন্ন হওয়ার পর সম্পূর্ণ অর্থ নগদে অথবা চেকের মাধ্যমে পরিশোধ করতে হবে।", "50% advance payment upon work order, remaining 50% payable in cash or cheque upon delivery & installation completion.")}</li>
+                      <li className="text-[10px]">{txt("উপরোক্ত মূল্যসমূহ VAT এবং প্রযোজ্য সকল কর ব্যতীত।", "The above prices exclude VAT and applicable government taxes.")}</li>
+                    </ol>
+                  )}
                   {activeQuotationPrint.note && (
-                    <div className="pt-1 text-gray-700 border-t mt-1">
+                    <div className="pt-1 text-gray-700 border-t mt-1 text-[10px]">
                       <strong>{txt("বিশেষ নোট:", "Special Note:")}</strong> {activeQuotationPrint.note}
                     </div>
                   )}
