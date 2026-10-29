@@ -45,3 +45,47 @@ export const formatWarranty = (warranty) => {
 
   return `${formatted} Warranty`;
 };
+
+/**
+ * Format warranty for Price Quotation table only
+ * 
+ * User requirement:
+ * শুধুমাত্র প্রাইস কোটেশন পেজটিতে ওয়ারেন্টি কলামে টু ইয়ারস ওয়ারেন্টি থেকে
+ * শুধুমাত্র দুই ইয়ার্স বা ওয়ান ইয়ার (2 Years / 1 Year) লেখা থাকবে, "ওয়ারেন্টি" / "Warranty" লেখাটি থাকবে না।
+ */
+export const formatQuotationWarranty = (warranty) => {
+  if (!warranty) return '-';
+  const w = String(warranty).trim();
+  if (
+    !w ||
+    w === 'নন-ওয়ারেন্টি' ||
+    w === 'নন-ওয়ারেন্টি' ||
+    w === 'ওয়ারেন্টি নেই' ||
+    w === 'ওয়ারেন্টি নেই' ||
+    w.toLowerCase() === 'none' ||
+    w.toLowerCase() === 'no warranty' ||
+    w.toLowerCase() === 'non warranty' ||
+    w.toLowerCase() === 'non-warranty'
+  ) {
+    return 'Non Warranty';
+  }
+
+  // Normalize durations to standard English representation e.g. "2 Years", "1 Year"
+  let formatted = w
+    .replace(/(?:1|one|এক|১|ওয়ান)\s*(?:years?|ইয়ার্স?|ইয়ারস?|বছর)/gi, '1 Year')
+    .replace(/(?:2|two|দুই|২|টু)\s*(?:years?|ইয়ার্স?|ইয়ারস?|বছর)/gi, '2 Years')
+    .replace(/(?:3|three|তিন|৩)\s*(?:years?|ইয়ার্স?|ইয়ারস?|বছর)/gi, '3 Years')
+    .replace(/(?:4|four|চার|৪)\s*(?:years?|ইয়ার্স?|ইয়ারস?|বছর)/gi, '4 Years')
+    .replace(/(?:5|five|পাঁচ|৫)\s*(?:years?|ইয়ার্স?|ইয়ারস?|বছর)/gi, '5 Years')
+    .replace(/(?:6|six|ছয়|৬)\s*(?:months?|মান্থস?|মাস)/gi, '6 Months')
+    .replace(/(?:3|three|তিন|৩)\s*(?:months?|মান্থস?|মাস)/gi, '3 Months')
+    .replace(/(?:1|one|এক|১|ওয়ান)\s*(?:months?|মান্থস?|মাস)/gi, '1 Month')
+    .replace(/(?:লাইফটাইম|lifetime)/gi, 'Lifetime');
+
+  // Strip out "Warranty" and "ওয়ারেন্টি" (both য় and য forms)
+  formatted = formatted
+    .replace(/(?:ওয়ারেন্টি|ওয়ারেন্টি|warrenty|warranty)/gi, '')
+    .trim();
+
+  return formatted || '-';
+};

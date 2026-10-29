@@ -18,7 +18,7 @@ import IspManagementModule from './components/IspManagementModule';
 import DatabaseBackupModal from './components/DatabaseBackupModal';
 import FcTechnologyWebsite from './components/FcTechnologyWebsite';
 import { API_BASE } from './utils/apiConfig';
-import { formatWarranty } from './utils/formatWarranty';
+import { formatWarranty, formatQuotationWarranty } from './utils/formatWarranty';
 import { buildDocumentPdfFilename, triggerPrintWithFilename } from './utils/pdfGenerator';
 
 
@@ -2276,7 +2276,7 @@ function App() {
     const newItems = validCart.map(c => ({
       id: Date.now() + Math.random(),
       name: c.name + (c.model ? ` (${c.model})` : ''),
-      warranty: c.warranty || '1 Year',
+      warranty: c.warranty ? formatQuotationWarranty(c.warranty) : '1 Year',
       qty: c.qty,
       unit_price: c.selling_price || c.sale_price,
       total_price: Math.max(0, ((c.selling_price || c.sale_price) * c.qty) - Number(c.discount || 0))
@@ -8735,7 +8735,7 @@ function App() {
               </div>
             </div>
 
-            <div id="printable-content" className="invoice-printable p-6 md:p-7 bg-white text-gray-900 text-xs font-sans flex flex-col justify-between min-h-[950px] max-h-[1123px] box-border print:p-0 print:m-0 relative overflow-hidden">
+            <div id="printable-content" className="invoice-printable px-9 sm:px-11 md:px-12 pt-6 pb-12 bg-white text-gray-900 text-xs font-sans flex flex-col justify-between min-h-[950px] max-h-[1123px] box-border print:p-0 print:m-0 relative overflow-hidden">
 
 
               {/* সেন্টারে FC Technology লোগো জলছাপ (Watermark - লেখার কারণে মুছে না গিয়ে স্পষ্ট দৃশ্যমান) */}
@@ -8750,8 +8750,8 @@ function App() {
 
               <div className="relative z-10 flex-1 flex flex-col justify-between">
                 <div>
-                  {/* ইনভয়েস হেডার */}
-                  <div className="flex justify-between items-start border-b-2 border-gray-900 pb-2.5 mb-2">
+                  {/* ইনভয়েস হেডার (উপরে FC Technology এর নিচে চিকন লম্বা এস কালারের দাগ) */}
+                  <div className="flex justify-between items-start border-b border-slate-300 pb-2.5 mb-2">
                     <div className="flex items-center gap-3.5">
                       <img 
                         src="/fc_logo_icon.png" 
@@ -8784,7 +8784,7 @@ function App() {
                               }
                             }}
                             title={txt("ক্লিক করে শিরোনাম পরিবর্তন করুন", "Click to edit title")}
-                            className="inline-block silver-title-badge bg-slate-200 text-slate-900 border border-slate-300 font-bold text-xs px-2.5 py-0.5 uppercase rounded cursor-text hover:bg-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-400 transition print:bg-slate-200 print:text-slate-900"
+                            className="inline-block silver-title-badge bg-gradient-to-b from-white via-slate-100 to-slate-200 text-slate-950 border border-slate-400 font-extrabold text-xs px-3 py-1 uppercase rounded-md shadow-xs cursor-text hover:brightness-105 focus:outline-none focus:ring-1 focus:ring-slate-400 transition"
                           >
                             {invoiceDocTitle || txt("ইনভয়েস / ক্যাশ মেমো", "INVOICE / CASH MEMO")}
                           </span>
@@ -8886,15 +8886,15 @@ function App() {
                 {/* আইটেম টেবিল (হালকা সিলভার হেডার ও প্রতিটি রোতে লেখাগুলো মাঝ বরাবর) */}
                 <table className="w-full text-left border-collapse mb-2 text-xs">
                   <thead>
-                    <tr className="silver-header-row bg-slate-200 text-slate-900 border-y border-slate-300 text-xs font-bold uppercase align-middle print:bg-slate-200 print:text-slate-900">
-                      <th className="py-1.5 px-2 text-center w-9 align-middle text-slate-900 font-bold border-y border-slate-300"><div className="flex items-center justify-center min-h-[22px]">{txt("নং", "SL")}</div></th>
-                      <th className="py-1.5 px-2 align-middle text-slate-900 font-bold border-y border-slate-300"><div className="flex items-center min-h-[22px]">{txt("পণ্যের বিবরণ, মডেল, ওয়ারেন্টি ও সিরিয়াল", "Product Description, Model, Warranty & Serial")}</div></th>
-                      <th className="py-1.5 px-2 text-center w-14 align-middle text-slate-900 font-bold border-y border-slate-300"><div className="flex items-center justify-center min-h-[22px]">{txt("পরিমাণ", "Qty")}</div></th>
-                      <th className="py-1.5 px-2 text-right w-24 align-middle text-slate-900 font-bold border-y border-slate-300"><div className="flex items-center justify-end min-h-[22px]">{txt("দর (৳)", "Rate (৳)")}</div></th>
-                      <th className="py-1.5 px-2 text-right w-24 align-middle text-slate-900 font-bold border-y border-slate-300"><div className="flex items-center justify-end min-h-[22px]">{txt("মোট মূল্য (৳)", "Total (৳)")}</div></th>
+                    <tr className="silver-header-row bg-slate-200 text-slate-900 border-y border-slate-400 text-xs font-extrabold uppercase align-middle print:bg-slate-200 print:text-slate-900">
+                      <th className="py-2 px-2 text-center w-9 align-middle text-slate-950 font-extrabold border-y border-slate-400"><div className="flex items-center justify-center min-h-[22px]">{txt("নং", "SL")}</div></th>
+                      <th className="py-2 px-2.5 align-middle text-slate-950 font-extrabold border-y border-slate-400"><div className="flex items-center min-h-[22px]">{txt("পণ্যের বিবরণ, মডেল, ওয়ারেন্টি ও সিরিয়াল", "Product Description, Model, Warranty & Serial")}</div></th>
+                      <th className="py-2 px-2 text-center w-14 align-middle text-slate-950 font-extrabold border-y border-slate-400"><div className="flex items-center justify-center min-h-[22px]">{txt("পরিমাণ", "Qty")}</div></th>
+                      <th className="py-2 px-2 text-right w-24 align-middle text-slate-950 font-extrabold border-y border-slate-400"><div className="flex items-center justify-end min-h-[22px]">{txt("দর (৳)", "Rate (৳)")}</div></th>
+                      <th className="py-2 px-2.5 text-right w-24 align-middle text-slate-950 font-extrabold border-y border-slate-400"><div className="flex items-center justify-end min-h-[22px]">{txt("মোট মূল্য (৳)", "Total (৳)")}</div></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 border-b">
+                  <tbody className="divide-y divide-gray-200 border-b border-slate-300">
                     {(!completedInvoice.items || completedInvoice.items.length === 0) ? (
                       <tr>
                         <td colSpan={5} className="py-3 px-2 text-center text-rose-600 font-bold bg-rose-50/50 text-xs">
@@ -9055,7 +9055,7 @@ function App() {
                         <span className="font-mono leading-snug">- {Number(completedInvoice.total_returned_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                     )}
-                    <div className="flex justify-between items-center py-0.5 font-bold text-gray-900 border-b">
+                    <div className="flex justify-between items-center py-0.5 font-bold text-gray-900 border-b border-slate-300">
                       <span className="leading-snug">{txt("১. বর্তমান মোট বিল:", "1. Current Net Bill:")}</span>
                       <span className="font-mono leading-snug">{Number(completedInvoice.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
@@ -9063,7 +9063,7 @@ function App() {
                       <span className="leading-snug">{txt("২. বর্তমান প্রদানকৃত টাকা:", "2. Current Paid Amount:")}</span>
                       <span className="font-mono font-bold leading-snug">{Number(completedInvoice.paid_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
-                    <div className="flex justify-between items-center py-0.5 text-red-600 font-bold border-b pb-0.5">
+                    <div className="flex justify-between items-center py-0.5 text-red-600 font-bold border-b border-slate-300 pb-0.5">
                       <span className="leading-snug">{txt("৩. বর্তমান বিলের বাকি:", "3. Current Bill Due:")}</span>
                       <span className="font-mono leading-snug">{Number(completedInvoice.due_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
@@ -9079,10 +9079,10 @@ function App() {
                 </div>
               </div>
 
-              {/* স্বাক্ষর সেকশন (ইনভয়েসের একদম নিচে) */}
-              <div className="invoice-signatures flex justify-between items-end pt-4 mt-auto text-xs pb-2">
+              {/* স্বাক্ষর সেকশন (ইনভয়েসের একদম নিচে ফুটার মার্জিন ও এস কালারের দাগ) */}
+              <div className="invoice-signatures flex justify-between items-end pt-6 mt-auto text-xs pb-6">
                 <div className="text-center w-44">
-                  <div className="border-t border-gray-400 pt-1.5 font-semibold text-gray-800">{txt("গ্রাহকের স্বাক্ষর", "Customer's Signature")}</div>
+                  <div className="border-t border-slate-300 pt-1.5 font-semibold text-gray-800">{txt("গ্রাহকের স্বাক্ষর", "Customer's Signature")}</div>
                 </div>
                 <div className="text-center w-64">
                   <img 
@@ -9092,7 +9092,7 @@ function App() {
                     style={{ maxHeight: '85px', width: 'auto' }}
                     onError={(e) => { e.target.style.display = 'none'; }}
                   />
-                  <div className="border-t border-gray-400 pt-1.5 font-bold text-gray-900 text-xs">{txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}</div>
+                  <div className="border-t border-slate-300 pt-1.5 font-bold text-gray-900 text-xs">{txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}</div>
                 </div>
               </div>
             </div>
@@ -10370,8 +10370,8 @@ function App() {
 
               <div className="relative z-10 flex-1 flex flex-col justify-between h-full">
                 <div>
-                  {/* প্যাড লেটারহেড হেডার */}
-                  <div className="flex justify-between items-start border-b-2 border-slate-900 pb-2.5 mb-2.5">
+                  {/* প্যাড লেটারহেড হেডার (উপরে FC TECHNOLOGY এর নিচে চিকন লম্বা এস কালারের দাগ) */}
+                  <div className="flex justify-between items-start border-b border-slate-300 pb-2.5 mb-2.5">
                     <div className="flex items-start gap-3">
                       <img 
                         src="/fc_logo_icon.png" 
@@ -10387,7 +10387,7 @@ function App() {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <span className="inline-block silver-title-badge bg-slate-200 text-slate-900 border border-slate-300 font-bold text-xs px-3 py-1 uppercase rounded mb-1.5 tracking-wider print:bg-slate-200 print:text-slate-900">
+                      <span className="inline-block silver-title-badge bg-gradient-to-b from-white via-slate-100 to-slate-200 text-slate-950 border border-slate-400 font-extrabold text-xs px-3 py-1 uppercase rounded-md mb-1.5 tracking-wider shadow-xs">
                         {txt("মূল্য প্রস্তাবনা / QUOTATION", "PRICE QUOTATION")}
                       </span>
                       <p className="text-xs font-bold text-gray-800">
@@ -10425,13 +10425,13 @@ function App() {
                 {/* আইটেম টেবিল (হালকা সিলভার হেডার ও প্রতিটি রোতে লেখাগুলো মাঝ বরাবর) */}
                 <table className="w-full text-left border-collapse border border-gray-300 mb-2 text-xs bg-transparent">
                   <thead>
-                    <tr className="silver-header-row bg-slate-200 text-slate-900 text-xs font-bold uppercase align-middle print:bg-slate-200 print:text-slate-900 border-b border-slate-300">
-                      <th className="py-1.5 px-2 text-center w-10 border border-slate-300 align-middle text-slate-900 font-bold"><div className="flex items-center justify-center min-h-[22px]">{txt("নং", "SL")}</div></th>
-                      <th className="py-1.5 px-3 border border-slate-300 align-middle text-slate-900 font-bold"><div className="flex items-center min-h-[22px]">{txt("পণ্যের বিবরণ ও স্পেসিফিকেশন", "Product Description & Specification")}</div></th>
-                      <th className="py-1.5 px-2 text-center w-24 border border-slate-300 align-middle text-slate-900 font-bold"><div className="flex items-center justify-center min-h-[22px]">{txt("ওয়ারেন্টি", "Warranty")}</div></th>
-                      <th className="py-1.5 px-2 text-center w-16 border border-slate-300 align-middle text-slate-900 font-bold"><div className="flex items-center justify-center min-h-[22px]">{txt("পরিমাণ", "Qty")}</div></th>
-                      <th className="py-1.5 px-3 text-right w-28 border border-slate-300 align-middle text-slate-900 font-bold"><div className="flex items-center justify-end min-h-[22px]">{txt("একক দর (৳)", "Unit Price (৳)")}</div></th>
-                      <th className="py-1.5 px-3 text-right w-32 border border-slate-300 align-middle text-slate-900 font-bold"><div className="flex items-center justify-end min-h-[22px]">{txt("মোট মূল্য (৳)", "Total Price (৳)")}</div></th>
+                    <tr className="silver-header-row bg-slate-200 text-slate-900 text-xs font-extrabold uppercase align-middle print:bg-slate-200 print:text-slate-900 border-b border-slate-400">
+                      <th className="py-2 px-2 text-center w-10 border border-slate-400 align-middle text-slate-950 font-extrabold"><div className="flex items-center justify-center min-h-[22px]">{txt("নং", "SL")}</div></th>
+                      <th className="py-2 px-3 border border-slate-400 align-middle text-slate-950 font-extrabold"><div className="flex items-center min-h-[22px]">{txt("পণ্যের বিবরণ ও স্পেসিফিকেশন", "Product Description & Specification")}</div></th>
+                      <th className="py-2 px-2 text-center w-24 border border-slate-400 align-middle text-slate-950 font-extrabold"><div className="flex items-center justify-center min-h-[22px]">{txt("ওয়ারেন্টি", "Warranty")}</div></th>
+                      <th className="py-2 px-2 text-center w-16 border border-slate-400 align-middle text-slate-950 font-extrabold"><div className="flex items-center justify-center min-h-[22px]">{txt("পরিমাণ", "Qty")}</div></th>
+                      <th className="py-2 px-3 text-right w-28 border border-slate-400 align-middle text-slate-950 font-extrabold"><div className="flex items-center justify-end min-h-[22px]">{txt("একক দর (৳)", "Unit Price (৳)")}</div></th>
+                      <th className="py-2 px-3 text-right w-32 border border-slate-400 align-middle text-slate-950 font-extrabold"><div className="flex items-center justify-end min-h-[22px]">{txt("মোট মূল্য (৳)", "Total Price (৳)")}</div></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-300 bg-transparent">
@@ -10445,7 +10445,7 @@ function App() {
                         </td>
                         <td className="py-1.5 px-2 text-center align-middle border-r border-gray-200">
                           <div className="flex items-center justify-center min-h-[24px]">
-                            <span className="text-blue-700 font-semibold text-xs">{formatWarranty(it.warranty)}</span>
+                            <span className="text-blue-700 font-semibold text-xs">{formatQuotationWarranty(it.warranty)}</span>
                           </div>
                         </td>
                         <td className="py-1.5 px-2 text-center align-middle border-r border-gray-200">
@@ -10460,7 +10460,7 @@ function App() {
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="border-t-2 border-slate-900 bg-transparent print:bg-transparent font-bold">
+                  <tfoot className="border-t-2 border-slate-300 bg-transparent print:bg-transparent font-bold">
                     <tr className="align-middle">
                       <td colSpan={5} className="py-2 px-3 text-right font-black text-xs text-gray-800 align-middle">
                         <div className="flex items-center justify-end min-h-[22px]">
@@ -10510,7 +10510,7 @@ function App() {
               <div className="quotation-signatures flex justify-between items-end pt-4 mt-auto text-xs w-full pb-2">
                 {/* গ্রাহকের স্বাক্ষর */}
                 <div className="text-center w-52">
-                  <div className="border-t border-gray-500 pt-1.5 font-bold text-gray-800">
+                  <div className="border-t border-slate-300 pt-1.5 font-bold text-gray-800">
                     {txt("গ্রাহকের স্বাক্ষর ও সিল", "Customer's Signature & Seal")}
                   </div>
                   <p className="text-[10px] text-gray-500 mt-0.5">{txt("গৃহীত ও অনুমোদিত", "Accepted & Approved")}</p>
@@ -10523,7 +10523,7 @@ function App() {
                     alt="Authorized Seal & Signature" 
                     className="h-16 object-contain mx-auto mb-1 select-none"
                   />
-                  <div className="border-t border-gray-600 pt-1 font-bold text-gray-900">
+                  <div className="border-t border-slate-300 pt-1 font-bold text-gray-900">
                     {txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}
                   </div>
                   <p className="text-[10px] text-gray-600 font-bold uppercase tracking-wider">

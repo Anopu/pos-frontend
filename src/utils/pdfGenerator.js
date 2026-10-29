@@ -257,27 +257,40 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
           font-size: 10px !important;
           line-height: 1.35 !important;
         }
-        /* Silver headers & title badges for Invoice and Quotation */
+        /* Glossy Ash headers & title badges for Invoice and Quotation */
         .silver-title-badge,
         .invoice-printable .silver-title-badge,
         .quotation-printable .silver-title-badge {
+          background: linear-gradient(180deg, #ffffff 0%, #edf2f7 32%, #d8e1e8 68%, #e6ecf2 100%) !important;
           background-color: #e2e8f0 !important;
-          color: #0f172a !important;
-          border: 1px solid #cbd5e1 !important;
+          color: #090d16 !important;
+          border: 1px solid #94a3b8 !important;
+          border-bottom: 1.5px solid #64748b !important;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+          text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+          font-weight: 800 !important;
+          letter-spacing: 0.03em !important;
         }
         .silver-header-row,
         .invoice-printable thead tr,
         .quotation-printable thead tr {
+          background: linear-gradient(180deg, #ffffff 0%, #edf2f7 28%, #d8e1e8 68%, #e4ecf3 100%) !important;
           background-color: #e2e8f0 !important;
-          color: #0f172a !important;
+          color: #090d16 !important;
+          border-top: 1px solid #94a3b8 !important;
+          border-bottom: 1.5px solid #64748b !important;
         }
         .silver-header-row th,
         .invoice-printable thead th,
         .quotation-printable thead th {
+          background: linear-gradient(180deg, #ffffff 0%, #edf2f7 28%, #d8e1e8 68%, #e4ecf3 100%) !important;
           background-color: #e2e8f0 !important;
-          color: #0f172a !important;
-          font-weight: 700 !important;
-          border-color: #cbd5e1 !important;
+          color: #090d16 !important;
+          font-weight: 800 !important;
+          border-color: #94a3b8 !important;
+          border-top: 1px solid #94a3b8 !important;
+          border-bottom: 1.5px solid #64748b !important;
+          text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75) !important;
         }
         /* Pinned signatures at very bottom of page */
         .invoice-signatures,
@@ -345,14 +358,18 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
           clonedEl.style.maxHeight = `${a4HeightPx}px`;
           clonedEl.style.minHeight = `${a4HeightPx}px`;
           clonedEl.style.overflow = 'hidden';
-          clonedEl.style.padding = '24px 28px';
+          if (clonedEl.classList.contains('invoice-printable')) {
+            clonedEl.style.padding = '22px 46px 44px 46px';
+          } else {
+            clonedEl.style.padding = '24px 28px';
+          }
 
           // Pin signatures to the bottom
           const sigBlock = clonedEl.querySelector('.invoice-signatures, .quotation-signatures, .money-receipt-signatures, .warranty-signatures');
           if (sigBlock) {
             sigBlock.style.marginTop = 'auto';
-            sigBlock.style.paddingTop = '12px';
-            sigBlock.style.paddingBottom = '10px';
+            sigBlock.style.paddingTop = '14px';
+            sigBlock.style.paddingBottom = clonedEl.classList.contains('invoice-printable') ? '22px' : '10px';
           }
         }
 
