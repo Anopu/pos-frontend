@@ -292,6 +292,13 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
           border-bottom: 1.5px solid #64748b !important;
           text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75) !important;
         }
+        /* Bottom silver divider */
+        .silver-bottom-divider {
+          width: 100% !important;
+          border-top: 2px solid #94a3b8 !important;
+          margin-top: auto !important;
+          margin-bottom: 6px !important;
+        }
         /* Pinned signatures at very bottom of page */
         .invoice-signatures,
         .quotation-signatures,
@@ -358,18 +365,14 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
           clonedEl.style.maxHeight = `${a4HeightPx}px`;
           clonedEl.style.minHeight = `${a4HeightPx}px`;
           clonedEl.style.overflow = 'hidden';
-          if (clonedEl.classList.contains('invoice-printable')) {
-            clonedEl.style.padding = '22px 46px 44px 46px';
-          } else {
-            clonedEl.style.padding = '24px 28px';
-          }
+          clonedEl.style.padding = '16px 20px 14px 20px';
 
           // Pin signatures to the bottom
           const sigBlock = clonedEl.querySelector('.invoice-signatures, .quotation-signatures, .money-receipt-signatures, .warranty-signatures');
           if (sigBlock) {
             sigBlock.style.marginTop = 'auto';
             sigBlock.style.paddingTop = '14px';
-            sigBlock.style.paddingBottom = clonedEl.classList.contains('invoice-printable') ? '22px' : '10px';
+            sigBlock.style.paddingBottom = '4px';
           }
         }
 

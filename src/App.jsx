@@ -8636,7 +8636,7 @@ function App() {
       {/* ১. A4 ইনভয়েস প্রিন্ট ভিউ */}
       {completedInvoice && (
         <div className="fixed inset-0 bg-black/60 flex items-start justify-center p-4 py-6 md:py-8 z-50 overflow-y-auto print:static print:bg-white print:p-0">
-          <div className="print-card-wrapper bg-white rounded-xl shadow-2xl w-full max-w-3xl my-2 relative flex flex-col print:shadow-none print:w-full print:m-0 print:border-none">
+          <div className="print-card-wrapper bg-white rounded-xl shadow-2xl w-full max-w-4xl my-2 relative flex flex-col print:shadow-none print:w-full print:m-0 print:border-none">
             <div className="sticky top-0 z-30 flex justify-between items-center p-4 border-b bg-gray-50 rounded-t-xl shadow-xs print:hidden">
               {completedInvoice.is_preview ? (
                 <div className="flex items-center gap-2">
@@ -8735,7 +8735,7 @@ function App() {
               </div>
             </div>
 
-            <div id="printable-content" className="invoice-printable px-9 sm:px-11 md:px-12 pt-6 pb-12 bg-white text-gray-900 text-xs font-sans flex flex-col justify-between min-h-[950px] max-h-[1123px] box-border print:p-0 print:m-0 relative overflow-hidden">
+            <div id="printable-content" className="invoice-printable px-5 md:px-6 pt-4 pb-3 bg-white text-gray-900 text-xs font-sans flex flex-col justify-between min-h-[960px] md:min-h-[1050px] max-h-[1123px] box-border print:p-0 print:m-0 relative overflow-hidden">
 
 
               {/* সেন্টারে FC Technology লোগো জলছাপ (Watermark - লেখার কারণে মুছে না গিয়ে স্পষ্ট দৃশ্যমান) */}
@@ -8750,8 +8750,8 @@ function App() {
 
               <div className="relative z-10 flex-1 flex flex-col justify-between">
                 <div>
-                  {/* ইনভয়েস হেডার (উপরে FC Technology এর নিচে চিকন লম্বা এস কালারের দাগ) */}
-                  <div className="flex justify-between items-start border-b border-slate-300 pb-2.5 mb-2">
+                  {/* ইনভয়েস হেডার (উপরে FC TECHNOLOGY এর নিচে চিকন লম্বা সিলভার কালারের দাগ) */}
+                  <div className="flex justify-between items-start border-b-2 border-slate-300 pb-2.5 mb-2">
                     <div className="flex items-center gap-3.5">
                       <img 
                         src="/fc_logo_icon.png" 
@@ -8760,7 +8760,7 @@ function App() {
                         onError={(e) => { e.target.style.display = 'none'; }}
                       />
                       <div>
-                        <h1 className="text-3xl md:text-4xl font-black text-gray-950 uppercase tracking-tight">FC Technology</h1>
+                        <h1 className="text-4xl md:text-5xl font-black text-gray-950 uppercase tracking-tight">FC TECHNOLOGY</h1>
                         <p className="text-gray-600 text-xs mt-0.5 font-medium">{txt("কম্পিউটার(ডেস্কটপ, ল্যাপটপ), সিসি ক্যামেরা ও আইটি পণ্যের বিশ্বস্ত প্রতিষ্ঠান", "Computer (Desktop, Laptop), CC Camera & Trusted IT Products Shop")}</p>
                         <p className="text-xs text-gray-500">{txt("দোকান নং #১৮, আর এফ জোহরা টাওয়ার, নীচ তলা, চৌমুহনী, আগ্রাবাদ, চট্টগ্রাম।", "Shop #18, RF Zohura Tower, Ground Floor, Chowmuhani, Agrabad, Chattogram.")}</p>
                         <p className="text-xs text-gray-500">{txt("হটলাইন: 09613-181920, 01812-091939", "Hotline: 09613-181920, 01812-091939")}</p>
@@ -9079,10 +9079,13 @@ function App() {
                 </div>
               </div>
 
-              {/* স্বাক্ষর সেকশন (ইনভয়েসের একদম নিচে ফুটার মার্জিন ও এস কালারের দাগ) */}
-              <div className="invoice-signatures flex justify-between items-end pt-6 mt-auto text-xs pb-6">
-                <div className="text-center w-44">
-                  <div className="border-t border-slate-300 pt-1.5 font-semibold text-gray-800">{txt("গ্রাহকের স্বাক্ষর", "Customer's Signature")}</div>
+              {/* নিচের লম্বা সিলভার কালারের ডিজাইন লাইন */}
+              <div className="silver-bottom-divider w-full border-t-2 border-slate-300 mt-auto mb-2 pt-0.5"></div>
+
+              {/* স্বাক্ষর সেকশন (ইনভয়েসের একদম নিচে) */}
+              <div className="invoice-signatures flex justify-between items-end text-xs pb-2 w-full">
+                <div className="text-center w-48">
+                  <div className="border-t-2 border-slate-300 pt-1.5 font-bold text-gray-800">{txt("গ্রাহকের স্বাক্ষর", "Customer's Signature")}</div>
                 </div>
                 <div className="text-center w-64">
                   <img 
@@ -9092,7 +9095,7 @@ function App() {
                     style={{ maxHeight: '85px', width: 'auto' }}
                     onError={(e) => { e.target.style.display = 'none'; }}
                   />
-                  <div className="border-t border-slate-300 pt-1.5 font-bold text-gray-900 text-xs">{txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}</div>
+                  <div className="border-t-2 border-slate-300 pt-1.5 font-bold text-gray-900 text-xs">{txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}</div>
                 </div>
               </div>
             </div>
@@ -10358,7 +10361,7 @@ function App() {
               </div>
             </div>
 
-            <div id="printable-content" className="quotation-printable p-6 md:p-8 bg-white text-gray-900 text-xs font-sans flex flex-col justify-between min-h-[950px] max-h-[1123px] box-border print:p-0 print:m-0 relative overflow-hidden">
+            <div id="printable-content" className="quotation-printable px-5 md:px-6 pt-4 pb-3 bg-white text-gray-900 text-xs font-sans flex flex-col justify-between min-h-[960px] md:min-h-[1050px] max-h-[1123px] box-border print:p-0 print:m-0 relative overflow-hidden">
               {/* সেন্টারে FC Technology লোগো জলছাপ (Watermark) */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                 <img 
@@ -10370,8 +10373,8 @@ function App() {
 
               <div className="relative z-10 flex-1 flex flex-col justify-between h-full">
                 <div>
-                  {/* প্যাড লেটারহেড হেডার (উপরে FC TECHNOLOGY এর নিচে চিকন লম্বা এস কালারের দাগ) */}
-                  <div className="flex justify-between items-start border-b border-slate-300 pb-2.5 mb-2.5">
+                  {/* প্যাড লেটারহেড হেডার (উপরে FC TECHNOLOGY এর নিচে চিকন লম্বা সিলভার কালারের দাগ) */}
+                  <div className="flex justify-between items-start border-b-2 border-slate-300 pb-2.5 mb-2.5">
                     <div className="flex items-start gap-3">
                       <img 
                         src="/fc_logo_icon.png" 
@@ -10380,7 +10383,7 @@ function App() {
                         onError={(e) => { e.target.style.display = 'none'; }}
                       />
                       <div>
-                        <h1 className="text-3xl font-black text-gray-950 uppercase tracking-tight">FC TECHNOLOGY</h1>
+                        <h1 className="text-4xl md:text-5xl font-black text-gray-950 uppercase tracking-tight">FC TECHNOLOGY</h1>
                         <p className="text-xs text-blue-700 font-bold mt-0.5">{txt("কম্পিউটার, সিসিটিভি ক্যামেরা ও পূর্ণাঙ্গ আইটি সলিউশন", "Computers, CCTV Camera & Complete IT Solutions")}</p>
                         <p className="text-xs text-gray-600 mt-0.5">{txt("দোকান নং #১৮, আর এফ জোহরা টাওয়ার, নীচ তলা, চৌমুহনী, আগ্রাবাদ, চট্টগ্রাম।", "Shop #18, RF Zohura Tower, Ground Floor, Chowmuhani, Agrabad, Chattogram.")}</p>
                         <p className="text-xs text-gray-600 font-medium">{txt("হটলাইন: 09613-181920, 01812-091939 | fctechnologist@gmail.com | www.fctechbd.com", "Hotline: 09613-181920, 01812-091939 | info@fctechbd.com | www.fctechbd.com")}</p>
@@ -10506,11 +10509,14 @@ function App() {
                 </div>
               </div>
 
+              {/* নিচের লম্বা সিলভার কালারের ডিজাইন লাইন */}
+              <div className="silver-bottom-divider w-full border-t-2 border-slate-300 mt-auto mb-2 pt-0.5"></div>
+
               {/* স্বাক্ষর সেকশন (কর্তৃপক্ষের স্বাক্ষর ও সিলের ছবি সহ - একদম নিচে) */}
-              <div className="quotation-signatures flex justify-between items-end pt-4 mt-auto text-xs w-full pb-2">
+              <div className="quotation-signatures flex justify-between items-end text-xs w-full pb-2">
                 {/* গ্রাহকের স্বাক্ষর */}
                 <div className="text-center w-52">
-                  <div className="border-t border-slate-300 pt-1.5 font-bold text-gray-800">
+                  <div className="border-t-2 border-slate-300 pt-1.5 font-bold text-gray-800">
                     {txt("গ্রাহকের স্বাক্ষর ও সিল", "Customer's Signature & Seal")}
                   </div>
                   <p className="text-[10px] text-gray-500 mt-0.5">{txt("গৃহীত ও অনুমোদিত", "Accepted & Approved")}</p>
@@ -10522,8 +10528,9 @@ function App() {
                     src="/authority_seal_signature.png" 
                     alt="Authorized Seal & Signature" 
                     className="h-16 object-contain mx-auto mb-1 select-none"
+                    onError={(e) => { e.target.style.display = 'none'; }}
                   />
-                  <div className="border-t border-slate-300 pt-1 font-bold text-gray-900">
+                  <div className="border-t-2 border-slate-300 pt-1 font-bold text-gray-900">
                     {txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}
                   </div>
                   <p className="text-[10px] text-gray-600 font-bold uppercase tracking-wider">
