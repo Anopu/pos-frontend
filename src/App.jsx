@@ -8735,7 +8735,7 @@ function App() {
               </div>
             </div>
 
-            <div id="printable-content" className="invoice-printable px-5 md:px-6 pt-4 pb-3 bg-white text-gray-900 text-xs font-sans flex flex-col justify-between min-h-[960px] md:min-h-[1050px] max-h-[1123px] box-border print:p-0 print:m-0 relative overflow-hidden">
+            <div id="printable-content" className="invoice-printable px-5 md:px-6 pt-7 md:pt-8 pb-2 bg-white text-gray-900 text-xs font-sans flex flex-col justify-between min-h-[960px] md:min-h-[1050px] max-h-[1123px] box-border print:p-0 print:m-0 relative overflow-hidden">
 
 
               {/* সেন্টারে FC Technology লোগো জলছাপ (Watermark - লেখার কারণে মুছে না গিয়ে স্পষ্ট দৃশ্যমান) */}
@@ -9079,13 +9079,11 @@ function App() {
                 </div>
               </div>
 
-              {/* নিচের লম্বা সিলভার কালারের ডিজাইন লাইন */}
-              <div className="silver-bottom-divider w-full border-t-2 border-slate-300 mt-auto mb-2 pt-0.5"></div>
-
               {/* স্বাক্ষর সেকশন (ইনভয়েসের একদম নিচে) */}
-              <div className="invoice-signatures flex justify-between items-end text-xs pb-2 w-full">
+              <div className="invoice-signatures flex justify-between items-end text-xs pb-1 w-full mt-auto">
                 <div className="text-center w-48">
-                  <div className="border-t-2 border-slate-300 pt-1.5 font-bold text-gray-800">{txt("গ্রাহকের স্বাক্ষর", "Customer's Signature")}</div>
+                  <div className="silver-signature-line w-full h-[2.5px] bg-gradient-to-r from-slate-300 via-slate-500 to-slate-300 rounded-full mb-1.5 border-t-2 border-slate-400"></div>
+                  <div className="font-bold text-gray-800 text-xs">{txt("গ্রাহকের স্বাক্ষর", "Customer's Signature")}</div>
                 </div>
                 <div className="text-center w-64">
                   <img 
@@ -9095,7 +9093,8 @@ function App() {
                     style={{ maxHeight: '85px', width: 'auto' }}
                     onError={(e) => { e.target.style.display = 'none'; }}
                   />
-                  <div className="border-t-2 border-slate-300 pt-1.5 font-bold text-gray-900 text-xs">{txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}</div>
+                  <div className="silver-signature-line w-full h-[2.5px] bg-gradient-to-r from-slate-300 via-slate-500 to-slate-300 rounded-full mb-1.5 border-t-2 border-slate-400"></div>
+                  <div className="font-bold text-gray-900 text-xs">{txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}</div>
                 </div>
               </div>
             </div>
@@ -10361,7 +10360,7 @@ function App() {
               </div>
             </div>
 
-            <div id="printable-content" className="quotation-printable px-5 md:px-6 pt-4 pb-3 bg-white text-gray-900 text-xs font-sans flex flex-col justify-between min-h-[960px] md:min-h-[1050px] max-h-[1123px] box-border print:p-0 print:m-0 relative overflow-hidden">
+            <div id="printable-content" className="quotation-printable px-5 md:px-6 pt-7 md:pt-8 pb-2 bg-white text-gray-900 text-xs font-sans flex flex-col justify-between min-h-[960px] md:min-h-[1050px] max-h-[1123px] box-border print:p-0 print:m-0 relative overflow-hidden">
               {/* সেন্টারে FC Technology লোগো জলছাপ (Watermark) */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                 <img 
@@ -10509,14 +10508,12 @@ function App() {
                 </div>
               </div>
 
-              {/* নিচের লম্বা সিলভার কালারের ডিজাইন লাইন */}
-              <div className="silver-bottom-divider w-full border-t-2 border-slate-300 mt-auto mb-2 pt-0.5"></div>
-
               {/* স্বাক্ষর সেকশন (কর্তৃপক্ষের স্বাক্ষর ও সিলের ছবি সহ - একদম নিচে) */}
-              <div className="quotation-signatures flex justify-between items-end text-xs w-full pb-2">
+              <div className="quotation-signatures flex justify-between items-end text-xs w-full pb-1 mt-auto">
                 {/* গ্রাহকের স্বাক্ষর */}
                 <div className="text-center w-52">
-                  <div className="border-t-2 border-slate-300 pt-1.5 font-bold text-gray-800">
+                  <div className="silver-signature-line w-full h-[2.5px] bg-gradient-to-r from-slate-300 via-slate-500 to-slate-300 rounded-full mb-1.5 border-t-2 border-slate-400"></div>
+                  <div className="font-bold text-gray-800 text-xs">
                     {txt("গ্রাহকের স্বাক্ষর ও সিল", "Customer's Signature & Seal")}
                   </div>
                   <p className="text-[10px] text-gray-500 mt-0.5">{txt("গৃহীত ও অনুমোদিত", "Accepted & Approved")}</p>
@@ -10530,7 +10527,8 @@ function App() {
                     className="h-16 object-contain mx-auto mb-1 select-none"
                     onError={(e) => { e.target.style.display = 'none'; }}
                   />
-                  <div className="border-t-2 border-slate-300 pt-1 font-bold text-gray-900">
+                  <div className="silver-signature-line w-full h-[2.5px] bg-gradient-to-r from-slate-300 via-slate-500 to-slate-300 rounded-full mb-1.5 border-t-2 border-slate-400"></div>
+                  <div className="font-bold text-gray-900 text-xs">
                     {txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}
                   </div>
                   <p className="text-[10px] text-gray-600 font-bold uppercase tracking-wider">

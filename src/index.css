@@ -56,7 +56,7 @@ html, body {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 6mm;
+    margin: 10mm 6mm 5mm 6mm;
   }
 
   /* ব্যাকগ্রাউন্ড অ্যাপ ও ডায়ালগ বাটন সম্পূর্ণ লুকানো */
@@ -117,11 +117,11 @@ html, body {
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    min-height: calc(297mm - 14mm) !important;
+    min-height: calc(297mm - 16mm) !important;
     box-sizing: border-box !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 0 2mm 2mm 2mm !important;
+    padding: 3mm 2mm 1mm 2mm !important;
     background: #ffffff !important;
   }
 
@@ -155,7 +155,7 @@ html, body {
     align-items: flex-end !important;
     margin-top: auto !important;
     padding-top: 0.5rem !important;
-    padding-bottom: 2mm !important;
+    padding-bottom: 0 !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     width: 100% !important;
@@ -167,7 +167,7 @@ html, body {
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    min-height: calc(297mm - 14mm) !important;
+    min-height: calc(297mm - 16mm) !important;
     box-sizing: border-box !important;
     width: 100% !important;
     margin: 0 !important;
@@ -193,7 +193,7 @@ html, body {
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    min-height: calc(297mm - 14mm) !important;
+    min-height: calc(297mm - 16mm) !important;
     box-sizing: border-box !important;
     width: 100% !important;
     margin: 0 !important;
@@ -218,7 +218,7 @@ html, body {
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    min-height: calc(297mm - 14mm) !important;
+    min-height: calc(297mm - 16mm) !important;
     box-sizing: border-box !important;
     width: 100% !important;
     margin: 0 !important;
@@ -232,7 +232,7 @@ html, body {
     align-items: flex-end !important;
     margin-top: auto !important;
     padding-top: 0.5rem !important;
-    padding-bottom: 2mm !important;
+    padding-bottom: 0 !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     width: 100% !important;
@@ -253,7 +253,7 @@ html, body {
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    min-height: calc(297mm - 14mm) !important;
+    min-height: calc(297mm - 16mm) !important;
     box-sizing: border-box !important;
     width: 100% !important;
     margin: 0 !important;
@@ -374,4 +374,12 @@ html, body {
   border-top: 2px solid #94a3b8 !important;
   margin-top: auto !important;
   margin-bottom: 6px !important;
+}
+
+/* অথরাইজড সিগনেচার ও গ্রাহকের স্বাক্ষরের নিচে ডিজাইন করা সিলভার দাগ */
+.silver-signature-line {
+  border-top: 2px solid #94a3b8 !important;
+  background: linear-gradient(90deg, #cbd5e1 0%, #64748b 50%, #cbd5e1 100%) !important;
+  background-color: #94a3b8 !important;
+  box-shadow: 0 1px 2px rgba(100, 116, 139, 0.2) !important;
 }

@@ -299,6 +299,12 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
           margin-top: auto !important;
           margin-bottom: 6px !important;
         }
+        /* Silver signature line */
+        .silver-signature-line {
+          border-top: 2px solid #94a3b8 !important;
+          background: linear-gradient(90deg, #cbd5e1 0%, #64748b 50%, #cbd5e1 100%) !important;
+          background-color: #94a3b8 !important;
+        }
         /* Pinned signatures at very bottom of page */
         .invoice-signatures,
         .quotation-signatures,
@@ -365,14 +371,14 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
           clonedEl.style.maxHeight = `${a4HeightPx}px`;
           clonedEl.style.minHeight = `${a4HeightPx}px`;
           clonedEl.style.overflow = 'hidden';
-          clonedEl.style.padding = '16px 20px 14px 20px';
+          clonedEl.style.padding = '28px 20px 8px 20px';
 
           // Pin signatures to the bottom
           const sigBlock = clonedEl.querySelector('.invoice-signatures, .quotation-signatures, .money-receipt-signatures, .warranty-signatures');
           if (sigBlock) {
             sigBlock.style.marginTop = 'auto';
             sigBlock.style.paddingTop = '14px';
-            sigBlock.style.paddingBottom = '4px';
+            sigBlock.style.paddingBottom = '0px';
           }
         }
 
