@@ -1679,7 +1679,7 @@ function App() {
   const extraDiscount = Math.max(0, Number(discountAmount || 0));
   const netDiscount = itemDiscountsTotal + extraDiscount;
   const netBillTotal = Math.max(0, subTotal - netDiscount);
-  const actualPaidAmount = paidAmount === '' ? netBillTotal : Number(paidAmount || 0);
+  const actualPaidAmount = paidAmount === '' ? (paymentType === 'Due' ? 0 : netBillTotal) : Math.max(0, Number(paidAmount || 0));
   const currentBillDue = Math.max(0, netBillTotal - actualPaidAmount);
 
   // কাস্টমারের পূর্বের বকেয়া ও সর্বমোট বকেয়া হিসাব
@@ -3926,6 +3926,8 @@ function App() {
                           setPaymentType(val);
                           if (val === 'Due') {
                             setPaidAmount('0');
+                          } else if (paidAmount === '0') {
+                            setPaidAmount('');
                           }
                         }} 
                         className="w-full text-xs border border-gray-300 p-2 rounded-lg bg-white outline-none focus:border-blue-500 font-medium"
@@ -9024,7 +9026,10 @@ function App() {
                     </div>
 
                     {/* পরিশোধিত নীল রংয়ের সিলটি বিক্রয়ের শর্তাবলির নিচে বসবে */}
-                    {(completedInvoice.payment_type === 'Cash' || Number(completedInvoice.due_amount || 0) <= 0) && (
+                    {(completedInvoice.payment_type !== 'Due' && 
+                      completedInvoice.payment_type?.toLowerCase() !== 'due' && 
+                      Number(completedInvoice.due_amount || 0) <= 0 && 
+                      (Number(completedInvoice.paid_amount || 0) > 0 || Number(completedInvoice.total_amount || 0) === 0)) && (
                       <div className="pt-2 flex items-center justify-start pl-6 select-none pointer-events-none">
                         <div className="w-24 h-24 md:w-28 md:h-28 rounded-full border-4 border-dashed border-blue-600 flex flex-col items-center justify-center p-1 text-center bg-blue-50/20 backdrop-blur-[0.5px] transform -rotate-12">
                           <div className="w-full h-full rounded-full border-2 border-blue-600 flex flex-col items-center justify-center p-0.5">
