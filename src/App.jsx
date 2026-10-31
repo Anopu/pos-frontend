@@ -18,7 +18,7 @@ import IspManagementModule from './components/IspManagementModule';
 import DatabaseBackupModal from './components/DatabaseBackupModal';
 import FcTechnologyWebsite from './components/FcTechnologyWebsite';
 import { API_BASE } from './utils/apiConfig';
-import { formatWarranty, formatQuotationWarranty } from './utils/formatWarranty';
+import { formatWarranty, formatQuotationWarranty, translateServiceName, SERVICE_CATEGORIES, getServiceCategoryTitle, isNonWarranty } from './utils/formatWarranty';
 import { buildDocumentPdfFilename, triggerPrintWithFilename } from './utils/pdfGenerator';
 
 
@@ -96,6 +96,17 @@ function App() {
     try {
       localStorage.setItem('pos_language', next);
     } catch {}
+
+    // Translate any service bill items currently in the cart
+    setCart(prevCart => (Array.isArray(prevCart) ? prevCart.map(item => {
+      if (item && item.is_service && item.name) {
+        return {
+          ...item,
+          name: translateServiceName(item.name, next)
+        };
+      }
+      return item;
+    }) : []));
   };
 
   // ভিউ স্টেট: ওয়েবসাইট নাকি পজ সিস্টেম (Website vs POS Counter View)
@@ -1374,9 +1385,13 @@ function App() {
       return alert(txt('সঠিক সার্ভিসিং চার্জ প্রদান করুন!', 'Please enter a valid service charge!'));
     }
 
+    const catTitle = getServiceCategoryTitle(serviceForm.category, lang);
+
     const serviceItem = {
       id: 'srv_' + Date.now(),
-      name: `${serviceForm.category}: ${serviceForm.title.trim()}`,
+      name: `${catTitle}: ${serviceForm.title.trim()}`,
+      service_category: serviceForm.category,
+      service_title: serviceForm.title.trim(),
       model: serviceForm.model.trim() || '',
       selling_price: charge,
       sale_price: charge,
@@ -1384,7 +1399,7 @@ function App() {
       current_stock: 99999,
       qty: 1,
       discount: '',
-      warranty: serviceForm.warranty || 'নন-ওয়ারেন্টি',
+      warranty: isNonWarranty(serviceForm.warranty) ? 'নন-ওয়ারেন্টি' : (serviceForm.warranty || 'নন-ওয়ারেন্টি'),
       is_service: true,
       selected_serials: []
     };
@@ -4340,7 +4355,7 @@ function App() {
                                   <p className="font-bold text-gray-800">{item.product_name}</p>
                                   {item.model && <p className="text-[10px] text-gray-500 font-mono">{txt('মডেল: ', 'Model: ')}{item.model}</p>}
                                 </td>
-                                <td className="p-2">{item.warranty || txt('নন-ওয়ারেন্টি', 'Non-Warranty')}</td>
+                                <td className="p-2">{formatWarranty(item.warranty) || '-'}</td>
                                 <td className="p-2 text-center font-bold">{item.quantity} {txt('টি', 'pcs')}</td>
                                 <td className="p-2 text-right">৳ {Number(item.unit_price).toLocaleString()}</td>
                                 <td className="p-2 text-right font-bold">৳ {Number(item.total_price).toLocaleString()}</td>
@@ -6394,7 +6409,7 @@ function App() {
                                     <div className="flex items-center gap-1.5 text-gray-500 font-mono text-[10px] mt-0.5">
                                       <span className="text-blue-700 font-bold">{ps.invoice_no}</span>
                                       {ps.customer_name && <span>• {ps.customer_name}</span>}
-                                      {ps.warranty && <span className="text-teal-700">({formatWarranty(ps.warranty)})</span>}
+                                      {formatWarranty(ps.warranty) ? <span className="text-teal-700">({formatWarranty(ps.warranty)})</span> : null}
                                     </div>
                                     {ps.serial_numbers && (
                                       <p className="text-[10px] font-mono text-purple-700 mt-0.5">S/N: {ps.serial_numbers}</p>
@@ -7243,15 +7258,7 @@ function App() {
               <div>
                 <label className="font-bold text-gray-700">{txt("ডিভাইস / সার্ভিসিং ক্যাটাগরি *", "Device / Service Category *")}</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-1">
-                  {[
-                    { id: 'ল্যাপটপ সার্ভিসিং', bn: 'ল্যাপটপ সার্ভিসিং', en: 'Laptop Service' },
-                    { id: 'ডেস্কটপ সার্ভিসিং', bn: 'ডেস্কটপ সার্ভিসিং', en: 'Desktop Service' },
-                    { id: 'প্রিন্টার সার্ভিস', bn: 'প্রিন্টার সার্ভিস', en: 'Printer Service' },
-                    { id: 'ক্যামেরা ইনস্টলেশন', bn: 'ক্যামেরা ইনস্টলেশন', en: 'Camera Installation' },
-                    { id: 'ক্যামেরা সার্ভিস', bn: 'ক্যামেরা সার্ভিস', en: 'Camera Service' },
-                    { id: 'ইউপিএস সার্ভিস', bn: 'ইউপিএস সার্ভিস', en: 'UPS Service' },
-                    { id: 'সাধারণ সার্ভিসিং', bn: 'সাধারণ সার্ভিসিং', en: 'General Service' }
-                  ].map(cat => (
+                  {SERVICE_CATEGORIES.map(cat => (
                     <button
                       key={cat.id}
                       type="button"
@@ -8658,6 +8665,15 @@ function App() {
                   <>
                     <button
                       type="button"
+                      onClick={() => toggleLanguage()}
+                      className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer border transition shadow-xs ${lang === 'en' ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300'}`}
+                      title={lang === 'en' ? txt("বাংলা বিল দেখতে ক্লিক করুন", "Switch to Bengali Bill") : txt("ইংরেজিতে বিল করতে ক্লিক করুন", "Click to view and bill in English")}
+                    >
+                      <Languages size={15} className={lang === 'en' ? "text-white" : "text-blue-600"} />
+                      <span>{lang === 'en' ? 'EN Bill (Active)' : 'English Bill'}</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleCheckout()}
                       className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md transition"
                     >
@@ -8678,6 +8694,15 @@ function App() {
                   </>
                 ) : (
                   <>
+                    <button
+                      type="button"
+                      onClick={() => toggleLanguage()}
+                      className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer border transition shadow-xs ${lang === 'en' ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300'}`}
+                      title={lang === 'en' ? txt("বাংলা বিল দেখতে ক্লিক করুন", "Switch to Bengali Bill") : txt("ইংরেজিতে বিল প্রিন্ট করতে ক্লিক করুন", "Click to view and print Bill in English")}
+                    >
+                      <Languages size={15} className={lang === 'en' ? "text-white" : "text-blue-600"} />
+                      <span>{lang === 'en' ? 'EN Bill (Active)' : 'English Bill'}</span>
+                    </button>
                     <button 
                       onClick={() => {
                         setShareData({
@@ -8788,7 +8813,7 @@ function App() {
                             title={txt("ক্লিক করে শিরোনাম পরিবর্তন করুন", "Click to edit title")}
                             className="inline-block silver-title-badge bg-gradient-to-b from-white via-slate-100 to-slate-200 text-slate-950 border border-slate-400 font-extrabold text-xs px-3 py-1 uppercase rounded-md shadow-xs cursor-text hover:brightness-105 focus:outline-none focus:ring-1 focus:ring-slate-400 transition"
                           >
-                            {invoiceDocTitle || txt("ইনভয়েস / ক্যাশ মেমো", "INVOICE / CASH MEMO")}
+                            {(!invoiceDocTitle || invoiceDocTitle === 'ইনভয়েস / ক্যাশ মেমো' || invoiceDocTitle === 'INVOICE / CASH MEMO') ? txt("ইনভয়েস / ক্যাশ মেমো", "INVOICE / CASH MEMO") : invoiceDocTitle}
                           </span>
                           <button
                             type="button"
@@ -8914,9 +8939,11 @@ function App() {
                         <td className="py-1.5 px-2 align-middle">
                           <div className="flex flex-col justify-center min-h-[24px]">
                             <div className="font-bold leading-snug text-xs">
-                              {it.name || it.product_name}
+                              {translateServiceName(it.name || it.product_name, lang)}
                               {it.model && <span className="ml-1 text-xs text-gray-600 font-mono font-normal">[{it.model}]</span>}
-                              <span className="ml-1 text-xs font-semibold text-blue-700">({formatWarranty(it.warranty)})</span>
+                              {formatWarranty(it.warranty) && (
+                                <span className="ml-1 text-xs font-semibold text-blue-700">({formatWarranty(it.warranty)})</span>
+                              )}
                               {Number(it.discount || 0) > 0 && (
                                 <span className="ml-1.5 text-xs font-bold text-orange-600 bg-orange-50 px-1 py-0.2 rounded border border-orange-200">
                                   {txt("ছাড়:", "Disc:")} -{Number(it.discount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -9313,7 +9340,7 @@ function App() {
                             <td className="py-2 px-3">
                               <div className="flex items-center gap-2">
                                 <span className="font-bold text-gray-900 leading-tight">
-                                  {it.name || it.product_name}
+                                  {translateServiceName(it.name || it.product_name, lang)}
                                 </span>
                                 {it.is_new ? (
                                   <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded text-[10px] font-black border border-emerald-300">
@@ -9327,7 +9354,9 @@ function App() {
                               </div>
                               <div className="text-[11px] text-gray-500 mt-0.5 flex items-center gap-2 flex-wrap">
                                 {it.model && <span className="font-mono bg-gray-100 px-1.5 py-0.2 rounded text-gray-700">{txt("মডেল:", "Model:")} {it.model}</span>}
-                                <span className="text-blue-700 font-semibold">{txt("ওয়ারেন্টি:", "Warranty:")} {formatWarranty(it.warranty)}</span>
+                                {formatWarranty(it.warranty) ? (
+                                  <span className="text-blue-700 font-semibold">{txt("ওয়ারেন্টি:", "Warranty:")} {formatWarranty(it.warranty)}</span>
+                                ) : null}
                               </div>
                               {/* সিরিয়াল প্রদর্শন ও হাইলাইটিং */}
                               {((it.selected_serials && it.selected_serials.length > 0) || it.serial_numbers) && (
@@ -10448,7 +10477,7 @@ function App() {
                           <div className="flex items-center justify-center min-h-[24px] font-mono text-xs leading-none">{idx + 1}</div>
                         </td>
                         <td className="py-1.5 px-3 align-middle border-r border-gray-200">
-                          <div className="flex items-center min-h-[24px] font-bold text-gray-900 leading-snug text-xs">{it.name}</div>
+                          <div className="flex items-center min-h-[24px] font-bold text-gray-900 leading-snug text-xs">{translateServiceName(it.name, lang)}</div>
                         </td>
                         <td className="py-1.5 px-2 text-center align-middle border-r border-gray-200">
                           <div className="flex items-center justify-center min-h-[24px]">
