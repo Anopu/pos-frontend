@@ -292,18 +292,10 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
           border-bottom: 1.5px solid #64748b !important;
           text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75) !important;
         }
-        /* Bottom silver divider */
-        .silver-bottom-divider {
-          width: 100% !important;
-          border-top: 2px solid #94a3b8 !important;
-          margin-top: auto !important;
-          margin-bottom: 6px !important;
-        }
-        /* Silver signature line */
+        /* Bottom silver divider & signature lines removed */
+        .silver-bottom-divider,
         .silver-signature-line {
-          border-top: 2px solid #94a3b8 !important;
-          background: linear-gradient(90deg, #cbd5e1 0%, #64748b 50%, #cbd5e1 100%) !important;
-          background-color: #94a3b8 !important;
+          display: none !important;
         }
         /* Pinned signatures at very bottom of page */
         .invoice-signatures,

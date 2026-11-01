@@ -476,6 +476,10 @@ export default function IspManagementModule({
 
   // কাস্টমার এডিট মোড ওপেন
   const handleEditCustomer = (c) => {
+    if (!isAdmin) {
+      alert(txt('শুধুমাত্র শপ অ্যাডমিন গ্রাহকের তথ্য এডিট করতে পারবেন!', 'Only Shop Admin can edit customer info!'));
+      return;
+    }
     setEditingCustomer(c);
     setCustomerForm({
       customer_user_id: c.customer_user_id || '',
@@ -1650,22 +1654,24 @@ ${timingNotice}
                               <Server size={14} />
                             </button>
 
-                            {/* এডিট ও ডিলিট বাটন (শুধুমাত্র অ্যাডমিন এর জন্য) */}
-                            <button
-                              onClick={() => handleEditCustomer(c)}
-                              className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition cursor-pointer"
-                              title={txt('গ্রাহকের তথ্য এডিট করুন', 'Edit Customer Info')}
-                            >
-                              <Edit size={14} />
-                            </button>
+                            {/* এডিট ও ডিলিট বাটন (শুধুমাত্র শপ অ্যাডমিন এর জন্য) */}
                             {isAdmin && (
-                              <button
-                                onClick={() => handleDeleteCustomer(c)}
-                                className="p-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition cursor-pointer"
-                                title={txt('মুছে ফেলুন', 'Delete')}
-                              >
-                                <Trash2 size={14} />
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => handleEditCustomer(c)}
+                                  className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition cursor-pointer"
+                                  title={txt('গ্রাহকের তথ্য এডিট করুন', 'Edit Customer Info')}
+                                >
+                                  <Edit size={14} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCustomer(c)}
+                                  className="p-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition cursor-pointer"
+                                  title={txt('মুছে ফেলুন', 'Delete')}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -3930,7 +3936,7 @@ ${timingNotice}
           onClose={() => setIsReceiptModalOpen(false)}
           receiptData={activeReceipt}
           lang={lang}
-          onEdit={(receipt) => handleOpenEditPayment(receipt)}
+          onEdit={isAdmin ? (receipt) => handleOpenEditPayment(receipt) : null}
         />
       )}
 

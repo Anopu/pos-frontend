@@ -502,9 +502,9 @@ function App() {
   });
   const [quotationNote, setQuotationNote] = useState('');
   const [quotationTerms, setQuotationTerms] = useState(
-`১. এই কোটেশনটি জমা দেওয়ার তারিখ থেকে এক (১) সপ্তাহ পর্যন্ত কার্যকর থাকবে।
-২. পণ্য সরবরাহের সময় ৫০ শতাংশ এবং সরবরাহ ও ইনস্টলেশন সম্পন্ন হওয়ার পর সম্পূর্ণ অর্থ নগদে অথবা চেকের মাধ্যমে পরিশোধ করতে হবে।
-৩. উপরোক্ত মূল্যসমূহ VAT এবং প্রযোজ্য সকল কর ব্যতীত।`
+`1. This quotation is valid for one (1) week from the date of submission.
+2. 50% advance payment upon work order, remaining 50% payable in cash or cheque upon delivery & installation completion.
+3. The above prices exclude VAT and applicable government taxes.`
   );
   const [quotationItems, setQuotationItems] = useState([
     { id: 1, name: '', warranty: '1 Year', qty: 1, unit_price: '', total_price: '' }
@@ -829,6 +829,10 @@ function App() {
   };
 
   const handleDeleteExpense = async (id) => {
+    if (currentUser?.role !== 'admin') {
+      alert(txt("অননুমোদিত অ্যাক্সেস! শুধুমাত্র শপ অ্যাডমিন খরচ মুছতে পারবেন।", "Unauthorized! Only Shop Admin can delete expenses."));
+      return;
+    }
     if (!window.confirm(txt('এই খরচের রেকর্ডটি মুছে ফেলতে চান?', 'Do you want to delete this expense record?'))) return;
     await fetch(`${API_BASE}/expenses/${id}`, { method: 'DELETE' });
     fetchExpenses(selectedDate);
@@ -840,6 +844,10 @@ function App() {
   };
 
   const handleDeleteQuotation = async (id, no) => {
+    if (currentUser?.role !== 'admin') {
+      alert(txt("অননুমোদিত অ্যাক্সেস! শুধুমাত্র শপ অ্যাডমিন কোটেশন ডিলিট করতে পারবেন।", "Unauthorized! Only Shop Admin can delete quotations."));
+      return;
+    }
     if (!window.confirm(txt(`আপনি কি "${no}" কোটেশনটি মুছে ফেলতে চান?`, `Do you want to delete quotation "${no}"?`))) return;
     try {
       const res = await fetch(`${API_BASE}/quotations/${id}`, { method: 'DELETE' });
@@ -1045,6 +1053,10 @@ function App() {
   };
 
   const handleSaveEditedInvoice = async () => {
+    if (currentUser?.role !== 'admin') {
+      alert(txt("অননুমোদিত অ্যাক্সেস! শুধুমাত্র শপ অ্যাডমিন ইনভয়েস এডিট ও সংরক্ষণ করতে পারবেন।", "Unauthorized! Only Shop Admin can edit and save invoices."));
+      return;
+    }
     if (!editingInvoice) return;
     if (editItems.length === 0) return alert(txt('ইনভয়েসে অন্তত একটি পণ্য থাকতে হবে!', 'Invoice must have at least one product!'));
 
@@ -1357,6 +1369,10 @@ function App() {
   };
 
   const handleDeleteUser = async (userId, username) => {
+    if (currentUser?.role !== 'admin') {
+      alert(txt("অননুমোদিত অ্যাক্সেস! শুধুমাত্র শপ অ্যাডমিন ইউজার ডিলিট করতে পারবেন।", "Unauthorized! Only Shop Admin can delete users."));
+      return;
+    }
     if (!window.confirm(txt(`আপনি কি নিশ্চিতভাবে "${username}" ইউজারটি মুছে ফেলতে চান?`, `Are you sure you want to delete user "${username}"?`))) return;
     try {
       const res = await fetch(`${API_BASE}/users/${userId}`, {
@@ -2302,6 +2318,10 @@ function App() {
   const quotationCalculatedTotal = quotationItems.reduce((sum, it) => sum + (Number(it.total_price) || (Number(it.qty || 1) * Number(it.unit_price || 0))), 0);
 
   const handleOpenEditQuotation = async (qId) => {
+    if (currentUser?.role !== 'admin') {
+      alert(txt("অননুমোদিত অ্যাক্সেস! শুধুমাত্র শপ অ্যাডমিন কোটেশন এডিট করতে পারবেন।", "Unauthorized! Only Shop Admin can edit quotations."));
+      return;
+    }
     try {
       const res = await fetch(`${API_BASE}/quotations/${qId}`);
       const data = await res.json();
@@ -2348,9 +2368,9 @@ function App() {
     });
     setQuotationNote('');
     setQuotationTerms(
-`১. এই কোটেশনটি জমা দেওয়ার তারিখ থেকে এক (১) সপ্তাহ পর্যন্ত কার্যকর থাকবে।
-২. পণ্য সরবরাহের সময় ৫০ শতাংশ এবং সরবরাহ ও ইনস্টলেশন সম্পন্ন হওয়ার পর সম্পূর্ণ অর্থ নগদে অথবা চেকের মাধ্যমে পরিশোধ করতে হবে।
-৩. উপরোক্ত মূল্যসমূহ VAT এবং প্রযোজ্য সকল কর ব্যতীত।`
+`1. This quotation is valid for one (1) week from the date of submission.
+2. 50% advance payment upon work order, remaining 50% payable in cash or cheque upon delivery & installation completion.
+3. The above prices exclude VAT and applicable government taxes.`
     );
     setQuotationItems([
       { id: 1, name: '', warranty: '1 Year', qty: 1, unit_price: '', total_price: '' }
@@ -2486,6 +2506,10 @@ function App() {
   };
 
   const handleDeleteCashReconciliation = async (id) => {
+    if (currentUser?.role !== 'admin') {
+      alert(txt("অননুমোদিত অ্যাক্সেস! শুধুমাত্র শপ অ্যাডমিন ক্যাশ রিকনসিলিয়েশন রেকর্ড মুছতে পারবেন।", "Unauthorized! Only Shop Admin can delete reconciliation records."));
+      return;
+    }
     if (!window.confirm(txt('আপনি কি এই রিকনসিলিয়েশন রেকর্ডটি মুছে ফেলতে চান?', 'Do you want to delete this reconciliation record?'))) return;
     try {
       await fetch(`${API_BASE}/cash-reconciliation/${id}`, { method: 'DELETE' });
@@ -2683,6 +2707,10 @@ function App() {
   };
 
   const handleDeleteSupplierPayment = (trans) => {
+    if (currentUser?.role !== 'admin') {
+      alert(txt("অননুমোদিত অ্যাক্সেস! শুধুমাত্র শপ অ্যাডমিন সাপ্লায়ার পেমেন্ট ডিলিট করতে পারবেন।", "Unauthorized! Only Shop Admin can delete supplier payments."));
+      return;
+    }
     if (!window.confirm(txt(
       `আপনি কি নিশ্চিতভাবে এই ${Number(trans.amount).toLocaleString()} টাকার পেমেন্টটি ডিলিট করতে চান?\n\nএটি ডিলিট করলে:\n১. সাপ্লায়ারের বকেয়া পাওনাতে ৳ ${Number(trans.amount).toLocaleString()} ফেরত যোগ হবে।\n২. নির্বাচিত তারিখের খরচের তালিকা হতে এটি বাদ যাবে এবং প্রত্যাশিত ক্যাশ সমন্বয় হবে।\n৩. মুছে ফেলা পেমেন্ট হিস্ট্রিতে এর সম্পূর্ণ রেকর্ড সংরক্ষিত থাকবে।`,
       `Are you sure you want to delete this payment of ৳ ${Number(trans.amount).toLocaleString()}?\n\nThis will restore the supplier balance and remove it from expenses.`
@@ -4980,15 +5008,17 @@ function App() {
                                 >
                                   <Printer size={13} /> {txt('প্রিন্ট', 'Print')}
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditQuotation(q.id)}
-                                  className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded font-bold text-xs flex items-center gap-1 cursor-pointer"
-                                  title={txt("কোটেশন এডিট ও সংশোধন করুন", "Edit quotation")}
-                                >
-                                  <Edit size={13} /> {txt('এডিট', 'Edit')}
-                                </button>
-                                {currentUser.role === 'admin' && (
+                                {currentUser?.role === 'admin' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditQuotation(q.id)}
+                                    className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded font-bold text-xs flex items-center gap-1 cursor-pointer"
+                                    title={txt("কোটেশন এডিট ও সংশোধন করুন", "Edit quotation")}
+                                  >
+                                    <Edit size={13} /> {txt('এডিট', 'Edit')}
+                                  </button>
+                                )}
+                                {currentUser?.role === 'admin' && (
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteQuotation(q.id, q.quotation_no)}
@@ -5771,9 +5801,11 @@ function App() {
                               )}
                             </td>
                             <td className="p-2.5 text-center">
-                              <button onClick={() => handleDeleteExpense(exp.id)} className="text-red-500 hover:text-red-700 p-1 cursor-pointer" title={txt("মুছুন", "Delete")}>
-                                <Trash2 size={14} />
-                              </button>
+                              {currentUser?.role === 'admin' && (
+                                <button onClick={() => handleDeleteExpense(exp.id)} className="text-red-500 hover:text-red-700 p-1 cursor-pointer" title={txt("মুছুন", "Delete")}>
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -7016,32 +7048,34 @@ function App() {
                           )}
                         </div>
                         <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingUserId(u.id);
-                              let parsedPerms = ['pos', 'returns', 'barcode_search'];
-                              if (u.permissions) {
-                                try {
-                                  parsedPerms = Array.isArray(u.permissions) ? u.permissions : JSON.parse(u.permissions);
-                                } catch {}
-                              } else if (u.role === 'admin') {
-                                parsedPerms = ALL_MODULES.map(m => m.id);
-                              }
-                              setNewUserForm({
-                                username: u.username,
-                                password: '',
-                                fullname: u.fullname,
-                                role: u.role,
-                                email: u.email || '',
-                                permissions: parsedPerms
-                              });
-                            }}
-                            className="px-2 py-1 bg-white hover:bg-purple-100 text-purple-700 border border-purple-200 rounded font-bold text-[11px] cursor-pointer transition flex items-center gap-1"
-                          >
-                            <Edit size={12} /> {txt("এডিট", "Edit")}
-                          </button>
-                          {usersList.length > 1 && (
+                          {currentUser?.role === 'admin' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingUserId(u.id);
+                                let parsedPerms = ['pos', 'returns', 'barcode_search'];
+                                if (u.permissions) {
+                                  try {
+                                    parsedPerms = Array.isArray(u.permissions) ? u.permissions : JSON.parse(u.permissions);
+                                  } catch {}
+                                } else if (u.role === 'admin') {
+                                  parsedPerms = ALL_MODULES.map(m => m.id);
+                                }
+                                setNewUserForm({
+                                  username: u.username,
+                                  password: '',
+                                  fullname: u.fullname,
+                                  role: u.role,
+                                  email: u.email || '',
+                                  permissions: parsedPerms
+                                });
+                              }}
+                              className="px-2 py-1 bg-white hover:bg-purple-100 text-purple-700 border border-purple-200 rounded font-bold text-[11px] cursor-pointer transition flex items-center gap-1"
+                            >
+                              <Edit size={12} /> {txt("এডিট", "Edit")}
+                            </button>
+                          )}
+                          {currentUser?.role === 'admin' && usersList.length > 1 && (
                             <button
                               type="button"
                               onClick={() => handleDeleteUser(u.id, u.username)}
@@ -9113,9 +9147,11 @@ function App() {
 
               {/* স্বাক্ষর সেকশন (ইনভয়েসের একদম নিচে) */}
               <div className="invoice-signatures flex justify-between items-end text-xs pb-1 w-full mt-auto">
-                <div className="text-center w-48">
-                  <div className="silver-signature-line w-full h-[2.5px] bg-gradient-to-r from-slate-300 via-slate-500 to-slate-300 rounded-full mb-1.5 border-t-2 border-slate-400"></div>
-                  <div className="font-bold text-gray-800 text-xs">{txt("গ্রাহকের স্বাক্ষর", "Customer's Signature")}</div>
+                <div className="text-center w-52">
+                  <div className="font-bold text-gray-800 text-xs">
+                    {txt("গ্রাহকের স্বাক্ষর ও সিল", "Customer's Signature & Seal")}
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-0.5">{txt("গৃহীত ও অনুমোদিত", "Accepted & Approved")}</p>
                 </div>
                 <div className="text-center w-64">
                   <img 
@@ -9125,8 +9161,12 @@ function App() {
                     style={{ maxHeight: '85px', width: 'auto' }}
                     onError={(e) => { e.target.style.display = 'none'; }}
                   />
-                  <div className="silver-signature-line w-full h-[2.5px] bg-gradient-to-r from-slate-300 via-slate-500 to-slate-300 rounded-full mb-1.5 border-t-2 border-slate-400"></div>
-                  <div className="font-bold text-gray-900 text-xs">{txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}</div>
+                  <div className="font-bold text-gray-900 text-xs">
+                    {txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}
+                  </div>
+                  <p className="text-[10px] text-gray-600 font-bold uppercase tracking-wider">
+                    FC TECHNOLOGY
+                  </p>
                 </div>
               </div>
             </div>
@@ -10522,16 +10562,16 @@ function App() {
 
                 {/* ৩টি বাধ্যতামূলক শর্তাবলী (ট্রান্সপারেন্ট বক্স যাতে জলছাপ ঢেকে না যায়) */}
                 <div className="quotation-terms-box quotation-transparent-box border border-gray-300 rounded-lg p-2.5 bg-transparent print:bg-transparent space-y-1 text-[10px]">
-                  <p className="font-bold text-gray-900 underline text-[10px]">{txt("শর্তাবলী / Terms & Conditions:", "Terms & Conditions:")}</p>
+                  <p className="font-bold text-gray-900 underline text-[10px]">{txt("Terms & Conditions:", "Terms & Conditions:")}</p>
                   {activeQuotationPrint.terms ? (
                     <div className="whitespace-pre-line text-gray-700 font-medium text-[10px] leading-snug">
                       {activeQuotationPrint.terms}
                     </div>
                   ) : (
                     <ol className="list-decimal list-inside space-y-0.5 text-gray-700 font-medium text-[10px] leading-snug">
-                      <li className="text-[10px]">{txt("এই কোটেশনটি জমা দেওয়ার তারিখ থেকে এক (১) সপ্তাহ পর্যন্ত কার্যকর থাকবে।", "This quotation is valid for one (1) week from the date of submission.")}</li>
-                      <li className="text-[10px]">{txt("পণ্য সরবরাহের সময় ৫০ শতাংশ এবং সরবরাহ ও ইনস্টলেশন সম্পন্ন হওয়ার পর সম্পূর্ণ অর্থ নগদে অথবা চেকের মাধ্যমে পরিশোধ করতে হবে।", "50% advance payment upon work order, remaining 50% payable in cash or cheque upon delivery & installation completion.")}</li>
-                      <li className="text-[10px]">{txt("উপরোক্ত মূল্যসমূহ VAT এবং প্রযোজ্য সকল কর ব্যতীত।", "The above prices exclude VAT and applicable government taxes.")}</li>
+                      <li className="text-[10px]">This quotation is valid for one (1) week from the date of submission.</li>
+                      <li className="text-[10px]">50% advance payment upon work order, remaining 50% payable in cash or cheque upon delivery & installation completion.</li>
+                      <li className="text-[10px]">The above prices exclude VAT and applicable government taxes.</li>
                     </ol>
                   )}
                   {activeQuotationPrint.note && (
@@ -10546,7 +10586,6 @@ function App() {
               <div className="quotation-signatures flex justify-between items-end text-xs w-full pb-1 mt-auto">
                 {/* গ্রাহকের স্বাক্ষর */}
                 <div className="text-center w-52">
-                  <div className="silver-signature-line w-full h-[2.5px] bg-gradient-to-r from-slate-300 via-slate-500 to-slate-300 rounded-full mb-1.5 border-t-2 border-slate-400"></div>
                   <div className="font-bold text-gray-800 text-xs">
                     {txt("গ্রাহকের স্বাক্ষর ও সিল", "Customer's Signature & Seal")}
                   </div>
@@ -10561,7 +10600,6 @@ function App() {
                     className="h-16 object-contain mx-auto mb-1 select-none"
                     onError={(e) => { e.target.style.display = 'none'; }}
                   />
-                  <div className="silver-signature-line w-full h-[2.5px] bg-gradient-to-r from-slate-300 via-slate-500 to-slate-300 rounded-full mb-1.5 border-t-2 border-slate-400"></div>
                   <div className="font-bold text-gray-900 text-xs">
                     {txt("কর্তৃপক্ষের স্বাক্ষর ও সিল", "Authorized Signature & Seal")}
                   </div>
@@ -11635,11 +11673,12 @@ function App() {
             )
           });
         }}
-        onEdit={(slip) => {
+        onEdit={currentUser?.role === 'admin' ? (slip) => {
           setActiveWarrantySlip(null);
           setActiveTab('warranty_service');
           setEditWarrantySlipDirect(slip);
-        }}
+        } : null}
+        currentUser={currentUser}
         lang={lang}
       />
 

@@ -269,6 +269,10 @@ export default function WarrantyServiceModule({
   };
 
   const handleOpenEditSlip = (slip) => {
+    if (currentUser?.role !== 'admin') {
+      alert(lang === 'en' ? 'Only Shop Admin can edit slips.' : 'শুধুমাত্র শপ অ্যাডমিন স্লিপ এডিট করতে পারবেন।');
+      return;
+    }
     setEditingSlip(slip);
     const cost = slip.final_cost !== null && slip.final_cost !== undefined ? slip.final_cost : (slip.estimated_cost || '');
     const paid = slip.paid_amount !== null && slip.paid_amount !== undefined ? slip.paid_amount : (slip.advance_paid || '');
@@ -332,6 +336,10 @@ export default function WarrantyServiceModule({
       };
 
       if (editingSlip) {
+        if (currentUser?.role !== 'admin') {
+          alert(lang === 'en' ? 'Only Shop Admin can edit slips.' : 'শুধুমাত্র শপ অ্যাডমিন স্লিপ এডিট করতে পারবেন।');
+          return;
+        }
         // এডিট মোড (PUT)
         const res = await fetch(`${API_BASE}/warranty-services/${editingSlip.id}`, {
           method: 'PUT',
@@ -964,14 +972,16 @@ export default function WarrantyServiceModule({
                           <Share2 size={13} />
                         </button>
 
-                        {/* স্লিপের তথ্য এডিট */}
-                        <button
-                          onClick={() => handleOpenEditSlip(item)}
-                          className="p-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg cursor-pointer transition"
-                          title={lang === 'en' ? 'Edit Slip' : 'স্লিপ এডিট করুন'}
-                        >
-                          <Edit size={13} />
-                        </button>
+                        {/* স্লিপের তথ্য এডিট (শুধুমাত্র শপ অ্যাডমিন) */}
+                        {currentUser?.role === 'admin' && (
+                          <button
+                            onClick={() => handleOpenEditSlip(item)}
+                            className="p-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg cursor-pointer transition"
+                            title={lang === 'en' ? 'Edit Slip' : 'স্লিপ এডিট করুন'}
+                          >
+                            <Edit size={13} />
+                          </button>
+                        )}
 
                         {/* স্ট্যাটাস আপডেট */}
                         <button

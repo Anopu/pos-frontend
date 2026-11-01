@@ -3,7 +3,7 @@ import { X, Printer, Share2, Wrench, Shield, CheckCircle, Clock, Edit3 } from 'l
 import { buildDocumentPdfFilename, triggerPrintWithFilename } from '../utils/pdfGenerator';
 import { formatDeviceCategory } from './WarrantyServiceModule';
 
-export default function WarrantySlipPrintModal({ slip, onClose, onShare, onEdit, lang = 'bn' }) {
+export default function WarrantySlipPrintModal({ slip, onClose, onShare, onEdit, lang = 'bn', currentUser }) {
   if (!slip) return null;
 
   const [slipDocTitle, setSlipDocTitle] = useState(lang === 'en' ? 'WARRANTY & SERVICE SLIP' : 'ওয়ারেন্টি ও সার্ভিসিং স্লিপ');
@@ -40,7 +40,7 @@ export default function WarrantySlipPrintModal({ slip, onClose, onShare, onEdit,
           </div>
 
           <div className="flex items-center gap-2">
-            {onEdit && (
+            {currentUser?.role === 'admin' && onEdit && (
               <button
                 onClick={() => {
                   if (typeof onEdit === 'function') onEdit(slip);

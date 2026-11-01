@@ -368,18 +368,8 @@ html, body {
   print-color-adjust: exact !important;
 }
 
-/* ইনভয়েস ও কোটেশন পেজের নিচের লম্বা সিলভার কালারের দাগ */
-.silver-bottom-divider {
-  width: 100% !important;
-  border-top: 2px solid #94a3b8 !important;
-  margin-top: auto !important;
-  margin-bottom: 6px !important;
-}
-
-/* অথরাইজড সিগনেচার ও গ্রাহকের স্বাক্ষরের নিচে ডিজাইন করা সিলভার দাগ */
+/* ইনভয়েস ও কোটেশন পেজের নিচের লম্বা দাগ ও সিগনেচার ডিভাইডার বাদ রাখা হয়েছে */
+.silver-bottom-divider,
 .silver-signature-line {
-  border-top: 2px solid #94a3b8 !important;
-  background: linear-gradient(90deg, #cbd5e1 0%, #64748b 50%, #cbd5e1 100%) !important;
-  background-color: #94a3b8 !important;
-  box-shadow: 0 1px 2px rgba(100, 116, 139, 0.2) !important;
+  display: none !important;
 }
