@@ -178,8 +178,7 @@ html, body {
 
   /* মানি রিসিপ্ট প্রিন্ট লেআউট ও একদম নিচে স্বাক্ষর */
   #printable-content.money-receipt-printable,
-  .money-receipt-printable,
-.isp-receipt-printable {
+  .money-receipt-printable {
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
@@ -296,19 +295,26 @@ html, body {
     background-color: transparent !important;
   }
 
-  /* আইএসপি মানি রিসিপ্ট ও বিল প্রিন্ট লেআউট */
+  /* আইএসপি মানি রিসিপ্ট ও বিল প্রিন্ট লেআউট - এক পেজে এ-ফোর সাইজে আঁটা ও সিগনেচার পরবর্তী পেজে না যাওয়া নিশ্চিতকরণ */
   #printable-content.isp-receipt-printable,
   #isp-printable-receipt,
   .isp-receipt-printable {
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    min-height: calc(297mm - 16mm) !important;
+    height: 268mm !important;
+    max-height: 268mm !important;
+    min-height: 0 !important;
     box-sizing: border-box !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 5mm 8mm 3mm 8mm !important;
     background: #ffffff !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    overflow: hidden !important;
   }
 
   .isp-signatures {
@@ -316,11 +322,21 @@ html, body {
     justify-content: space-between !important;
     align-items: flex-end !important;
     margin-top: auto !important;
-    padding-top: 1.5rem !important;
-    padding-bottom: 0.5rem !important;
+    padding-top: 0.35rem !important;
+    padding-bottom: 0 !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     width: 100% !important;
+  }
+
+  /* আইএসপি প্রিন্টে জলছাপ স্পষ্ট রাখতে ব্যাকগ্রাউন্ড স্বচ্ছকরণ */
+  .isp-receipt-printable .isp-transparent-box,
+  .isp-receipt-printable .isp-transparent-box div,
+  .isp-receipt-printable table,
+  .isp-receipt-printable tbody tr,
+  .isp-receipt-printable tbody td {
+    background: transparent !important;
+    background-color: transparent !important;
   }
 
   table {
@@ -333,7 +349,8 @@ html, body {
 /* ইনভয়েস, কোটেশন ও মানি রিসিপ্ট ফন্ট সাইজ ১২ (12px) অপটিমাইজেশন */
 .invoice-printable,
 .quotation-printable,
-.money-receipt-printable {
+.money-receipt-printable,
+.isp-receipt-printable {
   font-size: 12px !important;
 }
 
@@ -345,14 +362,20 @@ html, body {
 .quotation-printable table td,
 .money-receipt-printable table,
 .money-receipt-printable table th,
-.money-receipt-printable table td {
+.money-receipt-printable table td,
+.isp-receipt-printable table,
+.isp-receipt-printable table th,
+.isp-receipt-printable table td,
+.isp-receipt-printable p,
+.isp-receipt-printable span {
   font-size: 12px !important;
 }
 
 .invoice-printable .invoice-transparent-box,
 .invoice-printable .invoice-subtotal-box,
 .quotation-printable .quotation-transparent-box,
-.money-receipt-printable .invoice-transparent-box {
+.money-receipt-printable .invoice-transparent-box,
+.isp-receipt-printable .isp-transparent-box {
   font-size: 12px !important;
 }
 
@@ -368,7 +391,8 @@ html, body {
 /* ইনভয়েস ও কোটেশন টেবিল হেডার ও শিরোনাম ঘর প্রিমিয়াম গ্লসি অ্যাশ কালার স্টাইলিং */
 .silver-title-badge,
 .invoice-printable .silver-title-badge,
-.quotation-printable .silver-title-badge {
+.quotation-printable .silver-title-badge,
+.isp-receipt-printable .silver-title-badge {
   background: linear-gradient(180deg, #ffffff 0%, #edf2f7 32%, #d8e1e8 68%, #e6ecf2 100%) !important;
   background-color: #e2e8f0 !important;
   color: #090d16 !important;
@@ -384,7 +408,8 @@ html, body {
 
 .silver-header-row,
 .invoice-printable thead tr,
-.quotation-printable thead tr {
+.quotation-printable thead tr,
+.isp-receipt-printable thead tr {
   background: linear-gradient(180deg, #ffffff 0%, #edf2f7 28%, #d8e1e8 68%, #e4ecf3 100%) !important;
   background-color: #e2e8f0 !important;
   color: #090d16 !important;
@@ -397,7 +422,8 @@ html, body {
 
 .silver-header-row th,
 .invoice-printable thead th,
-.quotation-printable thead th {
+.quotation-printable thead th,
+.isp-receipt-printable thead th {
   background: linear-gradient(180deg, #ffffff 0%, #edf2f7 28%, #d8e1e8 68%, #e4ecf3 100%) !important;
   background-color: #e2e8f0 !important;
   color: #090d16 !important;

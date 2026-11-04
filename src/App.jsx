@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
+import {
+  Loader2,
   ShoppingCart, Users, User, Plus, X, Trash2, Printer, Search, Barcode, TrendingUp, DollarSign, 
   Edit, Edit3, History, ArrowDownRight, ArrowUpRight, LogOut, Shield, Truck, FileText, CheckCircle, 
   UserPlus, Calendar, RotateCcw, Wrench, Bell, AlertTriangle, CheckSquare, Clock, Filter, Eye, 
@@ -194,7 +195,7 @@ function App() {
     title: '',
     model: '',
     charge: '',
-    warranty: '1 month'
+    warranty: ''
   });
 
   // অপশন পারমিশন ও অ্যাক্সেস নিয়ন্ত্রণ হেল্পার
@@ -305,6 +306,55 @@ function App() {
   const [companyReturnDate, setCompanyReturnDate] = useState(new Date().toISOString().slice(0, 10));
   const [companyReturnImage, setCompanyReturnImage] = useState('');
   const [isSubmittingCompanyReturn, setIsSubmittingCompanyReturn] = useState(false);
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
+  const [isSubmittingCheckout, setIsSubmittingCheckout] = useState(false);
+  const [isSubmittingCustomerPay, setIsSubmittingCustomerPay] = useState(false);
+  const [isSubmittingSupplierPay, setIsSubmittingSupplierPay] = useState(false);
+  const [isSubmittingExpense, setIsSubmittingExpense] = useState(false);
+
+  // ডুপ্লিকেট সাবমিশন ও ডাবল-ক্লিক প্রতিরোধ ট্র্যাকার
+  const submissionTrackerRef = useRef({
+    inFlight: {},
+    recent: {}
+  });
+
+  const checkDuplicateSubmission = (actionType, payloadObj, timeWindowMs = 10000) => {
+    const signature = typeof payloadObj === 'string' ? payloadObj : JSON.stringify(payloadObj || {});
+    const now = Date.now();
+
+    if (submissionTrackerRef.current.inFlight[actionType]) {
+      alert(txt(
+        '⚠️ অনুরোধ ইতিমধ্যে প্রক্রিয়াধীন রয়েছে! দয়া করে অপেক্ষা করুন, বারবার ক্লিক করবেন না।',
+        '⚠️ Request is being processed! Please wait, do not click multiple times.'
+      ));
+      return false;
+    }
+
+    const lastSub = submissionTrackerRef.current.recent[actionType];
+    if (lastSub && lastSub.signature === signature && (now - lastSub.time) < timeWindowMs) {
+      alert(txt(
+        '⚠️ সতর্কবার্তা: একই তথ্য ইতিমধ্যে একবার এন্ট্রি করা হয়েছে! একই এন্ট্রি দ্বিতীয়বার যোগ হবে না।',
+        '⚠️ Warning: Identical entry was already submitted! Duplicate entry prevented.'
+      ));
+      return false;
+    }
+
+    return true;
+  };
+
+  const startSubmission = (actionType) => {
+    submissionTrackerRef.current.inFlight[actionType] = true;
+  };
+
+  const endSubmission = (actionType, payloadObj = null, recordSuccess = true) => {
+    delete submissionTrackerRef.current.inFlight[actionType];
+    if (recordSuccess && payloadObj) {
+      submissionTrackerRef.current.recent[actionType] = {
+        signature: typeof payloadObj === 'string' ? payloadObj : JSON.stringify(payloadObj),
+        time: Date.now()
+      };
+    }
+  };
   const [showReturnSlipModal, setShowReturnSlipModal] = useState(false);
   const [activeReturnSlip, setActiveReturnSlip] = useState(null);
 
@@ -808,6 +858,12 @@ function App() {
     e.preventDefault();
     if (!expenseForm.amount || Number(expenseForm.amount) <= 0) return alert(txt('টাকার সঠিক পরিমাণ দিন!', 'Please enter a valid amount!'));
 
+    const actionKey = `expense_${expenseForm.category}_${expenseForm.amount}_${selectedDate}_${(expenseForm.note || '').trim()}`;
+    if (!checkDuplicateSubmission('expense', actionKey)) return;
+
+    startSubmission('expense');
+    setIsSubmittingExpense(true);
+
     try {
       const res = await fetch(`${API_BASE}/expenses`, {
         method: 'POST',
@@ -816,15 +872,20 @@ function App() {
       });
       const data = await res.json();
       if (res.ok) {
+        endSubmission('expense', actionKey, true);
         alert(txt('✅ খরচ সফলভাবে যোগ হয়েছে!', '✅ Expense added successfully!'));
         setExpenseForm({ category: 'চা/নাস্তা ও আপ্যায়ন', amount: '', note: '' });
         fetchExpenses(selectedDate);
         fetchDailySummary(selectedDate);
       } else {
+        endSubmission('expense', null, false);
         alert(txt('এরর: ', 'Error: ') + data.error);
       }
     } catch {
+      endSubmission('expense', null, false);
       alert(txt('সার্ভার এরর', 'Server error'));
+    } finally {
+      setIsSubmittingExpense(false);
     }
   };
 
@@ -961,7 +1022,7 @@ function App() {
     const prod = products.find(p => p.id === Number(prodId));
     if (prod) {
       setEditProductPrice(prod.selling_price !== undefined ? prod.selling_price : '');
-      setEditProductWarranty(prod.warranty || '');
+      setEditProductWarranty('');
       setEditProductModel(prod.model || '');
       setEditProductQty(1);
       setEditProductSerials([]);
@@ -1439,7 +1500,7 @@ function App() {
       name: '',
       model: '',
       category: '',
-      warranty: '1 Year',
+      warranty: '',
       qty: 1,
       selling_price: '',
       min_selling_price: 0,
@@ -1492,7 +1553,7 @@ function App() {
       name: product.name,
       model: product.model || '',
       category: product.category || 'General',
-      warranty: product.warranty || '1 Year',
+      warranty: '',
       selling_price: product.selling_price || 0,
       min_selling_price: Number(product.min_selling_price || 0),
       current_stock: product.current_stock,
@@ -1541,7 +1602,7 @@ function App() {
         name: product.name,
         model: product.model || '',
         category: product.category || 'General',
-        warranty: product.warranty || '1 Year',
+        warranty: '',
         selling_price: product.selling_price || 0,
         min_selling_price: Number(product.min_selling_price || 0),
         current_stock: product.current_stock,
@@ -1879,6 +1940,13 @@ function App() {
       })
     };
 
+    // ডুপ্লিকেট সাবমিশন রোধ
+    const checkoutSignature = `chk_${payload.customer_id || payload.customer_name}_${actualPaidAmount}_${netDiscount}_${payload.items.map(i => `${i.id}_${i.qty}_${i.selling_price}`).join(';')}`;
+    if (!checkDuplicateSubmission('checkout', checkoutSignature)) return;
+
+    startSubmission('checkout');
+    setIsSubmittingCheckout(true);
+
     try {
       const res = await fetch(`${API_BASE}/invoices`, {
         method: 'POST',
@@ -1888,6 +1956,8 @@ function App() {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || txt('ইনভয়েস সেভ হয়নি', 'Invoice not saved'));
+
+      endSubmission('checkout', checkoutSignature, true);
 
       setCompletedInvoice({
         id: data.invoice_id,
@@ -1933,8 +2003,11 @@ function App() {
       fetchDailySummary(selectedDate);
 
     } catch (err) {
+      endSubmission('checkout', null, false);
       console.error('Checkout error:', err);
       alert(txt('ইনভয়েস তৈরিতে এরর: ', 'Invoice creation error: ') + err.message);
+    } finally {
+      setIsSubmittingCheckout(false);
     }
   };
 
@@ -1951,15 +2024,22 @@ function App() {
 
   const handleProductSubmit = async (e) => {
     e.preventDefault();
+    const payload = {
+      ...formData,
+      barcode: (formData.barcode && typeof formData.barcode === 'string' && formData.barcode.trim()) ? formData.barcode.trim() : null
+    };
+
+    const actionType = editingProductId ? `prod_edit_${editingProductId}` : 'prod_add';
+    const prodSignature = `${payload.name}_${payload.category}_${payload.purchase_price}_${payload.selling_price}_${payload.barcode || ''}_${payload.supplier_id || ''}`;
+    if (!checkDuplicateSubmission(actionType, prodSignature)) return;
+
+    startSubmission(actionType);
+    setIsSubmittingProduct(true);
+
     const url = editingProductId ? `${API_BASE}/products/${editingProductId}` : `${API_BASE}/products`;
     const method = editingProductId ? 'PUT' : 'POST';
 
     try {
-      const payload = {
-        ...formData,
-        barcode: (formData.barcode && typeof formData.barcode === 'string' && formData.barcode.trim()) ? formData.barcode.trim() : null
-      };
-
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -1975,6 +2055,7 @@ function App() {
 
       if (!res.ok) throw new Error(data.error || txt('পণ্য সংরক্ষণে সমস্যা হয়েছে', 'Product save failed'));
 
+      endSubmission(actionType, prodSignature, true);
       alert(data.message || txt('পণ্য সফলভাবে সংরক্ষিত হয়েছে!', 'Product saved successfully!'));
       setShowProductModal(false);
       setEditingProductId(null);
@@ -1986,7 +2067,10 @@ function App() {
       fetchProducts();
       fetchSuppliers();
     } catch (err) {
+      endSubmission(actionType, null, false);
       alert(txt('পণ্য সংরক্ষণে এরর: ', 'Product save error: ') + err.message);
+    } finally {
+      setIsSubmittingProduct(false);
     }
   };
 
@@ -4065,9 +4149,11 @@ function App() {
                     <button
                       type="button"
                       onClick={handleCheckout}
-                      className="w-3/5 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold rounded-xl text-xs sm:text-sm transition cursor-pointer shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5"
+                      disabled={isSubmittingCheckout}
+                      className="w-3/5 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs sm:text-sm transition cursor-pointer shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5"
                     >
-                      <CheckCircle size={18} /> {txt('কনফার্ম ও ইনভয়েস প্রিন্ট', 'Confirm & Print Invoice')}
+                      {isSubmittingCheckout ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle size={18} />}
+                      {isSubmittingCheckout ? txt('বিল প্রক্রিয়াধীন...', 'Processing...') : txt('কনফার্ম ও ইনভয়েস প্রিন্ট', 'Confirm & Print Invoice')}
                     </button>
                   </div>
                 </div>
@@ -5904,8 +5990,9 @@ function App() {
                       )}
                     </div>
 
-                    <button type="submit" className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl cursor-pointer transition shadow-sm">
-                      {txt("+ খরচ সেভ করুন", "+ Save Expense")}
+                    <button type="submit" disabled={isSubmittingExpense} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 disabled:cursor-not-allowed text-white font-bold rounded-xl cursor-pointer transition shadow-sm flex items-center justify-center gap-2">
+                      {isSubmittingExpense && <Loader2 size={16} className="animate-spin" />}
+                      {isSubmittingExpense ? txt("সংরক্ষণ হচ্ছে...", "Saving...") : txt("+ খরচ সেভ করুন", "+ Save Expense")}
                     </button>
                   </form>
                 </div>
@@ -7928,25 +8015,34 @@ function App() {
             <h3 className="text-lg font-bold text-gray-800 mb-1">{txt("সাপ্লায়ারকে পরিশোধ", "Pay Supplier")}</h3>
             <p className="text-xs text-gray-500 mb-4">{supplierPayModal.name} {supplierPayModal.company ? `(${supplierPayModal.company})` : ''} - {txt("বকেয়া পাওনা: ৳ ", "Payable Balance: ৳ ")}{Number(supplierPayModal.total_payable).toLocaleString()}</p>
 
-            <form onSubmit={(e) => {
+            <form onSubmit={async (e) => {
               e.preventDefault();
-              fetch(`${API_BASE}/suppliers/pay`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                  supplier_id: supplierPayModal.id, 
-                  amount: supplierPayAmount, 
-                  payment_method: supplierPayMethod || 'Cash', 
-                  payment_date: supplierPayDate,
-                  note: supplierPayNote || txt('সাপ্লায়ার দেনা পরিশোধ', 'Supplier Payment') 
-                })
-              })
-              .then(r => r.json())
-              .then(data => {
-                if (data.error) {
-                  alert(data.error);
-                  return;
-                }
+              if (!supplierPayAmount || Number(supplierPayAmount) <= 0) {
+                return alert(txt('সঠিক টাকার পরিমাণ দিন!', 'Please enter a valid amount!'));
+              }
+              const suppPayload = { 
+                supplier_id: supplierPayModal.id, 
+                amount: supplierPayAmount, 
+                payment_method: supplierPayMethod || 'Cash', 
+                payment_date: supplierPayDate,
+                note: supplierPayNote || txt('সাপ্লায়ার দেনা পরিশোধ', 'Supplier Payment') 
+              };
+
+              const suppSignature = `supp_pay_${supplierPayModal.id}_${supplierPayAmount}_${supplierPayDate}`;
+              if (!checkDuplicateSubmission('supplier_pay', suppSignature)) return;
+
+              startSubmission('supplier_pay');
+              setIsSubmittingSupplierPay(true);
+              try {
+                const r = await fetch(`${API_BASE}/suppliers/pay`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(suppPayload)
+                });
+                const data = await r.json();
+                if (data.error) throw new Error(data.error);
+
+                endSubmission('supplier_pay', suppSignature, true);
                 setSupplierPayModal(null);
                 setSupplierPayAmount('');
                 setSupplierPayNote('');
@@ -7954,8 +8050,12 @@ function App() {
                 fetchExpenses(selectedDate);
                 fetchDailySummary(selectedDate);
                 alert(txt("পেমেন্ট সফলভাবে সংরক্ষিত হয়েছে এবং নির্বাচিত তারিখের খরচের তালিকায় যুক্ত হয়েছে!", "Payment recorded successfully and added to daily expenses list!"));
-              })
-              .catch(err => alert(err.message));
+              } catch (err) {
+                endSubmission('supplier_pay', null, false);
+                alert(err.message);
+              } finally {
+                setIsSubmittingSupplierPay(false);
+              }
             }} className="space-y-3">
               <div>
                 <label className="text-xs font-bold text-gray-700 block mb-1">
@@ -8018,8 +8118,9 @@ function App() {
                 />
               </div>
 
-              <button type="submit" className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg text-sm cursor-pointer shadow transition mt-2">
-                {txt("পরিশোধ নিশ্চিত করুন", "Confirm Payment")}
+              <button type="submit" disabled={isSubmittingSupplierPay} className="w-full py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white font-bold rounded-lg text-sm cursor-pointer shadow transition mt-2 flex items-center justify-center gap-2">
+                {isSubmittingSupplierPay && <Loader2 size={16} className="animate-spin" />}
+                {isSubmittingSupplierPay ? txt("পরিশোধ প্রক্রিয়াধীন...", "Processing...") : txt("পরিশোধ নিশ্চিত করুন", "Confirm Payment")}
               </button>
             </form>
           </div>
@@ -8274,8 +8375,9 @@ function App() {
                 />
               </div>
 
-              <button type="submit" className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-sm cursor-pointer shadow transition mt-2 flex items-center justify-center gap-1.5">
-                <Receipt size={16} /> {txt("জমা নিশ্চিত ও মানি রিসিপ্ট প্রদান করুন", "Confirm Receipt & Issue Money Receipt")}
+              <button type="submit" disabled={isSubmittingCustomerPay} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 disabled:cursor-not-allowed text-white font-bold rounded-lg text-sm cursor-pointer shadow transition mt-2 flex items-center justify-center gap-1.5">
+                {isSubmittingCustomerPay ? <Loader2 size={16} className="animate-spin" /> : <Receipt size={16} />}
+                {isSubmittingCustomerPay ? txt("জমা প্রক্রিয়াধীন...", "Processing...") : txt("জমা নিশ্চিত ও মানি রিসিপ্ট প্রদান করুন", "Confirm Receipt & Issue Money Receipt")}
               </button>
             </form>
           </div>
@@ -8709,9 +8811,11 @@ function App() {
                     <button
                       type="button"
                       onClick={() => handleCheckout()}
-                      className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md transition"
+                      disabled={isSubmittingCheckout}
+                      className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md transition"
                     >
-                      <CheckCircle size={15} /> {txt("বিল কনফার্ম ও সংরক্ষণ করুন", "Confirm & Save Bill")}
+                      {isSubmittingCheckout ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
+                      {isSubmittingCheckout ? txt("বিল হচ্ছে...", "Saving...") : txt("বিল কনফার্ম ও সংরক্ষণ করুন", "Confirm & Save Bill")}
                     </button>
                     <button 
                       onClick={() => window.print()} 
@@ -9392,11 +9496,42 @@ function App() {
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[11px] text-gray-500 mt-0.5 flex items-center gap-2 flex-wrap">
-                                {it.model && <span className="font-mono bg-gray-100 px-1.5 py-0.2 rounded text-gray-700">{txt("মডেল:", "Model:")} {it.model}</span>}
-                                {formatWarranty(it.warranty) ? (
-                                  <span className="text-blue-700 font-semibold">{txt("ওয়ারেন্টি:", "Warranty:")} {formatWarranty(it.warranty)}</span>
-                                ) : null}
+                              <div className="text-[11px] text-gray-500 mt-1 flex items-center gap-2 flex-wrap">
+                                {it.model && <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">{txt("মডেল:", "Model:")} {it.model}</span>}
+                                <div className="flex items-center gap-1.5 bg-blue-50/80 px-2 py-0.5 rounded border border-blue-200">
+                                  <span className="text-blue-900 font-bold text-[10px]">{txt("ওয়ারেন্টি:", "Warranty:")}</span>
+                                  <select
+                                    value={['1 month', '3 months', '6 months', '1 year', '2 years', '3 years', 'লাইফটাইম', 'নন-ওয়ারেন্টি'].includes(it.warranty) ? it.warranty : (it.warranty ? 'custom' : 'নন-ওয়ারেন্টি')}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setEditItems(editItems.map((item, i) => i === idx ? { 
+                                        ...item, 
+                                        warranty: val === 'নন-ওয়ারেন্টি' ? '' : (val === 'custom' ? (item.warranty || '') : val) 
+                                      } : item));
+                                    }}
+                                    className="bg-white border border-blue-300 rounded px-1.5 py-0.5 text-[10px] font-semibold text-blue-900 outline-none cursor-pointer"
+                                  >
+                                    <option value="নন-ওয়ারেন্টি">{txt('নন-ওয়ারেন্টি', 'No Warranty')}</option>
+                                    <option value="1 month">1 month</option>
+                                    <option value="3 months">3 months</option>
+                                    <option value="6 months">6 months</option>
+                                    <option value="1 year">1 year</option>
+                                    <option value="2 years">2 years</option>
+                                    <option value="3 years">3 years</option>
+                                    <option value="লাইফটাইম">{txt('লাইফটাইম', 'Lifetime')}</option>
+                                    <option value="custom">{txt('কাস্টম...', 'Custom...')}</option>
+                                  </select>
+                                  <input
+                                    type="text"
+                                    placeholder={txt("কাস্টম মেয়াদ...", "Custom...")}
+                                    value={it.warranty || ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setEditItems(editItems.map((item, i) => i === idx ? { ...item, warranty: val } : item));
+                                    }}
+                                    className="w-24 bg-white border border-blue-300 rounded px-1.5 py-0.5 text-[10px] outline-none font-semibold text-blue-950 focus:border-blue-600"
+                                  />
+                                </div>
                               </div>
                               {/* সিরিয়াল প্রদর্শন ও হাইলাইটিং */}
                               {((it.selected_serials && it.selected_serials.length > 0) || it.serial_numbers) && (

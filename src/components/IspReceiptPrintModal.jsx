@@ -533,7 +533,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
           <div 
             ref={printableRef}
             id="isp-printable-receipt"
-            className="isp-receipt-printable relative w-full max-w-[720px] bg-white p-7 md:p-9 shadow-md print:shadow-none border border-slate-200 print:border-none min-h-[960px] md:min-h-[1050px] print:min-h-[1050px] flex flex-col justify-between overflow-hidden text-slate-900"
+            className="isp-receipt-printable relative w-full max-w-[720px] bg-white p-5 md:p-7 shadow-md print:shadow-none border border-slate-200 print:border-none min-h-[880px] md:min-h-[940px] print:h-[268mm] print:max-h-[268mm] flex flex-col justify-between overflow-hidden text-slate-900"
             style={{ boxSizing: 'border-box' }}
           >
             {/* স্পষ্ট দৃশ্যমান এফসি টেকনোলজি ওয়াটারমার্ক / জলছাপ */}
@@ -541,7 +541,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
               <img 
                 src="/fc_logo_watermark.png" 
                 alt="FC Watermark" 
-                className="w-80 md:w-[440px] max-w-[85%] opacity-[0.09] md:opacity-[0.11] select-none object-contain print:opacity-[0.09]"
+                className="w-96 md:w-[460px] max-w-[85%] opacity-[0.16] md:opacity-[0.18] select-none object-contain print:opacity-[0.15]"
                 onError={(e) => {
                   e.target.src = '/fc_brand_watermark.png';
                 }}
@@ -555,13 +555,13 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
               <div className="flex-1 flex flex-col">
                 
                 {/* ১.১ হেডার অংশ (আইএসপি মানি রিসিপ্ট ও বিলে শুধু FC লোগোটি আসবে) */}
-                <div className="flex items-start justify-between border-b-2 border-slate-900 pb-4 mb-4">
+                <div className="flex items-start justify-between border-b-2 border-slate-900 pb-2 mb-2">
                   <div className="flex items-center gap-3.5">
                     {/* শুধু এফসি লোগো আইকন */}
                     <img 
                       src="/fc_logo_icon.png" 
                       alt="FC Logo" 
-                      className="h-16 w-16 md:h-18 md:w-18 object-contain shrink-0 select-none"
+                      className="h-14 w-14 md:h-16 md:w-16 object-contain shrink-0 select-none"
                       onError={(e) => { e.target.style.display = 'none'; }}
                     />
                     <div>
@@ -582,19 +582,19 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
 
                   {/* ডকুমেন্ট টাইপ ব্যাজ (মানি রিসিপ্ট vs মাসিক বিল) */}
                   <div className="text-right flex flex-col items-end">
-                    <div className="bg-slate-900 text-white px-3.5 py-1.5 rounded-xl text-center shadow-sm print:shadow-none">
-                      <span className="text-[11px] font-black uppercase tracking-wider block leading-tight">
+                    <div className="silver-title-badge px-3.5 py-1 rounded-xl text-center shadow-xs">
+                      <span className="text-[12px] font-black uppercase tracking-wider block leading-tight text-slate-900">
                         {docMode === 'receipt' 
                           ? txt('মানি রিসিপ্ট', 'MONEY RECEIPT') 
                           : txt('মাসিক ইন্টারনেট বিল', 'MONTHLY INTERNET BILL')}
                       </span>
-                      <span className="text-[9px] text-slate-300 font-mono tracking-wide block">
+                      <span className="text-[10px] text-slate-700 font-mono tracking-wide block font-bold">
                         {docMode === 'receipt' 
                           ? txt('বিল পরিশোধ রশিদ', 'PAYMENT RECEIPT') 
                           : txt('ইন্টারনেট বিল চালান', 'INTERNET BILL INVOICE')}
                       </span>
                     </div>
-                    <div className="mt-2 text-right text-[11px]">
+                    <div className="mt-1.5 text-right text-[12px]">
                       <p className="font-bold text-slate-900">
                         {docMode === 'receipt' ? txt('রশিদ নং: ', 'Receipt No: ') : txt('বিল নং: ', 'Bill No: ')}
                         <span className="font-mono text-blue-900">{receipt_no}</span>
@@ -612,8 +612,8 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                 </div>
 
                 {/* ১.২ গ্রাহক পরিচিতি গ্রিড */}
-                <div className="bg-white/40 border border-slate-200/90 rounded-2xl p-3.5 mb-4 text-xs backdrop-blur-[0.5px] print:bg-transparent print:border-slate-300">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="isp-transparent-box bg-white/40 border border-slate-200/90 rounded-2xl p-2.5 mb-2 text-[12px] backdrop-blur-[0.5px] print:bg-transparent print:border-slate-300">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[12px]">
                     <div>
                       <span className="text-[10px] text-slate-500 uppercase font-bold block leading-tight">{txt('গ্রাহকের নাম:', 'Customer Name:')}</span>
                       <span className="font-bold text-slate-900 text-[13px] block leading-tight mt-0.5">{customer_name}</span>
@@ -679,20 +679,20 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                 </div>
 
                 {/* ১.৩ বিল / লেনদেন বিবরণী টেবিল (স্বচ্ছ ব্যাকগ্রাউন্ড) */}
-                <div className="border border-slate-300/90 rounded-xl overflow-hidden mb-4 bg-white/30 backdrop-blur-[0.5px] print:bg-transparent print:border-slate-300">
+                <div className="isp-transparent-box border border-slate-300/90 rounded-xl overflow-hidden mb-2 bg-white/30 backdrop-blur-[0.5px] print:bg-transparent print:border-slate-300">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
-                      <tr className="bg-slate-900 text-white text-[11px] uppercase tracking-wider">
-                        <th className="py-2.5 px-3 w-12 text-center">{txt('নং', 'SL')}</th>
-                        <th className="py-2.5 px-4">{txt('সেবা / ফি এর বিবরণ', 'Service / Fee Description')}</th>
-                        <th className="py-2.5 px-3 text-center">{txt('মেয়াদকাল', 'Period')}</th>
-                        <th className="py-2.5 px-4 text-right">{txt('পরিমাণ (টাকা)', 'Amount (BDT)')}</th>
+                      <tr className="silver-header-row text-slate-900 text-[12px] uppercase tracking-wider font-extrabold border-y border-slate-400">
+                        <th className="py-1 px-3 w-12 text-center font-extrabold">{txt('নং', 'SL')}</th>
+                        <th className="py-1 px-3 font-extrabold">{txt('সেবার বিবরণ', 'Service Description')}</th>
+                        <th className="py-1 px-3 text-center font-extrabold">{txt('মেয়াদকাল', 'Period')}</th>
+                        <th className="py-1 px-3 text-right font-extrabold">{txt('পরিমাণ (টাকা)', 'Amount (BDT)')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200/90 text-slate-800">
                       <tr className="hover:bg-slate-50/40 bg-transparent print:bg-transparent">
-                        <td className="py-2.5 px-3 text-center font-mono font-bold">{txt('০১', '01')}</td>
-                        <td className="py-2.5 px-4">
+                        <td className="py-1.5 px-3 text-center font-mono font-bold text-[12px]">{txt('০১', '01')}</td>
+                        <td className="py-1.5 px-3 text-[12px]">
                           <span className="font-bold text-slate-900 block">
                             {txt(
                               `ইন্টারনেট মাসিক সাবস্ক্রিপশন ফি (${speed || 'Standard'})${monthsCount > 1 ? ` (${monthsCount} মাসের মোট বকেয়া)` : ''}`,
@@ -706,7 +706,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                             }
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-[11px]">
+                        <td className="py-1.5 px-3 text-center font-mono text-[12px]">
                           {displayBillingMonth}
                         </td>
                         <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
@@ -735,9 +735,9 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                 </div>
 
                 {/* ১.৪ টাকার হিসাব এবং কথায় রূপান্তর (স্বচ্ছ ব্যাকগ্রাউন্ড) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2 text-[12px]">
                   {/* বাম পাশে কথায় রূপান্তর ও পেমেন্ট মেথড */}
-                  <div className="bg-white/40 border border-slate-200/90 rounded-xl p-3 flex flex-col justify-between text-xs backdrop-blur-[0.5px] print:bg-transparent print:border-slate-300">
+                  <div className="isp-transparent-box bg-white/40 border border-slate-200/90 rounded-xl p-2.5 flex flex-col justify-between text-[12px] backdrop-blur-[0.5px] print:bg-transparent print:border-slate-300">
                     <div>
                       <span className="text-[10px] text-slate-500 font-bold uppercase block mb-1">
                         {txt('কথায় (Amount in Words):', 'Amount in Words:')}
@@ -760,7 +760,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                   </div>
 
                   {/* ডান পাশে হিসাব সারাংশ */}
-                  <div className="bg-white/40 border border-slate-200/90 rounded-xl p-3 text-xs space-y-1.5 backdrop-blur-[0.5px] print:bg-transparent print:border-slate-300">
+                  <div className="isp-transparent-box bg-white/40 border border-slate-200/90 rounded-xl p-2.5 text-[12px] space-y-1 backdrop-blur-[0.5px] print:bg-transparent print:border-slate-300">
                     <div className="flex justify-between text-slate-700">
                       <span>{txt(`সাবস্ক্রিপশন ফি${monthsCount > 1 ? ` (${monthsCount} মাস)` : ''}:`, `Subscription Fee${monthsCount > 1 ? ` (${monthsCount} mo)` : ''}:`)}</span>
                       <span className="font-mono font-bold">৳ {Number(subtotalMonthly).toLocaleString()}</span>
@@ -793,7 +793,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                 </div>
 
                 {/* ১.৫ যেভাবে বিল পরিশোধ করবেন (bKash Payment Instruction) */}
-                <div className="p-3 bg-pink-50/70 border border-pink-200/90 rounded-xl text-[11px] text-slate-800 mb-2.5 backdrop-blur-[0.5px] print:bg-slate-50/70 print:border-slate-300">
+                <div className="isp-transparent-box p-2 bg-pink-50/70 border border-pink-200/90 rounded-xl text-[11.5px] text-slate-800 mb-1.5 backdrop-blur-[0.5px] print:bg-slate-50/70 print:border-slate-300">
                   <div className="flex items-start gap-2.5">
                     <div className="w-5 h-5 rounded-full bg-[#E2136E] text-white flex items-center justify-center font-black text-[11px] shrink-0 mt-0.5 shadow-sm">
                       ৳
@@ -816,7 +816,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                 </div>
 
                 {/* ১.৬ নোট ও বিশেষ দ্রষ্টব্য */}
-                <div className="p-2.5 bg-blue-50/40 border border-blue-200/80 rounded-xl text-[10.5px] text-blue-900 mb-4 backdrop-blur-[0.5px] print:bg-transparent print:border-slate-300">
+                <div className="isp-transparent-box p-1.5 bg-blue-50/40 border border-blue-200/80 rounded-xl text-[11px] text-blue-900 mb-1.5 backdrop-blur-[0.5px] print:bg-transparent print:border-slate-300">
                   <p className="font-semibold">
                     📌 <strong>{txt('বিশেষ দ্রষ্টব্য:', 'Special Note:')}</strong> {txt(
                       'প্রতি মাসের নির্দিষ্ট মেয়াদের মধ্যে সাবস্ক্রিপশন ফি পরিশোধ করার অনুরোধ করা হচ্ছে। নিরবচ্ছিন্ন ইন্টারনেট সার্ভিস উপভোগ করার জন্য ধন্যবাদ।',
@@ -828,7 +828,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
               </div>
 
               {/* ২. ফুটার অংশ (গ্রাহকের স্বাক্ষর এবং কর্তৃপক্ষের অনুমোদিত স্বাক্ষর পেইজের একদম নিচে) */}
-              <div className="isp-signatures pt-6 mt-auto w-full pb-2">
+              <div className="isp-signatures pt-2 mt-auto w-full pb-0">
                 <div className="flex items-end justify-between px-4 md:px-6">
                   {/* গ্রাহকের স্বাক্ষর */}
                   <div className="text-center w-52">
@@ -847,7 +847,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                       <img 
                         src="/authority_seal_signature.png" 
                         alt="Authority Seal & Signature" 
-                        className="w-32 md:w-36 object-contain pointer-events-none drop-shadow-sm select-none"
+                        className="w-28 md:w-32 object-contain pointer-events-none drop-shadow-sm select-none"
                         onError={(e) => {
                           e.target.style.display = 'none';
                         }}
@@ -863,7 +863,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                   </div>
                 </div>
 
-                <div className="mt-4 text-center text-[10px] text-slate-400 font-mono">
+                <div className="mt-2 text-center text-[10px] text-slate-400 font-mono">
                   {txt(
                     `এটি এফসি টেকনোলজির অফিসিয়াল কম্পিউটার জেনারেটেড ${docMode === 'receipt' ? 'মানি রিসিপ্ট' : 'মাসিক ইন্টারনেট বিল'}।`,
                     `This is a computer generated official ${docMode === 'receipt' ? 'Money Receipt' : 'Monthly Internet Bill'} with verified watermark from FC Technology.`
