@@ -2811,7 +2811,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#060b19] via-[#091533] to-[#0d1d47] flex flex-col font-sans text-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-[#060b19] via-[#091533] to-[#0d1d47] flex flex-col font-sans text-slate-100 print:bg-white print:text-black">
       {/* টপ কালারফুল অ্যাকসেন্ট বার */}
       <div className="h-1 bg-gradient-to-r from-blue-600 via-indigo-500 via-purple-500 via-pink-500 via-amber-500 to-emerald-500 print:hidden shrink-0"></div>
 
@@ -6763,7 +6763,7 @@ function App() {
                   <option value="">{txt("-- কোনো সাপ্লায়ার নেই (Direct / Cash Purchase) --", "-- No Supplier (Direct / Cash Purchase) --")}</option>
                   {suppliers.map(sup => (
                     <option key={sup.id} value={sup.id}>
-                      {sup.name} {sup.company ? `(${sup.company})` : ''} - {txt("মোবাইল:", "Mobile:")} {sup.mobile || txt('নেই', 'None')}
+                      {sup.company ? (sup.name ? `${sup.company} (${sup.name})` : sup.company) : sup.name} - {txt("মোবাইল:", "Mobile:")} {sup.mobile || txt('নেই', 'None')}
                     </option>
                   ))}
                 </select>
@@ -7395,7 +7395,7 @@ function App() {
                 <label className="text-xs font-bold text-gray-700">{txt("সাপ্লায়ার সিলেক্ট করুন", "Select Supplier")}</label>
                 <select value={stockInSupplier} onChange={e => setStockInSupplier(e.target.value)} className="w-full border p-2 rounded text-xs mt-1 bg-white">
                   <option value="">{txt("সাপ্লায়ার ছাড়া (Direct/Own)", "Without Supplier (Direct/Own)")}</option>
-                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.company})</option>)}
+                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.company ? (s.name ? `${s.company} (${s.name})` : s.company) : s.name}</option>)}
                 </select>
               </div>
 
@@ -7511,7 +7511,7 @@ function App() {
                   <option value="">{txt("সাপ্লায়ার নির্দিষ্ট নয় / সরাসরি স্টক সমন্বয়", "No specific supplier / Stock adjust only")}</option>
                   {suppliers.map(s => (
                     <option key={s.id} value={s.id}>
-                      {s.name} {s.company ? `(${s.company})` : ''} — {txt("বর্তমান বকেয়া পাওনা:", "Current Payable:")} ৳{Number(s.total_payable || 0).toLocaleString()}
+                      {s.company ? (s.name ? `${s.company} (${s.name})` : s.company) : s.name} — {txt("বর্তমান বকেয়া পাওনা:", "Current Payable:")} ৳{Number(s.total_payable || 0).toLocaleString()}
                     </option>
                   ))}
                 </select>
@@ -7841,7 +7841,7 @@ function App() {
                 >
                   <option value="">{lang === 'en' ? '-- Select Supplier --' : '-- সাপ্লায়ার সিলেক্ট করুন --'}</option>
                   {suppliers.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} {s.company ? `(${s.company})` : ''} - {txt("দেনা:", "Payable:")} ৳{Number(s.total_payable || 0).toLocaleString()}</option>
+                    <option key={s.id} value={s.id}>{s.company ? (s.name ? `${s.company} (${s.name})` : s.company) : s.name} - {txt("দেনা:", "Payable:")} ৳{Number(s.total_payable || 0).toLocaleString()}</option>
                   ))}
                 </select>
               </div>

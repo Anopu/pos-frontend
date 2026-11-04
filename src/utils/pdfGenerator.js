@@ -112,7 +112,7 @@ export function downloadPdfFile(blobOrFile, filename) {
 export async function findPrintableElement(elementId = 'printable-content', maxRetries = 10) {
   for (let i = 0; i < maxRetries; i++) {
     const el = document.getElementById(elementId) || 
-               document.querySelector('.invoice-printable, .quotation-printable, .statement-printable, .money-receipt-printable, .warranty-slip-printable, #printable-content');
+               document.getElementById('isp-printable-receipt') || document.querySelector('.invoice-printable, .quotation-printable, .statement-printable, .money-receipt-printable, .warranty-slip-printable, .isp-receipt-printable, #printable-content, #isp-printable-receipt');
     if (el) return el;
     await new Promise(res => setTimeout(res, 60));
   }
@@ -201,6 +201,41 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
         .money-receipt-printable table td {
           vertical-align: middle !important;
           line-height: 1.35 !important;
+        }
+        .font-mono, font-mono, code {
+          font-family: 'Courier New', Courier, monospace !important;
+        }
+        .isp-receipt-printable {
+          font-size: 12px !important;
+        }
+        .isp-receipt-printable table {
+          border-collapse: collapse !important;
+          width: 100% !important;
+        }
+        .isp-receipt-printable table tr {
+          vertical-align: middle !important;
+        }
+        .isp-receipt-printable table th,
+        .isp-receipt-printable table td {
+          vertical-align: middle !important;
+          line-height: 1.35 !important;
+        }
+        .isp-receipt-printable .grid > div {
+          display: block !important;
+          vertical-align: top !important;
+        }
+        .isp-receipt-printable .inline-flex {
+          display: inline-block !important;
+          vertical-align: middle !important;
+        }
+        .isp-signatures {
+          margin-top: auto !important;
+          padding-top: 14px !important;
+          padding-bottom: 4px !important;
+          width: 100% !important;
+          display: flex !important;
+          justify-content: space-between !important;
+          align-items: flex-end !important;
         }
         .invoice-printable table td > div,
         .invoice-printable table th > div,
@@ -316,7 +351,7 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
 
       // Find element or clone root in cloned document
       const clonedEl = clonedDoc.getElementById(element.id || 'printable-content') || 
-                       clonedDoc.querySelector('.invoice-printable, .quotation-printable, .statement-printable, .money-receipt-printable, .warranty-slip-printable, #printable-content') || 
+                       clonedDoc.getElementById('isp-printable-receipt') || clonedDoc.querySelector('.invoice-printable, .quotation-printable, .statement-printable, .money-receipt-printable, .warranty-slip-printable, .isp-receipt-printable, #printable-content, #isp-printable-receipt') || 
                        clonedDoc.body.firstElementChild;
       
       if (clonedEl) {
@@ -350,7 +385,9 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
           clonedEl.classList.contains('quotation-printable') || 
           clonedEl.classList.contains('money-receipt-printable') ||
           clonedEl.classList.contains('warranty-slip-printable') ||
-          clonedEl.id === 'printable-content'
+          clonedEl.classList.contains('isp-receipt-printable') ||
+          clonedEl.id === 'printable-content' ||
+          clonedEl.id === 'isp-printable-receipt'
         );
 
         if (isSinglePageDoc) {
@@ -366,7 +403,7 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
           clonedEl.style.padding = '28px 20px 8px 20px';
 
           // Pin signatures to the bottom
-          const sigBlock = clonedEl.querySelector('.invoice-signatures, .quotation-signatures, .money-receipt-signatures, .warranty-signatures');
+          const sigBlock = clonedEl.querySelector('.invoice-signatures, .quotation-signatures, .money-receipt-signatures, .warranty-signatures, .isp-signatures');
           if (sigBlock) {
             sigBlock.style.marginTop = 'auto';
             sigBlock.style.paddingTop = '14px';
@@ -382,7 +419,7 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
 
         // Auto-ensure authority seal & signature image is present in any printable document
         const sigBlocks = clonedDoc.querySelectorAll(
-          '.invoice-signatures, .quotation-signatures, .money-receipt-signatures, .statement-signatures, .warranty-signatures, [class*="-signatures"]'
+          '.invoice-signatures, .quotation-signatures, .money-receipt-signatures, .statement-signatures, .warranty-signatures, .isp-signatures, [class*="-signatures"]'
         );
         sigBlocks.forEach((sigBlock) => {
           const cols = Array.from(sigBlock.children);
@@ -440,6 +477,8 @@ export async function generatePdfFromElement(element, filename = 'FC_Technology_
     element.classList.contains('quotation-printable') || 
     element.classList.contains('money-receipt-printable') ||
     element.classList.contains('warranty-slip-printable') ||
+    element.classList.contains('isp-receipt-printable') ||
+    element.id === 'isp-printable-receipt' ||
     imgHeight <= pageHeight + 5
   );
 

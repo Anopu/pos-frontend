@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   X, Printer, Download, Share2, MessageCircle, Phone, 
   Mail, Check, Copy, FileText, CheckCircle2, ShieldCheck, Sparkles, Loader2, Globe, Edit3 
@@ -22,6 +23,15 @@ export default function IspReceiptPrintModal({
   useEffect(() => {
     setDocLang(lang);
   }, [lang]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('isp-receipt-open');
+      return () => {
+        document.body.classList.remove('isp-receipt-open');
+      };
+    }
+  }, [isOpen]);
 
   if (!isOpen || !receiptData) return null;
 
@@ -376,9 +386,9 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
     }
   };
 
-  return (
+  const modalElement = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 bg-slate-950/80 backdrop-blur-sm overflow-y-auto print:p-0 print:bg-white print:static">
-      <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto border border-slate-200 print:shadow-none print:border-none print:rounded-none">
+      <div className="print-card-wrapper relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto border border-slate-200 print:shadow-none print:border-none print:rounded-none">
         
         {/* টপ কন্ট্রোল বার (প্রিন্টে লুকানো থাকবে) */}
         <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 px-5 py-3.5 text-white flex flex-wrap items-center justify-between gap-3 print:hidden">
@@ -573,7 +583,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                   {/* ডকুমেন্ট টাইপ ব্যাজ (মানি রিসিপ্ট vs মাসিক বিল) */}
                   <div className="text-right flex flex-col items-end">
                     <div className="bg-slate-900 text-white px-3.5 py-1.5 rounded-xl text-center shadow-sm print:shadow-none">
-                      <span className="text-[11px] font-black uppercase tracking-wider block">
+                      <span className="text-[11px] font-black uppercase tracking-wider block leading-tight">
                         {docMode === 'receipt' 
                           ? txt('মানি রিসিপ্ট', 'MONEY RECEIPT') 
                           : txt('মাসিক ইন্টারনেট বিল', 'MONTHLY INTERNET BILL')}
@@ -591,7 +601,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                       </p>
                       <p className="font-bold text-blue-950 mt-0.5">
                         <span className="text-slate-600 font-normal">{txt('ইউজার আইডি: ', 'User ID: ')}</span>
-                        <span className="font-mono bg-blue-100/90 text-blue-900 px-1.5 py-0.5 rounded border border-blue-300 font-black">{displayUserId}</span>
+                        <span className="font-mono bg-blue-100 text-blue-900 px-1.5 py-0.5 rounded border border-blue-300 font-black text-xs leading-none inline-block">{displayUserId}</span>
                       </p>
                       <p className="text-slate-600 mt-0.5">
                         {txt('তারিখ: ', 'Date: ')}
@@ -605,65 +615,65 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
                 <div className="bg-white/40 border border-slate-200/90 rounded-2xl p-3.5 mb-4 text-xs backdrop-blur-[0.5px] print:bg-transparent print:border-slate-300">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase font-bold block">{txt('গ্রাহকের নাম:', 'Customer Name:')}</span>
-                      <span className="font-bold text-slate-900 text-[13px]">{customer_name}</span>
+                      <span className="text-[10px] text-slate-500 uppercase font-bold block leading-tight">{txt('গ্রাহকের নাম:', 'Customer Name:')}</span>
+                      <span className="font-bold text-slate-900 text-[13px] block leading-tight mt-0.5">{customer_name}</span>
                       {receiptData?.contact_person && (
-                        <span className="text-[10px] text-slate-600 block mt-0.5">
+                        <span className="text-[10px] text-slate-600 block mt-0.5 leading-tight">
                           {txt('কন্টাক্ট: ', 'Contact: ')}<span className="font-semibold text-slate-800">{receiptData.contact_person}</span>
                         </span>
                       )}
                     </div>
-                    <div className="bg-blue-50/70 border border-blue-200/90 rounded-xl px-2.5 py-1 flex flex-col justify-center">
-                      <span className="text-[10px] text-blue-800 uppercase font-black block tracking-wider">{txt('কাস্টমার ইউজার আইডি:', 'Customer User ID:')}</span>
-                      <span className="font-mono font-black text-blue-950 text-[13.5px]">{displayUserId}</span>
+                    <div className="bg-blue-50/80 border border-blue-200 rounded-lg p-2 block">
+                      <span className="text-[10px] text-blue-800 uppercase font-black block leading-tight">{txt('কাস্টমার ইউজার আইডি:', 'Customer User ID:')}</span>
+                      <span className="font-mono font-black text-blue-950 text-[13px] block leading-tight mt-1">{displayUserId}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase font-bold block">{txt('মোবাইল নম্বর:', 'Mobile Number:')}</span>
-                      <span className="font-bold text-slate-900 font-mono text-[13px]">{customer_mobile || '-'}</span>
+                      <span className="text-[10px] text-slate-500 uppercase font-bold block leading-tight">{txt('মোবাইল নম্বর:', 'Mobile Number:')}</span>
+                      <span className="font-bold text-slate-900 font-mono text-[13px] block leading-tight mt-0.5">{customer_mobile || '-'}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase font-bold block">{txt('প্যাকেজ / স্পিড:', 'Package / Speed:')}</span>
-                      <span className="font-black text-blue-700 text-[13px]">{speed || 'Standard'}</span>
+                      <span className="text-[10px] text-slate-500 uppercase font-bold block leading-tight">{txt('প্যাকেজ / স্পিড:', 'Package / Speed:')}</span>
+                      <span className="font-black text-blue-700 text-[13px] block leading-tight mt-0.5">{speed || 'Standard'}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase font-bold block">{txt('বিলিং মাস:', 'Billing Month:')}</span>
-                      <span className="font-bold text-slate-900 text-[13px]">{displayBillingMonth}</span>
+                      <span className="text-[10px] text-slate-500 uppercase font-bold block leading-tight">{txt('বিলিং মাস:', 'Billing Month:')}</span>
+                      <span className="font-bold text-slate-900 text-[13px] block leading-tight mt-0.5">{displayBillingMonth}</span>
                     </div>
 
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase font-bold block">{txt('বিলিং ধরণ:', 'Billing Type:')}</span>
-                      <span className={`inline-flex items-center gap-1 font-bold text-[11px] px-2 py-0.5 rounded-md ${
+                      <span className="text-[10px] text-slate-500 uppercase font-bold block leading-tight">{txt('বিলিং ধরণ:', 'Billing Type:')}</span>
+                      <span className={`inline-block font-bold text-[11px] px-2 py-0.5 rounded-md leading-tight mt-1 whitespace-nowrap ${
                         billing_type === 'postpaid' 
-                          ? 'bg-blue-100 text-blue-800' 
-                          : 'bg-indigo-100 text-indigo-800'
+                          ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                          : 'bg-indigo-100 text-indigo-800 border border-indigo-200'
                       }`}>
-                        {billing_type === 'postpaid' ? txt('📅 পোস্টপেইড', '📅 Postpaid') : txt('⚡ প্রিপেইড', '⚡ Prepaid')}
+                        {billing_type === 'postpaid' ? txt('পোস্টপেইড (Postpaid)', 'Postpaid') : txt('প্রিপেইড (Prepaid)', 'Prepaid')}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase font-bold block">{txt('পেমেন্ট স্ট্যাটাস:', 'Payment Status:')}</span>
-                      <span className={`inline-flex items-center gap-1 font-bold text-[11px] px-2 py-0.5 rounded-md ${
+                      <span className="text-[10px] text-slate-500 uppercase font-bold block leading-tight">{txt('পেমেন্ট স্ট্যাটাস:', 'Payment Status:')}</span>
+                      <span className={`inline-block font-bold text-[11px] px-2 py-0.5 rounded-md leading-tight mt-1 whitespace-nowrap ${
                         isDue 
-                          ? 'bg-amber-100 text-amber-800' 
-                          : 'bg-emerald-100 text-emerald-800'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-300' 
+                          : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                       }`}>
-                        {isDue ? txt('⚠️ অপরিশোধিত / বকেয়া', '⚠️ Due / Unpaid') : txt('✓ পরিশোধিত', '✓ Paid')}
+                        {isDue ? txt('বকেয়া (Due / Unpaid)', 'Due / Unpaid') : txt('পরিশোধিত (Paid)', 'Paid')}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase font-bold block">{txt('মেয়াদ / বিলিং সাইকেল:', 'Billing Cycle / Validity:')}</span>
-                      <span className="text-slate-900 font-semibold font-mono text-[11px]">
+                      <span className="text-[10px] text-slate-500 uppercase font-bold block leading-tight">{txt('মেয়াদ / বিলিং সাইকেল:', 'Billing Cycle / Validity:')}</span>
+                      <span className="text-slate-900 font-semibold font-mono text-[11px] block leading-tight mt-0.5">
                         {cycle_start ? `${cycle_start} ${txt('হতে', 'to')} ${cycle_end || ''}` : `${cycle_end ? `${txt('পরবর্তী মেয়াদ: ', 'Next Due: ')}${cycle_end}` : '-'}`}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase font-bold block">{txt('আইপি / ইউজার:', 'IP / PPPoE User:')}</span>
-                      <span className="text-slate-900 font-mono text-[11px] font-semibold">{pppoe_username || ip_address || '-'}</span>
+                      <span className="text-[10px] text-slate-500 uppercase font-bold block leading-tight">{txt('আইপি / ইউজার:', 'IP / PPPoE User:')}</span>
+                      <span className="text-slate-900 font-mono text-[11px] font-semibold block leading-tight mt-0.5">{pppoe_username || ip_address || '-'}</span>
                     </div>
 
                     <div className="col-span-2 md:col-span-4 pt-1 border-t border-slate-200/60">
-                      <span className="text-[10px] text-slate-500 uppercase font-bold block">{txt('গ্রাহকের ঠিকানা:', 'Customer Address:')}</span>
-                      <span className="text-slate-800 font-medium">{customer_address || txt('আগ্রাবাদ, চট্টগ্রাম', 'Agrabad, Chattogram')}</span>
+                      <span className="text-[10px] text-slate-500 uppercase font-bold block leading-tight">{txt('গ্রাহকের ঠিকানা:', 'Customer Address:')}</span>
+                      <span className="text-slate-800 font-medium block leading-tight mt-0.5">{customer_address || txt('আগ্রাবাদ, চট্টগ্রাম', 'Agrabad, Chattogram')}</span>
                     </div>
                   </div>
                 </div>
@@ -818,7 +828,7 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
               </div>
 
               {/* ২. ফুটার অংশ (গ্রাহকের স্বাক্ষর এবং কর্তৃপক্ষের অনুমোদিত স্বাক্ষর পেইজের একদম নিচে) */}
-              <div className="pt-6 mt-auto w-full pb-2">
+              <div className="isp-signatures pt-6 mt-auto w-full pb-2">
                 <div className="flex items-end justify-between px-4 md:px-6">
                   {/* গ্রাহকের স্বাক্ষর */}
                   <div className="text-center w-52">
@@ -868,4 +878,6 @@ ${cycle_start && cycle_end ? `মেয়াদ: ${cycle_start} হতে ${cyc
       </div>
     </div>
   );
+
+  return createPortal(modalElement, document.body);
 }

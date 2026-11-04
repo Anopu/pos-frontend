@@ -64,6 +64,21 @@ html, body {
     display: none !important;
   }
 
+  /* যখন পোর্টাল দিয়ে ISP রিসিট প্রিন্ট হয় তখন মূল অ্যাপ #root লুকানো থাকবে */
+  body.isp-receipt-open #root,
+  body:has(#isp-printable-receipt) #root,
+  body:has(.isp-receipt-printable) #root {
+    display: none !important;
+  }
+
+  body,
+  #root,
+  .min-h-screen {
+    background: #ffffff !important;
+    background-image: none !important;
+    color: #000000 !important;
+  }
+
   html, body {
     width: 100% !important;
     min-width: 100% !important;
@@ -163,7 +178,8 @@ html, body {
 
   /* মানি রিসিপ্ট প্রিন্ট লেআউট ও একদম নিচে স্বাক্ষর */
   #printable-content.money-receipt-printable,
-  .money-receipt-printable {
+  .money-receipt-printable,
+.isp-receipt-printable {
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
@@ -278,6 +294,33 @@ html, body {
   .warranty-slip-printable .warranty-transparent-box div {
     background: transparent !important;
     background-color: transparent !important;
+  }
+
+  /* আইএসপি মানি রিসিপ্ট ও বিল প্রিন্ট লেআউট */
+  #printable-content.isp-receipt-printable,
+  #isp-printable-receipt,
+  .isp-receipt-printable {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    min-height: calc(297mm - 16mm) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .isp-signatures {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-end !important;
+    margin-top: auto !important;
+    padding-top: 1.5rem !important;
+    padding-bottom: 0.5rem !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    width: 100% !important;
   }
 
   table {
